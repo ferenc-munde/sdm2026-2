@@ -4,6 +4,12 @@ Information for participants of the Team 12 hackathon (2026-11-13 and 2026-11-14
 
 The most important information is also on the course's e-learning page: <https://elearning.unideb.hu/course/view.php?id=5322>
 
+## Meeting
+
+During the hackathon we use this Google Meet room:
+
+**https://meet.google.com/qca-ueup-nmr**
+
 ## Ground rules
 
 - **One shared repository:** every team works in this repository. No private forks or side repositories.
