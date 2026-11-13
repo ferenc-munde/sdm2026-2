@@ -41,6 +41,17 @@ yet (`pnpm --filter` cannot resolve without it). When the workspace lands
 (platform build-order step 1), commands move to `pnpm --filter @team-2/game
 …` and lockfiles are ignored on purpose until then.
 
+## Run the multiplayer lobby
+
+From `games/team-2/`, run `npm install` once and then `npm run dev`. The dev
+script starts Vite with `client/` as its root on port 5173 and the Colyseus
+lobby server on port 2567. The client keeps the train-scene speed and pause
+controls from the local harness.
+Use two browser tabs, choose the same team size, and join with distinct player
+names. The server-owned countdown is 30 seconds; the host can skip it to start
+with the current crew, including one player. When time expires, the game
+starts with whoever joined.
+
 ## Rules for code in `shared/`
 
 - Pure functions only: the same state, input and elapsed time always give the

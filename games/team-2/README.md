@@ -18,27 +18,32 @@ Work only inside this folder unless an issue says otherwise. The package was sel
 - GitHub CLI (`gh`) is **optional** — handy for issues/PRs from the terminal,
   but the web UI works fine; nothing in the run steps needs it
 
-## Run locally
+## Run the game and multiplayer lobby
 
 ```bash
 npm install
-npm run dev      # client on :5173: 2D train map + HUD + ticking local state
+npm run dev      # Vite client on :5173 and Colyseus lobby on :2567
 npm test         # headless rules tests (deterministic sim)
 npm run typecheck
 npm run build    # typecheck + client build to client/dist/ (Vite root is client/)
 npm run preview  # serve the client build
 ```
 
-> There is no server yet — the platform host is stalled (#73). The client
-> plays against a **local state adapter** (`client/stateModel.ts`) that drives
-> the real GameDefinition headless; when the platform lands, that one file is
-> swapped for `net.ts` + the Colyseus join (team-3 precedent).
+Open two browser tabs, choose the same crew size, and join with distinct names.
+The host can skip the 30-second lobby countdown and depart with the current
+crew, including one player. When the timer expires, the game starts with
+whoever joined.
+
+The lobby is networked. The existing local rules adapter and moving train scene
+remain intact after departure; gameplay simulation and player movement are not
+networked yet.
 
 On Windows PowerShell, use `npm.cmd` if `npm.ps1` is blocked. Use Node 22 LTS.
 The map is flat 2D, displayed by Three.js with five vertical carriages, 20
 station locations, four passages, scrolling scenery and a carriage inspector.
-Crew artwork is still static: queued movement inputs are not a completed
-player movement feature.
+The landscape scrolls in the scene preview and follows speed in local rules.
+Crew artwork remains fixed in place; player movement is a separate unfinished
+feature.
 
 The **Local rules** mode displays actual state from the adapter and keeps
 WASD/arrows, E pickup and Q drop input wiring. Current rule modules are partly
@@ -49,10 +54,11 @@ Choose **Scene preview** to use the separate example controls: repair,
 journey/time, speed (0–2x), pause, victory, defeat and reset. These controls
 never modify the adapter state. Switch back to Local rules to see live state.
 The standalone HUD preview is also available with `node client/preview-hud.mjs`
-on port 5174. Neither mode connects multiple browser tabs as network players.
+on port 5174. The lobby connects browser tabs for crew assembly; match
+gameplay state remains local to each browser for now.
 
-Two browser tabs at `localhost:5173` = two players, once real networking
-lands (#70).
+Two browser tabs at `localhost:5173` can join the same lobby; gameplay state
+after departure remains local to each browser for now.
 
 ## Workflow (repo rules — see root `CLAUDE.md`)
 

@@ -4,6 +4,7 @@ import { createLocalStateModel } from "./stateModel.ts";
 import { localStateToHud } from "./state-to-hud";
 import gameConfig from "../config/game.json";
 import { TRAIN_CARS } from "./train-map";
+import { mountLobby } from "./lobby";
 import "./hud.css";
 import "./styles.css";
 
@@ -104,7 +105,13 @@ function onKey(event: KeyboardEvent) {
 window.addEventListener("keydown", onKey);
 model.onTick(update);
 reset(); syncMode(); model.start();
+const lobby = mountLobby(document.body, (match) => {
+  // The lobby is networked; gameplay still uses the existing local rules adapter.
+  if (isPreview()) journey.phase = "running";
+  update();
+  status.value = `Crew aboard · ${match.playerCount}/${match.teamSize} · ${match.players.map((player) => player.name).join(", ")}`;
+});
 window.addEventListener("pagehide", () => {
   model.stop(); window.removeEventListener("keydown", onKey);
-  trainScene?.destroy(); hud.destroy();
+  lobby.destroy(); trainScene?.destroy(); hud.destroy();
 });
