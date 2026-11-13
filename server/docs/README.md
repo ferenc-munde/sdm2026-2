@@ -2,6 +2,10 @@
 
 Documentation for the platform, next to [../ARCHITECTURE.md](../ARCHITECTURE.md) and [../CLAUDE.md](../CLAUDE.md).
 
+Written so far:
+
+- [`LOBBY_AND_JOIN.md`](LOBBY_AND_JOIN.md): how creating a room, joining by code, invite links and reconnecting worked on the previous hackathon's platform; the design to follow here.
+
 Planned documents (written by the platform team as the parts are built):
 
 - `CLIENT_GUIDE.md`: for game teams: connecting, join by code, reconnect, messages, routes, debugging.
