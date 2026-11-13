@@ -1,5 +1,7 @@
 import "./styles.css";
 import { MockSessionAdapter, SessionError, type LobbyPlayer, type SessionAdapter, type SessionEvent } from "./session-adapter.mjs";
+import { createPreviewSnapshot, MockGameStateAdapter } from "./game-state-adapter.mjs";
+import { mountSceneView } from "./gameplay-view";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Lobby root element #app was not found.");
@@ -54,7 +56,9 @@ app.innerHTML = `
     <div class="room-meta"><span class="status-chip"><span class="live-dot"></span><span id="connection-label">CONNECTED</span></span><span class="room-code-label">CREW CODE <strong id="active-code"></strong></span><span class="room-capacity" id="room-capacity"></span></div>
     <ul id="player-list" class="player-list" aria-label="Connected crew members"></ul>
     <p class="room-footnote"><span class="live-dot"></span> Waiting for the crew to assemble</p>
+    <button id="board-train" class="button button-primary board-button" type="button"><span>Board the train</span><span aria-hidden="true">↗</span></button>
   </section>
+  <section id="game-screen" class="game-screen" aria-label="Train journey" hidden></section>
   <footer class="footer"><span>NO. 001 — THE NIGHT LINE</span><span>DESTINATION UNKNOWN</span></footer>
 `;
 
@@ -63,10 +67,14 @@ const room = app.querySelector<HTMLElement>("#crew-room")!;
 const playerList = app.querySelector<HTMLUListElement>("#player-list")!;
 const createButton = app.querySelector<HTMLButtonElement>("#create-session")!;
 const joinButton = app.querySelector<HTMLButtonElement>("#join-session")!;
+const gameScreen = app.querySelector<HTMLElement>("#game-screen")!;
+let gameplayAdapter: MockGameStateAdapter | undefined;
+let disposeGameplay: (() => void) | undefined;
 
 createButton.addEventListener("click", () => void connect("create"));
 joinButton.addEventListener("click", () => void connect("join"));
 app.querySelector<HTMLButtonElement>("#leave-session")!.addEventListener("click", () => void disconnect());
+app.querySelector<HTMLButtonElement>("#board-train")!.addEventListener("click", startGameplayPreview);
 app.querySelector<HTMLInputElement>("#room-code")!.addEventListener("input", (event) => {
   const input = event.currentTarget as HTMLInputElement;
   input.value = input.value.replace(/[^a-z0-9]/gi, "").toUpperCase();
@@ -122,6 +130,32 @@ function handleSessionEvent(event: SessionEvent): void {
     showFeedback(`${event.player.name} left the crew.`, "neutral");
   }
   renderRoom();
+  if (gameplayAdapter) {
+    gameplayAdapter.publish({ ...gameplayAdapter.getSnapshot(), players: createPreviewSnapshot(crew).players });
+  }
+}
+
+function startGameplayPreview(): void {
+  if (!roomCode || gameplayAdapter) return;
+  gameplayAdapter = new MockGameStateAdapter(createPreviewSnapshot(crew));
+  for (const selector of [".hero", ".preview-note", ".lobby-grid", "#feedback", "#crew-room"]) {
+    app.querySelector<HTMLElement>(selector)!.hidden = true;
+  }
+  gameScreen.hidden = false;
+  disposeGameplay = mountSceneView(gameScreen, gameplayAdapter, {
+    roomCode,
+    onExit: returnToCrew,
+  });
+}
+
+function returnToCrew(): void {
+  disposeGameplay?.();
+  disposeGameplay = undefined;
+  gameplayAdapter = undefined;
+  gameScreen.hidden = true;
+  for (const selector of [".hero", ".preview-note", ".lobby-grid", "#feedback", "#crew-room"]) {
+    app.querySelector<HTMLElement>(selector)!.hidden = false;
+  }
 }
 
 function renderRoom(): void {
