@@ -10,8 +10,8 @@ import {
   nameProblem,
   normaliseCode,
   normaliseName,
-  shareLink,
 } from "./lobbyModel.ts";
+import { buildRoomLink } from "./roomLinks.ts";
 
 export interface LobbyHandlers {
   onCreate(name: string): void;
@@ -30,6 +30,8 @@ export interface Lobby {
   reset(): void;
   /** Hides the menu, for example once the room is joined. */
   hide(): void;
+  /** Shows the menu again (used by "back to menu"). */
+  show(): void;
   dispose(): void;
 }
 
@@ -187,7 +189,7 @@ export function createLobby(container: HTMLElement, handlers: LobbyHandlers): Lo
       error.hidden = true;
       roomTitle.textContent = "Room ready";
       roomCode.textContent = code;
-      roomLink.textContent = shareLink(code, window.location.origin);
+      roomLink.textContent = buildRoomLink(window.location.href, code);
       room.hidden = false;
     },
     updateError(code: ErrorCode): void {
@@ -206,6 +208,9 @@ export function createLobby(container: HTMLElement, handlers: LobbyHandlers): Lo
     },
     hide(): void {
       root.hidden = true;
+    },
+    show(): void {
+      root.hidden = false;
     },
     dispose(): void {
       root.remove();

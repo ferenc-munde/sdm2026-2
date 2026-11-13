@@ -1,15 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  canCreate,
-  canJoin,
-  codeFromHash,
-  codeProblem,
-  errorText,
-  nameProblem,
-  normaliseCode,
-  normaliseName,
-  shareLink,
-} from "./lobbyModel.ts";
+import { canCreate, canJoin, codeProblem, errorText, nameProblem, normaliseCode, normaliseName } from "./lobbyModel.ts";
 
 describe("name and code", () => {
   it("trims the name", () => {
@@ -49,7 +39,7 @@ describe("name and code", () => {
 
 describe("error copy", () => {
   it("has a plain sentence for every error code", () => {
-    const codes = ["roomNotFound", "roomFull", "gameInProgress", "invalidName", "invalidMessage"] as const;
+    const codes = ["roomNotFound", "roomFull", "gameInProgress", "invalidName", "invalidMessage", "notHost"] as const;
     for (const code of codes) {
       const text = errorText(code);
       expect(text.length).toBeGreaterThan(10);
@@ -58,16 +48,4 @@ describe("error copy", () => {
   });
 });
 
-describe("shared links", () => {
-  it("builds a link with the code in the hash", () => {
-    expect(shareLink("k7qf", "https://example.test/team-3/")).toBe("https://example.test/team-3/#K7QF");
-    expect(shareLink("K7QF", "https://example.test")).toBe("https://example.test/#K7QF");
-  });
 
-  it("reads a code back out of a hash", () => {
-    expect(codeFromHash("#k7qf")).toBe("K7QF");
-    expect(codeFromHash("#K7QF")).toBe("K7QF");
-    expect(codeFromHash("")).toBeNull();
-    expect(codeFromHash("#abc")).toBeNull();
-  });
-});
