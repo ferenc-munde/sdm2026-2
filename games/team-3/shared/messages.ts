@@ -1,5 +1,10 @@
 // Messages between client and server, sent as JSON over the WebSocket.
 // Every message has a `type` field so it can be switched on.
+//
+// Note: the platform's room base (@sdm/host, #8) owns room codes, seats, reconnection,
+// the tick and state sync. Once we connect to it, createRoom, joinRoom, joined and state
+// (and GameState.roomCode) will probably be replaced by the platform's own versions.
+// They stay here until then so the client and the room can be built against them.
 
 import type { Direction, GameState, PlayerId } from "./types.ts";
 

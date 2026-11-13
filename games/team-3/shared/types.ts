@@ -53,6 +53,11 @@ export interface Hazard {
   id: HazardId;
   kind: HazardKind;
   car: number;
+  /**
+   * The map spot the hazard sits on (spot ids come from the map data, #6).
+   * A fire on the "engine" spot stalls the train.
+   */
+  spotId: string;
   position: Vec2;
   /** Seconds the hazard has existed (fire spreads after FIRE_SPREAD_SECONDS). */
   age: number;
