@@ -1,11 +1,9 @@
-// Browser entry point: draws the train and the crew in a Three.js canvas.
+// Browser entry point: draws the platform or the train and the crew in a Three.js canvas.
 //
-// This is a hand-check page for the renderer (#10), the heads-up display (#20),
-// the win and lose screens (#21) and the scrolling scenery (#25). The real
-// client gets the state from the room once the platform host exists; until then
-// it shows a small demo crew walking through the cars, a demo journey counting
-// down, two buttons that show either end screen, and a background that slows at
-// low fuel and stops when the train stalls.
+// By default this is the real game (#220): the main menu creates or joins a room on the game
+// server (`pnpm run server`), and every frame draws the room's state (`readView`, #209).
+// With `?demo` in the address it is the hand-check page instead: a demo crew and journey,
+// a mock waiting room, and buttons for the end screens and sounds, with no server needed.
 
 import { createConductor } from "./conductor.ts";
 import { createHelp } from "./help.ts";
@@ -19,7 +17,7 @@ import { buildTrainScene, fitCameraToMap, type RenderHazard, type RenderItem } f
 import type { RenderPlayer } from "./renderPlayer.ts";
 import { createHudBars } from "./hud.ts";
 import { hudView } from "./hudModel.ts";
-import { createKeyboard, isIdle } from "./keyboard.ts";
+import { createKeyboard, isEditableTarget, isIdle } from "./keyboard.ts";
 import { createLobby } from "./lobby.ts";
 import { buildPlatformScene, fitCameraToPlatform } from "./platformScene.ts";
 import { createEndScreen } from "./screens.ts";
@@ -28,6 +26,15 @@ import { createMuteButton, createSoundPlayer, eventsBetween, type SoundName } fr
 import { createWaitingRoom } from "./waitingRoom.ts";
 import { waitingView } from "./waitingRoomModel.ts";
 import { platformSpawn } from "../shared/map/platform.ts";
+import { errorText } from "./lobbyModel.ts";
+import { createActionKeys } from "./actionKeys.ts";
+import { createRoom, joinRoomByCode, serverAddress, type RoomConnection } from "./roomConnection.ts";
+import { joinErrorText } from "./roomLinks.ts";
+import { createSharedLinkJoin } from "./sharedLinkJoin.ts";
+
+/** `?demo` opens the hand-check page; otherwise the page plays a real room. */
+const demo = new URLSearchParams(window.location.search).has("demo");
+const server = serverAddress(window.location, import.meta.env?.VITE_SERVER_URL as string | undefined);
 import { createPlatformBoard } from "./platformBoard.ts";
 
 const container = document.getElementById("app");
@@ -87,23 +94,47 @@ const conductor = createConductor(document.body);
 const help = createHelp(document.body, () => keyboard.reset());
 help.update("lobby");
 
-// The main menu (#12). The room socket plugs in at `sendToRoom` (#80).
-const sendToRoom = (_message: ClientMessage): void => {};
-/** Shown after "Create room" until #80 connects the platform room; not a real room. */
-const PLACEHOLDER_ROOM_CODE = "K7QF";
+// The connection to the room (#220); null in the menu and on the demo page.
+let connection: RoomConnection | null = null;
+const sendToRoom = (message: ClientMessage): void => connection?.send(message);
+/** The mock room's code on the demo page only. */
+const DEMO_ROOM_CODE = "K7QF";
 
 const lobby = createLobby(document.body, {
   onCreate: (name) => {
-    sendToRoom({ type: "createRoom", name });
-    // TODO(#80): PLACEHOLDER. Until the platform room exists, open a mock room so the
-    // waiting room can be checked by hand; the room's reply (roomView, #198) will drive this.
-    enterWaiting(PLACEHOLDER_ROOM_CODE);
+    if (demo) return enterWaiting(DEMO_ROOM_CODE);
+    lobby.setStatus("Creating a room…");
+    createRoom(server, name).then(enterLive, () => lobby.setStatus(joinErrorText("connectionFailed")));
   },
   onJoin: (name, code) => {
-    sendToRoom({ type: "joinRoom", name, code });
-    enterWaiting(code);
+    if (demo) return enterWaiting(code);
+    lobby.setStatus("Joining the room…");
+    void joinRoomByCode(server, code, name).then((result) => {
+      if (result.ok) enterLive(result.connection);
+      else if (result.error === "connectionFailed") lobby.setStatus(joinErrorText(result.error));
+      else lobby.updateError(result.error);
+    });
   },
 });
+
+// Opening a shared link (`?room=CODE`, #147) goes straight to "enter your name, then join".
+if (!demo) {
+  const linked = createSharedLinkJoin(document.body, {
+    address: window.location.href,
+    join: async (name, code) => {
+      const result = await joinRoomByCode(server, code, name);
+      if (!result.ok) return { ok: false, error: result.error };
+      enterLive(result.connection);
+      return { ok: true };
+    },
+    onMainMenu: (message) => {
+      lobby.show();
+      if (message) lobby.setStatus(message);
+    },
+    onJoined: () => {},
+  });
+  if (linked) lobby.hide();
+}
 
 // Sound effects (#31): the player and its mute button.
 const sound = createSoundPlayer();
@@ -116,7 +147,7 @@ readout.style.cssText =
   "position:fixed;right:16px;bottom:16px;padding:8px 12px;border-radius:8px;" +
   "background:rgba(16,16,24,.78);font:12px system-ui,sans-serif;color:#e6e6ee;" +
   "pointer-events:none;white-space:pre;font-variant-numeric:tabular-nums";
-document.body.append(readout);
+if (demo) document.body.append(readout);
 
 const describeInput = (message: InputMessage): string => {
   const idle = isIdle(message) ? "  (idle)" : "";
@@ -128,7 +159,23 @@ const describeInput = (message: InputMessage): string => {
 // and the readout is only the stand-in until the platform host exists.
 const sendInput = (message: InputMessage): void => {
   readout.textContent = describeInput(message);
+  sendToRoom(message);
 };
+
+// The action keys from the design (#220): tap E or left-click to pick up / drop, Shift or F to
+// throw; holding E (or Space) is "interact" in the keyboard bindings.
+const onAction = createActionKeys(sendToRoom);
+window.addEventListener("keydown", (event) => {
+  if (!connection || isEditableTarget(event.target)) return;
+  onAction({ kind: "keydown", code: event.code, repeat: event.repeat, time: performance.now() });
+});
+window.addEventListener("keyup", (event) => {
+  if (!connection || isEditableTarget(event.target)) return;
+  onAction({ kind: "keyup", code: event.code, time: performance.now() });
+});
+renderer.domElement.addEventListener("mousedown", (event) => {
+  if (connection) onAction({ kind: "click", button: event.button });
+});
 
 const keyboard = createKeyboard({ onChange: sendInput });
 readout.textContent = describeInput(keyboard.current());
@@ -139,12 +186,9 @@ readout.textContent = describeInput(keyboard.current());
 let demoPhase: Phase = "playing";
 let demoStart = 0;
 
-// The room's socket plugs in here (#12): send `{ type: "playAgain" }` instead.
-const sendPlayAgain = (): void => {};
-
 const endScreen = createEndScreen(document.body, {
   onPlayAgain: () => {
-    sendPlayAgain();
+    if (connection) return sendToRoom({ type: "playAgain" });
     demoStart = performance.now();
     demoPhase = "playing";
     endScreen.update("playing");
@@ -174,7 +218,7 @@ const addDemoButton = (label: string, phase: Phase): void => {
 };
 addDemoButton("Show win screen", "won");
 addDemoButton("Show lose screen", "lost");
-document.body.append(demoBar);
+if (demo) document.body.append(demoBar);
 
 // One button per sound, so every cue can be checked by hand.
 const soundBar = document.createElement("div");
@@ -196,7 +240,7 @@ addSoundButton("Repair", "repairDone");
 addSoundButton("Low fuel", "lowFuel");
 addSoundButton("Win", "win");
 addSoundButton("Lose", "lose");
-document.body.append(soundBar);
+if (demo) document.body.append(soundBar);
 
 // The waiting room (#146): the crew on the platform. The room state will come from the
 // platform room (#80, via roomView in #198); until then a mock room with two crewmates drives the screen.
@@ -245,12 +289,14 @@ function enterWaiting(code: string): void {
 
 const waiting = createWaitingRoom(document.body, {
   onSize: (size) => {
+    if (connection) return sendToRoom({ type: "configureRoom", crewSize: size });
     if (!mockState) return;
     mockState = { ...mockState, lobby: { ...mockState.lobby, crewSize: size } };
     waiting.update(waitingView(mockState, me));
     platformBoard.update(mockState, me, platformScene.map.objects);
   },
   onDepart: () => {
+    if (connection) return sendToRoom({ type: "startGame" });
     if (!mockState) return;
     if (!waitingView(mockState, me).canDepart) return;
     waiting.hide();
@@ -264,6 +310,7 @@ const waiting = createWaitingRoom(document.body, {
     hud.root.hidden = false;
   },
   onLeave: () => {
+    if (connection) return void leaveLive();
     waiting.hide();
     platformBoard.hide();
     waitingMode = false;
@@ -276,6 +323,115 @@ const waiting = createWaitingRoom(document.body, {
   },
 });
 
+// --- The real room (#220) ---
+
+// A short line for the room's refusals (not host, crew incomplete, …).
+const toast = document.createElement("div");
+toast.setAttribute("role", "status");
+toast.style.cssText =
+  "position:fixed;left:50%;top:96px;transform:translateX(-50%);padding:8px 14px;border-radius:8px;" +
+  "background:rgba(16,16,24,.9);color:#ffd0a8;font:14px system-ui,sans-serif;z-index:35;pointer-events:none";
+toast.hidden = true;
+document.body.append(toast);
+let toastTimer = 0;
+function showToast(text: string): void {
+  toast.textContent = text;
+  toast.hidden = false;
+  window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => (toast.hidden = true), 3000);
+}
+
+let liveState: GameState | null = null;
+let lastNotice = 0;
+
+function enterLive(next: RoomConnection): void {
+  connection = next;
+  liveState = null;
+  lastNotice = 0;
+  next.onClosed(() => backToMenu("The connection to the room was lost."));
+  lobby.hide();
+  hud.root.hidden = true;
+}
+
+function backToMenu(message?: string): void {
+  connection = null;
+  liveState = null;
+  waiting.hide();
+  platformBoard.hide();
+  platformScene.updatePlayers([]);
+  hud.root.hidden = true;
+  endScreen.update("lobby");
+  help.update("lobby");
+  lobby.reset();
+  lobby.show();
+  if (message) lobby.setStatus(message);
+}
+
+async function leaveLive(): Promise<void> {
+  const leaving = connection;
+  backToMenu();
+  await leaving?.leave().catch(() => undefined);
+}
+
+/** Draws one frame of the real room and keeps the screens in step with its phase. */
+function drawLive(delta: number): void {
+  const live = connection!;
+  const state = live.view();
+  const notice = live.notice();
+
+  if (notice && notice.n !== lastNotice) {
+    lastNotice = notice.n;
+    // Refused before getting a seat (room full for the crew size, run already started): back to the menu.
+    if (!state?.players[live.me]) {
+      void leaveLive().then(() => lobby.updateError(notice.error));
+      return;
+    }
+    showToast(notice.message ?? errorText(notice.error));
+  }
+  if (!state || !state.players[live.me]) {
+    renderer.render(platformScene.scene, platformScene.camera);
+    return;
+  }
+
+  const phaseChanged = liveState?.phase !== state.phase;
+  if (state.phase === "lobby") {
+    if (phaseChanged) {
+      hud.root.hidden = true;
+      endScreen.update("lobby");
+      help.update("lobby");
+      waiting.show();
+    }
+    platformScene.updatePlayers(Object.values(state.players));
+    waiting.update(waitingView(state, live.me));
+    platformBoard.update(state, live.me, platformScene.map.objects);
+    liveState = state;
+    renderer.render(platformScene.scene, platformScene.camera);
+    return;
+  }
+
+  if (phaseChanged) {
+    waiting.hide();
+    platformBoard.hide();
+    hud.root.hidden = false;
+    endScreen.update(state.phase);
+    help.update(state.phase);
+  }
+  train.updateState({
+    players: Object.values(state.players),
+    items: Object.values(state.items),
+    hazards: Object.values(state.hazards),
+  });
+  hud.update(hudView(state.journey));
+  scenery.update(delta, state.phase === "playing" ? state.journey.speedFactor : 0);
+  if (liveState && liveState.phase !== "lobby") {
+    for (const name of eventsBetween(liveState, state)) sound.play(name);
+  }
+  courseWarning.update(state);
+  conductor.update(state);
+  liveState = state;
+  renderer.render(train.scene, train.camera);
+}
+
 // Walk the crew along their car and drain a demo journey so it is obvious that
 // the scene, the bars, the end screens and the scenery follow the state.
 let lastTime: number | null = null;
@@ -284,6 +440,18 @@ const walk = (time: number): void => {
   // Clamp the frame time so a tab switch does not make the scenery jump.
   const delta = lastTime === null ? 0 : Math.min(0.1, (time - lastTime) / 1000);
   lastTime = time;
+
+  if (connection) {
+    drawLive(delta);
+    requestAnimationFrame(walk);
+    return;
+  }
+  if (!demo) {
+    // The main menu: show the empty platform behind it.
+    renderer.render(platformScene.scene, platformScene.camera);
+    requestAnimationFrame(walk);
+    return;
+  }
 
   // While the crew waits, draw the platform instead of the train (#146).
   if (waitingMode) {
