@@ -1,5 +1,7 @@
 html, body { margin: 0; height: 100%; background: #0b141e; color: #eef3f6; font-family: system-ui, sans-serif; }
 #scene { position: fixed; inset: 0; }
+#app { position: fixed; inset: 0; }
+#app canvas { display: block; touch-action: none; image-rendering: pixelated; }
 #scene canvas { display: block; touch-action: none; }
 #demo-controls { position: fixed; bottom: 16px; left: 20px; right: 20px; padding: 14px 18px; border: 1px solid #566878; border-radius: 12px; background: #14222ef2; }
 #demo-controls strong { color: #f5d190; letter-spacing: 0.06em; }
@@ -13,6 +15,9 @@ html, body { margin: 0; height: 100%; background: #0b141e; color: #eef3f6; font-
 .map-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .map-controls select { padding: 7px; background: #24382e; color: #fff1ca; border: 1px solid #979b80; font: inherit; }
 #map-description { color: #cfdbc9; font-size: 12px; }
+#status { display: block; margin: 8px 0; color: #cfdbc9; font-size: 12px; }
+#view-mode { padding: 6px; background: #24382e; color: #fff1ca; }
+#demo-controls button:disabled, #demo-controls input:disabled { opacity: 0.45; cursor: default; }
 @media (max-width: 800px) { .train-hud { max-height: 25vh; font-size: 13px; padding: 12px; } #demo-controls { font-size: 12px; } }
 /* Layout inspired by the reference: tasks left, status right, world centered. */
 #scene canvas { image-rendering: pixelated; }

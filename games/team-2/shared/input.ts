@@ -9,7 +9,6 @@ export const clientInputSchema = z.discriminatedUnion("type", [
 	z.object({ type: z.literal("progress"), seq, taskId: z.string().min(1).max(64), amount: z.number().int().min(1).max(4) }),
 	z.object({ type: z.literal("pickup"), seq, itemId: z.string().min(1).max(64) }),
 	z.object({ type: z.literal("drop"), seq, itemId: z.string().min(1).max(64) }),
-	z.object({ type: z.literal("toss"), seq, itemId: z.string().min(1).max(64), tx: z.number(), ty: z.number() }),
 	z.object({ type: z.literal("startRun"), seq }),
 ]);
 

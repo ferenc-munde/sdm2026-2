@@ -11,6 +11,12 @@
     <aside id="demo-controls">
       <strong>THE LAST TRAIN · LOCAL SCENE DEMO</strong>
       <p>2D top-down view · Example controls · No multiplayer connected</p>
+      <label for="view-mode">Data source</label>
+      <select id="view-mode">
+        <option value="local">Local rules</option>
+        <option value="preview">Scene preview (example data)</option>
+      </select>
+      <output id="status" aria-live="off">Starting local adapter…</output>
       <div class="map-controls">
         <label for="map-car">Inspect map</label>
         <select id="map-car" aria-describedby="map-description">

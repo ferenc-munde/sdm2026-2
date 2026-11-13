@@ -18,40 +18,46 @@ Work only inside this folder unless an issue says otherwise. The package was sel
 - GitHub CLI (`gh`) is **optional** — handy for issues/PRs from the terminal,
   but the web UI works fine; nothing in the run steps needs it
 
-## Run the local Three.js scene
-
-From `games/team-2/`, run `npm.cmd install`, then `npm.cmd run dev`.
-Open the address printed in the terminal (normally http://127.0.0.1:5173/).
-The scene uses flat 2D top-down artwork with a Three.js orthographic camera,
-five vertical carriages, forest tracks, and the HUD. Buttons change example data only; the crew artwork is a static
-placeholder. There is no player movement, repair minigame, or multiplayer yet.
-Scenery now scrolls past the train. Use the demo speed slider (0–2x) and
-Pause scenery to test the effect. Victory/defeat stop the scenery, and Reset
-demo restores 1x. These controls do not calculate gameplay speed or advance
-the game clock; real speed will come from the rules/network integration.
-`npm.cmd run build` checks TypeScript and builds the browser app into `dist/`.
-`npm.cmd run preview` serves that build locally.
-
-The standalone task-panel preview remains available with
-`node client/preview-hud.mjs` on port 5174.
-
-## Multiplayer (once the platform template is copied here)
+## Run locally
 
 ```bash
-pnpm install
-pnpm --filter @team-2/game dev   # client on :5173, server on :2567
-pnpm --filter @team-2/game test  # headless rules tests (deterministic sim)
+npm install
+npm run dev      # client on :5173: 2D train map + HUD + ticking local state
+npm test         # headless rules tests (deterministic sim)
+npm run typecheck
+npm run build    # typecheck + client build to client/dist/ (Vite root is client/)
+npm run preview  # serve the client build
 ```
 
-> The local `dev` command currently starts the browser scene only. The
-> multiplayer server still depends on the platform host/template (#73).
+> There is no server yet — the platform host is stalled (#73). The client
+> plays against a **local state adapter** (`client/stateModel.ts`) that drives
+> the real GameDefinition headless; when the platform lands, that one file is
+> swapped for `net.ts` + the Colyseus join (team-3 precedent).
 
-Two browser tabs at `localhost:5173` = two players.
+On Windows PowerShell, use `npm.cmd` if `npm.ps1` is blocked. Use Node 22 LTS.
+The map is flat 2D, displayed by Three.js with five vertical carriages, 20
+station locations, four passages, scrolling scenery and a carriage inspector.
+Crew artwork is still static: queued movement inputs are not a completed
+player movement feature.
+
+The **Local rules** mode displays actual state from the adapter and keeps
+WASD/arrows, E pickup and Q drop input wiring. Current rule modules are partly
+stubs, so speed, tasks and journey may not advance even while ticks increase.
+The countdown uses elapsed run ticks and the configured tick rate.
+
+Choose **Scene preview** to use the separate example controls: repair,
+journey/time, speed (0–2x), pause, victory, defeat and reset. These controls
+never modify the adapter state. Switch back to Local rules to see live state.
+The standalone HUD preview is also available with `node client/preview-hud.mjs`
+on port 5174. Neither mode connects multiple browser tabs as network players.
+
+Two browser tabs at `localhost:5173` = two players, once real networking
+lands (#70).
 
 ## Workflow (repo rules — see root `CLAUDE.md`)
 
 1. **Issue first** — `[team-2] Short description`, goal + `done when`, label `team-2`, assignee.
-2. Branch `team-2/<issue#>-<short-description>` from up-to-date `main`.
+2. Branch `team-2/<issue#>-<short-description>` from up-to-date `Team_2_Feature`.
 3. Conventional Commits: `feat(team-2): add boiler station` + `Refs #N` in the body.
 4. One PR per issue, `Closes #N`, say how you tested it; ≥1 approving review; delete branch after merge.
 5. Never push to `main`. Platform needs → `platform`-labeled issue, never patch `server/`.

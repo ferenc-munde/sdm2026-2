@@ -59,6 +59,10 @@ No shared state, gameplay formulas, or task rules are changed by this API.
 
 `client/main.ts` currently provides demo speed/pause controls. Replace their
 example inputs with network state when the platform connection is ready.
+The integrated startup now defaults to **Local rules**, using `stateModel.ts`
+and the read-only `state-to-hud.ts` mapping. **Scene preview** keeps example
+controls isolated from the real local state. Vite serves `client/index.html`;
+the package-root HTML is a compatible alternate entry, not the scripted root.
 Victory and defeat stop visual movement. The demo does not automatically
 advance journey distance or countdown; those remain explicit preview controls.
 

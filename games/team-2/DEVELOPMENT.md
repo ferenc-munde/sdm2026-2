@@ -12,9 +12,12 @@ games/team-2/
 ```
 
 This mirrors the platform template layout (`server/template/README.md`).
-`server.ts`, `index.html` and `vite.config.ts` are added when the platform
-host and template exist. See `SPEC.md` for the game design and
-`WORKFLOW.md` for who owns which files.
+Until the platform lands (#73, stalled), the client runs on a local dev
+harness (team-3's merged precedent): `npm run dev` serves `client/` with
+vite and `client/stateModel.ts` drives the real `lastTrain` GameDefinition
+headless. That adapter is the swap point — it becomes `net.ts` + schema
+callbacks when `@sdm/host` exists; nothing else changes. See `SPEC.md` for
+the game design and `WORKFLOW.md` for who owns which files.
 
 `shared/config.ts` mirrors the platform's `RoomSettingsSchema` fields; once
 `@sdm/core` lands it will extend it directly instead of redefining them
@@ -32,9 +35,11 @@ npm test
 npm run typecheck
 ```
 
-Until the root pnpm workspace exists, `pnpm` works the same way. Lockfiles in
-this folder are ignored on purpose: the workspace lockfile at the repository
-root will replace them.
+We use **npm** for now because that is what the CI runs (`npm ci` /
+`npm install` in the team-2 workflow) and there is no root pnpm workspace
+yet (`pnpm --filter` cannot resolve without it). When the workspace lands
+(platform build-order step 1), commands move to `pnpm --filter @team-2/game
+…` and lockfiles are ignored on purpose until then.
 
 ## Rules for code in `shared/`
 
