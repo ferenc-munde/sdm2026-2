@@ -7,9 +7,12 @@ import {
   HAZARD_INTERVAL_LATE_SECONDS,
   HAZARD_INTERVAL_SECONDS,
   HAZARD_LATE_PROGRESS,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
   WIN_DISTANCE,
 } from "../constants.ts";
 import type { GameState, Hazard, HazardKind, Vec2 } from "../types.ts";
+import { connectedPlayerCount } from "./phases.ts";
 import { pickIndex, type RandomSource } from "./random.ts";
 
 /** A place on the map where a hazard can start. The list comes from the map data (#6). */
@@ -30,15 +33,16 @@ export interface DirectorState {
 /** The hazard kinds the director starts. The course hazard (#28) has its own trigger. */
 export const DIRECTOR_HAZARD_KINDS: readonly HazardKind[] = ["breach", "fire"];
 
-/** A fresh director for a new run: the first hazard comes after one full interval for that crew size. */
-export function createDirector(playerCount = 0): DirectorState {
+/**
+ * A fresh director for a new run: the first hazard comes after one full interval for that
+ * crew size, or after the plan's base interval when no crew size is given.
+ */
+export function createDirector(playerCount?: number): DirectorState {
   return { secondsUntilNext: hazardInterval(0, playerCount), spawnedCount: 0 };
 }
 
 /** How many players are connected: the crew the difficulty is scaled to. */
-export function crewSize(state: GameState): number {
-  return Object.values(state.players).filter((player) => player.connected).length;
-}
+export const crewSize = connectedPlayerCount;
 
 /** How far the train has travelled, from 0 (start) to 1 (destination). */
 export function journeyProgress(state: GameState): number {
@@ -46,12 +50,18 @@ export function journeyProgress(state: GameState): number {
 }
 
 /**
- * Seconds between hazards. A bigger crew gets hazards more often (14, 11 and 9 seconds for
- * 2, 3 and 4 players; 12 for any other count). Once more than 65% of the distance is covered
- * the interval shrinks by the plan's late ratio, 7 / 12.
+ * Seconds between hazards. A bigger crew gets hazards more often: 14, 11 and 9 seconds for
+ * 2, 3 and 4 players. The count is clamped to that range, so a crew that has shrunk to one
+ * connected player keeps the gentlest rate instead of getting a harder one. Without a count
+ * the plan's base interval of 12 seconds applies. Once more than 65% of the distance is
+ * covered the interval shrinks by the plan's late ratio, 7 / 12.
  */
-export function hazardInterval(progress: number, playerCount = 0): number {
-  const base = HAZARD_INTERVAL_BY_PLAYERS[playerCount] ?? HAZARD_INTERVAL_SECONDS;
+export function hazardInterval(progress: number, playerCount?: number): number {
+  const base =
+    playerCount === undefined
+      ? HAZARD_INTERVAL_SECONDS
+      : (HAZARD_INTERVAL_BY_PLAYERS[Math.min(MAX_PLAYERS, Math.max(MIN_PLAYERS, Math.round(playerCount)))] ??
+        HAZARD_INTERVAL_SECONDS);
   if (progress <= HAZARD_LATE_PROGRESS) return base;
   return base * (HAZARD_INTERVAL_LATE_SECONDS / HAZARD_INTERVAL_SECONDS);
 }
