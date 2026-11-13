@@ -60,6 +60,7 @@ export class TrainLobbyRoom extends Room<{ state: LobbyState }> {
 
 	private startCountdown(): void {
 		this.stopCountdown();
+		// Use server time as the source of truth so client clocks cannot change the wait.
 		this.countdownStartedAt = this.clock.currentTime;
 		this.countdownTask = this.clock.setInterval(() => {
 			const elapsed = Math.floor((this.clock.currentTime - this.countdownStartedAt) / 1000);
@@ -74,6 +75,7 @@ export class TrainLobbyRoom extends Room<{ state: LobbyState }> {
 	}
 
 	private requestStartNow(client: Client): void {
+		// Only the current host may skip; startLobby still rejects empty rooms.
 		if (client.sessionId !== this.state.hostSessionId) {
 			client.send("lobby-error", "The crew host controls departure.");
 			return;
@@ -88,6 +90,7 @@ export class TrainLobbyRoom extends Room<{ state: LobbyState }> {
 
 	private finishMatch(): void {
 		if (this.matchAnnounced || this.state.status !== "running" || this.state.playerCount === 0) return;
+		// Guard the room transition so timer and skip requests cannot announce twice.
 		this.matchAnnounced = true;
 		this.stopCountdown();
 		this.lock();

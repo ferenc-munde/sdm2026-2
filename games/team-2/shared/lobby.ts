@@ -25,6 +25,7 @@ export class LobbyPlayer extends Schema {
 }
 
 export class LobbyState extends Schema {
+	// Replicated by Colyseus so every client sees the same crew and departure state.
 	@type("uint8") teamSize = 4;
 	@type("uint8") playerCount = 0;
 	@type("uint8") startedPlayerCount = 0;
@@ -47,6 +48,7 @@ export function createLobbyState(teamSize: TeamSize): LobbyState {
 
 /** Add one authenticated session and start immediately when the room fills. */
 export function addLobbyPlayer(state: LobbyState, sessionId: string, rawName: unknown): boolean {
+	// Treat join data as untrusted even though the room also validates it in onAuth.
 	const parsedName = playerNameSchema.safeParse(rawName);
 	if (
 		!parsedName.success ||
@@ -70,6 +72,7 @@ export function addLobbyPlayer(state: LobbyState, sessionId: string, rawName: un
 		state.secondsRemaining = LOBBY_COUNTDOWN_SECONDS;
 	}
 
+	// A full crew departs immediately; smaller crews can wait or have the host skip.
 	if (state.playerCount >= state.teamSize) startLobby(state);
 	return true;
 }
@@ -116,6 +119,7 @@ export function startLobby(state: LobbyState): boolean {
 	if (state.status !== "waiting" || state.playerCount === 0) return false;
 	state.status = "running";
 	state.secondsRemaining = 0;
+	// Freeze the crew size at departure; the match can start with a single player.
 	state.startedPlayerCount = state.playerCount;
 	return true;
 }

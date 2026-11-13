@@ -184,6 +184,7 @@ export function mountLobby(
 	}
 
 	function sync(state: LobbyRoomView): void {
+		// Render the authoritative room snapshot; the browser never decides when play starts.
 		const players = Array.from(state.players.entries())
 			.map(([sessionId, player]) => ({ sessionId, ...player }))
 			.sort((a, b) => a.slot - b.slot);
