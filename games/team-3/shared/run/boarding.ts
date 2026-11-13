@@ -106,7 +106,9 @@ export function usePlatformAction(
       ? { ok: true, platform: { session: result.session, practice: current.practice } }
       : { ok: false, platform: current, message: result.message };
   }
-  if (!isNearPracticeObject(current.session.state, playerId, platform.objects)) {
+  // A player carrying a practice item can always drop it, wherever they stand.
+  const carrying = Object.values(current.practice.items).some((item) => item.heldBy === playerId);
+  if (!carrying && !isNearPracticeObject(current.session.state, playerId, platform.objects)) {
     return { ok: false, platform: current, message: "Action unavailable" };
   }
   const practice = usePracticeObject(current.session.state, current.practice, playerId, platform.objects);

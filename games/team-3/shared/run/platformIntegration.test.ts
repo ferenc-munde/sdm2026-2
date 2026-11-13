@@ -46,6 +46,16 @@ describe("integrated platform lobby", () => {
     });
   });
 
+  it("lets a player drop a carried practice item away from the objects", () => {
+    let lobby = createPlatformLobby(at(joined("host"), "host", map.objects.wrench), map);
+    const pickUp = usePlatformAction(lobby, "host", map, train);
+    expect(pickUp.ok).toBe(true); if (!pickUp.ok) return;
+    lobby = { ...pickUp.platform, session: at(pickUp.platform.session, "host", map.objects.breach) };
+    const drop = usePlatformAction(lobby, "host", map, train);
+    expect(drop.ok).toBe(true); if (!drop.ok) return;
+    expect(drop.platform.practice.items["practice-wrench"]?.heldBy).toBeNull();
+  });
+
   it("repairs with held input and respawns after five seconds", () => {
     let lobby = createPlatformLobby(at(joined("host"), "host", map.objects.wrench), map);
     const action = usePlatformAction(lobby, "host", map, train);
