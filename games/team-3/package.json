@@ -1,0 +1,20 @@
+{
+  "name": "@team-3/game",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The Last Train: a co-operative online train crew game (Team 3)",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0",
+    "@types/three": "^0.170.0"
+  }
+}
