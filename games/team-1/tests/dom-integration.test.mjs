@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { Window } from "happy-dom";
 import { createTestViteServer } from "./helpers/vite-loader.mjs";
 
-const browser = new Window({ url: "http://localhost/" });
+// `?mock` selects the in-memory adapters; without it the page connects to a game server.
+const browser = new Window({ url: "http://localhost/?mock" });
 browser.document.body.innerHTML = '<main id="app" class="shell"></main>';
 globalThis.window = browser;
 globalThis.document = browser.document;
