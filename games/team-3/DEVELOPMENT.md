@@ -8,7 +8,7 @@ games/team-3/
 ├─ config/game.json  tickRate, patchRate, maxPlayers, reconnectSeconds
 ├─ shared/           browser-safe game rules, state, inputs and config (pure, tested)
 ├─ room/             room registration for the platform host
-└─ client/           browser code: drawing, input, screens
+└─ client/           browser code: Three.js scene, input, screens
 ```
 
 This is the layout of the platform template (`server/template/README.md`). `server.ts`, `index.html` and `vite.config.ts` are added when the platform host and template exist.
