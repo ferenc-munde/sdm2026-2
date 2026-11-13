@@ -11,7 +11,7 @@ export const HOW_TO_PLAY = [
 export const CONTROL_HINTS = "Move: WASD / arrows · Hold interact: Space / E";
 
 /** Mount beside the lobby and keep it mounted during play. No game state is changed. */
-export function createHelp(container: HTMLElement) {
+export function createHelp(container: HTMLElement, beforeOpen: () => void = () => {}) {
   const open = document.createElement("button");
   open.type = "button"; open.textContent = "How to play";
   open.style.cssText = "position:fixed;right:16px;top:56px;z-index:12;padding:8px;border-radius:6px";
@@ -26,12 +26,12 @@ export function createHelp(container: HTMLElement) {
   hints.style.cssText="position:fixed;left:16px;bottom:16px;max-width:42vw;background:#101018dd;padding:8px;z-index:2;font:12px system-ui;color:white";
   // Stop game keyboard listeners while the modal has focus, including Space/E.
   dialog.addEventListener("keydown", event => event.stopPropagation());
-  const onOpen=()=>dialog.showModal();const onClose=()=>dialog.close();
-  const restore=()=>open.focus();
+  const onOpen=()=>{ beforeOpen(); dialog.showModal(); };const onClose=()=>dialog.close();
+  const restore=()=>{ if (!open.hidden) open.focus(); };
   open.addEventListener("click",onOpen);close.addEventListener("click",onClose);dialog.addEventListener("close",restore);
   dialog.append(title,list,close);container.append(open,dialog,hints);
   return {
-    update(phase: Phase) { hints.hidden=phase!=="playing"; open.hidden=phase==="won"||phase==="lost"; },
+    update(phase: Phase) { hints.hidden=phase!=="playing"; open.hidden=phase==="won"||phase==="lost"; if (open.hidden && dialog.open) dialog.close(); },
     dispose() { open.remove();dialog.remove();hints.remove(); },
   };
 }
