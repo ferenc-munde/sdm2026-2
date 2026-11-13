@@ -1,6 +1,7 @@
 function copyState(state) {
   return {
     ...state,
+    repairs: { ...state.repairs },
     players: state.players.map((player) => ({ ...player, position: { ...player.position } })),
     tasks: state.tasks.map((task) => ({ ...task })),
     outcome: { ...state.outcome },
