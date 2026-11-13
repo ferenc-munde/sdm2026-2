@@ -1,13 +1,14 @@
 // Browser entry point: draws the train and the crew in a Three.js canvas.
 //
-// This is a hand-check page for the renderer (#10), the heads-up display (#20)
-// and the win and lose screens (#21). The real client gets the state from the
-// room once the platform host exists; until then it shows a small demo crew
-// walking through the cars, a demo journey counting down, and two buttons that
-// show either end screen immediately.
+// This is a hand-check page for the renderer (#10), the heads-up display (#20),
+// the win and lose screens (#21) and the scrolling scenery (#25). The real
+// client gets the state from the room once the platform host exists; until then
+// it shows a small demo crew walking through the cars, a demo journey counting
+// down, two buttons that show either end screen, and a background that slows at
+// low fuel and stops when the train stalls.
 
 import { WebGLRenderer } from "three";
-import { FUEL_MAX, HULL_MAX, WIN_DISTANCE } from "../shared/constants.ts";
+import { FUEL_MAX, HULL_MAX, LOW_FUEL_THRESHOLD, WIN_DISTANCE } from "../shared/constants.ts";
 import type { InputMessage } from "../shared/messages.ts";
 import type { Phase } from "../shared/types.ts";
 import { buildTrainScene, fitCameraToMap } from "./trainScene.ts";
@@ -17,6 +18,7 @@ import { createHudBars } from "./hud.ts";
 import { hudView } from "./hudModel.ts";
 import { createKeyboard, isIdle } from "./keyboard.ts";
 import { createEndScreen } from "./screens.ts";
+import { buildScenery } from "./scenery.ts";
 
 const container = document.getElementById("app");
 if (!container) throw new Error("#app is missing from index.html");
@@ -33,6 +35,15 @@ const demoPlayers: RenderPlayer[] = [
 ];
 
 const train = buildTrainScene(demoPlayers);
+
+// The ground and sleepers that scroll past the train (#25).
+const carXs = train.map.cars.map((car) => car.x);
+const scenery = buildScenery({
+  left: Math.min(...carXs) - CAR_LENGTH / 2,
+  right: Math.max(...carXs) + CAR_LENGTH / 2,
+  depth: Math.max(...train.map.cars.map((car) => car.depth)),
+});
+train.scene.add(scenery.group);
 
 const resize = (): void => {
   const width = container.clientWidth;
@@ -109,8 +120,13 @@ addDemoButton("Show lose screen", "lost");
 document.body.append(demoBar);
 
 // Walk the crew along their car and drain a demo journey so it is obvious that
-// the scene, the bars and the end screens follow the state.
+// the scene, the bars, the end screens and the scenery follow the state.
+let lastTime: number | null = null;
 const walk = (time: number): void => {
+  // Clamp the frame time so a tab switch does not make the scenery jump.
+  const delta = lastTime === null ? 0 : Math.min(0.1, (time - lastTime) / 1000);
+  lastTime = time;
+
   if (demoPhase === "playing") {
     const seconds = (time - demoStart) / 1000;
     const moved = demoPlayers.map((player, seat) => {
@@ -121,21 +137,26 @@ const walk = (time: number): void => {
     train.updatePlayers(moved);
 
     // A ~3 minute run: fuel and hull fall, distance grows, then the win screen.
+    // The train slows at low fuel and stops when the tank is empty (#25).
+    const fuel = Math.max(0, FUEL_MAX - seconds * 0.6);
+    const speedFactor = fuel <= 0 ? 0 : fuel <= LOW_FUEL_THRESHOLD ? 0.5 : 1;
     const progress = Math.min(1, seconds / 180);
     hud.update(
       hudView({
-        fuel: Math.max(0, FUEL_MAX - seconds * 0.6),
+        fuel,
         hull: Math.max(0, HULL_MAX - seconds * 0.3),
         distance: progress * WIN_DISTANCE,
-        speedFactor: 1,
+        speedFactor,
       }),
     );
+    scenery.update(delta, speedFactor);
 
     if (progress >= 1) {
       demoPhase = "won";
       endScreen.update("won");
     }
   }
+
 
   renderer.render(train.scene, train.camera);
   requestAnimationFrame(walk);
