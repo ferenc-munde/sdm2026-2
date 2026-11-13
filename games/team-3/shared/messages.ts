@@ -70,7 +70,14 @@ export interface StateMessage {
   state: GameState;
 }
 
-export type ErrorCode = "roomNotFound" | "roomFull" | "gameInProgress" | "invalidName" | "invalidMessage";
+export type ErrorCode =
+  | "roomNotFound"
+  | "roomFull"
+  | "gameInProgress"
+  | "invalidName"
+  | "invalidMessage"
+  /** A run needs at least MIN_PLAYERS connected players to start. */
+  | "notEnoughPlayers";
 
 export interface ErrorMessage {
   type: "error";
