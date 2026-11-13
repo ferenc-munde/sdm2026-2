@@ -12,8 +12,9 @@ Browser code for **The Last Train**. What is in this folder today:
 | `hudModel.ts` | Journey numbers → bar widths, fuel colour, displayed values (pure, tested) | #20 |
 | `hud.ts` | Creates the three HUD bars once and updates their width and colour | #20 |
 | `keyboard.ts` | Keys → `input` message: WASD/arrows, Space/E to interact | #11 |
+| `screens.ts` | Win and lose screens, shown from `state.phase`, with "play again" | #21 |
 | `vite.config.ts` | Vite config for this app only | #10 |
-| `docs/*.jpg` | Screenshots used in the PRs | #10, #11, #20 |
+| `docs/*.jpg` | Screenshots used in the PRs | #10, #11, #20, #21 |
 
 ## Run it
 
@@ -27,6 +28,6 @@ npm run typecheck
 ## Not here yet
 
 - **Lobby** (#12): name entry, create/join a room by code, showing server errors.
-- **Screens and effects** (#19, #21, #25, #31): hazard drawing, end screens, scrolling scenery, sound.
+- **Screens and effects** (#19, #25, #31): hazard drawing, scrolling scenery, sound.
 
 The client draws the state it receives and sends inputs; it never changes the game state itself.
