@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { TRAIN_CARS, TRAIN_PASSAGES } from "./train-map";
 
 /** Flat top-down artwork displayed with Three.js, without 3D perspective. */
 export function createTrainScene(container: HTMLElement) {
@@ -34,30 +35,51 @@ export function createTrainScene(container: HTMLElement) {
   landscape.width = art.width; landscape.height = art.height;
   landscape.getContext("2d")!.drawImage(art, 0, 0);
   c.clearRect(0, 0, art.width, art.height);
-  const names = ["COMMAND", "BOILER", "MECHANICAL", "CARGO", "GENERATOR"];
-  const colors = ["#478ca4", "#a56838", "#b49842", "#926b42", "#53846c"];
-  for (let i = 0; i < 5; i++) {
-    const y = 50 + i * 168;
+  for (const car of TRAIN_CARS) {
+    const i = car.index;
+    const y = car.bounds.y;
     rect(683, y + 8, 240, 162, "#161b17");
     rect(690, y, 220, 158, "#6a743b"); rect(698, y + 7, 204, 144, "#232a29");
     for (let tx = 0; tx < 5; tx++) for (let ty = 0; ty < 4; ty++)
-      rect(705 + tx * 38, y + 16 + ty * 32, 36, 30, (tx + ty) % 2 ? "#655f51" : "#706657");
+      rect(705 + tx * 38, y + 16 + ty * 32, 36, 30, car.floor);
     for (const x of [700, 896]) rect(x, y + 45, 4, 42, "#ffd06a");
-    for (const x of [720, 818]) {
-      rect(x, y + 25, 62, 38, "#242b28"); rect(x + 4, y + 29, 54, 30, colors[i]!);
-      rect(x + 10, y + 33, 20, 4, "#cfbc79");
+    for (const station of car.stations) {
+      const { x, y: sy, color } = station;
+      rect(x - 2, sy - 2, 62, 34, "#242b28");
+      rect(x, sy, 58, 30, color);
+      if (station.id.startsWith("nav")) {
+        rect(x + 5, sy + 3, 48, 14, "#183c52");
+        rect(x + 10, sy + 7, 22, 3, "#8ee0d4");
+      } else if (station.id === "boiler" || station.id === "generator-crank") {
+        rect(x + 5, sy + 3, 46, 13, "#313b39");
+        for (let n = 0; n < 4; n++) rect(x + 10 + n * 9, sy + 5, 3, 10, "#9ca79d");
+      } else if (station.id.includes("valve") || station.id === "pipe-junction") {
+        rect(x + 3, sy + 8, 52, 5, "#d7b55b");
+        c.strokeStyle = "#a43730"; c.lineWidth = 3;
+        c.beginPath(); c.arc(x + 29, sy + 10, 7, 0, Math.PI * 2); c.stroke();
+      } else {
+        rect(x + 6, sy + 4, 46, 10, "#323d36");
+      }
+      c.font = "bold 7px monospace"; c.textAlign = "center"; c.fillStyle = "#fff1ca";
+      c.fillText(station.label, x + 29, sy + 25);
     }
-    if (i === 1 || i === 2) {
-      rect(723, y + 99, 147, 9, "#292b25"); rect(726, y + 101, 141, 5, "#bd963d");
-      c.strokeStyle = "#cb5142"; c.lineWidth = 5;
-      c.beginPath(); c.arc(800, y + 102, 12, 0, Math.PI * 2); c.stroke();
-    }
-    if (i === 3) for (const x of [725, 830]) {
-      rect(x, y + 95, 32, 28, "#302b22"); rect(x + 3, y + 98, 26, 22, "#a17b44");
-    }
-    rect(773, y + 151, 54, 17, "#252b28"); rect(779, y + 153, 42, 11, "#85806b");
-    c.font = "bold 11px monospace"; c.textAlign = "center"; c.fillStyle = "#f0d18a";
-    c.fillText(`${i + 1} ${names[i]}`, 800, y + 12);
+    // Top/bottom wall openings line up with the central aisle.
+    if (i > 0) rect(778, y, 44, 17, car.floor);
+    if (i < 4) rect(778, y + 140, 44, 18, car.floor);
+    c.font = "bold 9px monospace"; c.textAlign = "center"; c.fillStyle = "#f0d18a";
+    c.fillText(`${i + 1} ${car.name.toUpperCase()}`, 800, y + 23);
+  }
+  for (const passage of TRAIN_PASSAGES) {
+    const { x, y, width, height } = passage.bounds;
+    rect(x - 4, y, width + 8, height, "#1d2523");
+    rect(x, y, width, height, "#8a8875");
+    for (let n = 0; n < 6; n++) rect(x, y + n * 7, width, 2, "#676f63");
+    // Retracted bulkhead door leaves flank the open passage.
+    rect(x - 6, y + 8, 6, 18, "#e4b552");
+    rect(x + width, y + 8, 6, 18, "#e4b552");
+    const hatch = passage.hatch;
+    rect(hatch.x, hatch.y, hatch.width, hatch.height, "#343e3a");
+    rect(hatch.x + 4, hatch.y + 4, hatch.width - 8, hatch.height - 8, "#d0ba78");
   }
   for (const [x, y, color] of [[790, 140, "#62cdd3"], [850, 455, "#e46c63"], [755, 635, "#e0bc4e"]] as const) {
     rect(x - 9, y + 4, 7, 8, "#192327"); rect(x + 2, y + 4, 7, 8, "#192327");
@@ -85,11 +107,13 @@ export function createTrainScene(container: HTMLElement) {
   const renderer = new THREE.WebGLRenderer({ antialias: false });
   renderer.domElement.setAttribute("aria-label", "2D top-down train with five carriages and forest tracks");
   container.append(renderer.domElement);
+  let focusedCar: number | null = null;
   function resize() {
     const w = container.clientWidth, h = Math.max(1, container.clientHeight), ratio = w / h;
-    const height = Math.max(1000, 1600 / ratio);
+    const height = focusedCar === null ? Math.max(1000, 1600 / ratio) : Math.max(400, 560 / ratio);
     camera.left = -height * ratio / 2; camera.right = height * ratio / 2;
     camera.top = height / 2; camera.bottom = -height / 2;
+    camera.position.y = focusedCar === null ? 0 : 500 - (TRAIN_CARS[focusedCar]!.bounds.y + 79);
     camera.updateProjectionMatrix(); renderer.setSize(w, h); renderer.render(scene, camera);
   }
   window.addEventListener("resize", resize); resize();
@@ -106,6 +130,11 @@ export function createTrainScene(container: HTMLElement) {
     renderer.render(scene, camera);
   });
   return {
+    /** Inspect approximately two cars; null restores the full map overview. */
+    focusCar(index: number | null) {
+      focusedCar = index === null ? null : Math.max(0, Math.min(4, Math.floor(index)));
+      resize();
+    },
     /** Visual multiplier, not a gameplay speed formula. Zero stops the scenery. */
     setSpeed(value: number) { speed = Number.isFinite(value) ? Math.max(0, value) : 0; },
     setPaused(value: boolean) { paused = value; },

@@ -11,6 +11,18 @@
     <aside id="demo-controls">
       <strong>THE LAST TRAIN · LOCAL SCENE DEMO</strong>
       <p>2D top-down view · Example controls · No multiplayer connected</p>
+      <div class="map-controls">
+        <label for="map-car">Inspect map</label>
+        <select id="map-car" aria-describedby="map-description">
+          <option value="all">Whole train</option>
+          <option value="0">1 · Command & Guidance</option>
+          <option value="1">2 · Boiler Room</option>
+          <option value="2">3 · Mechanical Junction</option>
+          <option value="3">4 · Cargo Hold</option>
+          <option value="4">5 · Caboose / Generator</option>
+        </select>
+        <span id="map-description">Four open bulkheads connect the five carriages. Gold squares mark relief hatches.</span>
+      </div>
       <div class="motion-controls">
         <label for="speed">Demo speed</label>
         <input id="speed" type="range" min="0" max="2" step="0.1" value="1">

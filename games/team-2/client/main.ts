@@ -2,6 +2,7 @@ import { createTrainScene } from "./scene";
 import { createHud, type HudTask, type HudJourney } from "./hud";
 import "./hud.css";
 import "./styles.css";
+import { TRAIN_CARS } from "./train-map";
 
 const sceneRoot = document.querySelector<HTMLElement>("#scene")!;
 let trainScene: ReturnType<typeof createTrainScene> | undefined;
@@ -19,6 +20,14 @@ let demoPaused = false;
 const speedInput = document.querySelector<HTMLInputElement>("#speed")!;
 const speedLabel = document.querySelector<HTMLOutputElement>("#speed-value")!;
 const pauseButton = document.querySelector<HTMLButtonElement>("#pause-motion")!;
+const mapSelect = document.querySelector<HTMLSelectElement>("#map-car")!;
+mapSelect.addEventListener("change", () => {
+  const car = mapSelect.value === "all" ? null : Number(mapSelect.value);
+  trainScene?.focusCar(car);
+  document.getElementById("map-description")!.textContent = car === null
+    ? "Four open bulkheads connect the five carriages. Gold squares mark relief hatches."
+    : TRAIN_CARS[car]!.stations.map(station => station.label).join(" · ");
+});
 function update() {
   hud.updateTasks(tasks);
   hud.updateGauges({ power: tasks[0]?.current ? 100 : 40, pressure: 35 });

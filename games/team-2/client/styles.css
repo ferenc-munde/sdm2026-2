@@ -10,6 +10,9 @@ html, body { margin: 0; height: 100%; background: #0b141e; color: #eef3f6; font-
 .motion-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .motion-controls input { accent-color: #e4c18a; width: 160px; }
 .motion-controls output { min-width: 4ch; color: #f5d190; }
+.map-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.map-controls select { padding: 7px; background: #24382e; color: #fff1ca; border: 1px solid #979b80; font: inherit; }
+#map-description { color: #cfdbc9; font-size: 12px; }
 @media (max-width: 800px) { .train-hud { max-height: 25vh; font-size: 13px; padding: 12px; } #demo-controls { font-size: 12px; } }
 /* Layout inspired by the reference: tasks left, status right, world centered. */
 #scene canvas { image-rendering: pixelated; }
