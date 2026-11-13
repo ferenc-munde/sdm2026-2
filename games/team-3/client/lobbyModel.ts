@@ -67,8 +67,6 @@ export function errorText(code: ErrorCode): string {
       return "Only the host can do that.";
     case "invalidMessage":
       return "The room did not accept that. Try again.";
-    case "notHost":
-      return "Only the host can do that.";
     default:
       return "Something went wrong. Try again.";
   }
