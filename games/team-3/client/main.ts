@@ -10,7 +10,7 @@
 import { createHelp } from "./help.ts";
 import { WebGLRenderer } from "three";
 import { FUEL_MAX, HULL_MAX, LOW_FUEL_THRESHOLD, WIN_DISTANCE } from "../shared/constants.ts";
-import type { InputMessage } from "../shared/messages.ts";
+import type { ClientMessage, InputMessage } from "../shared/messages.ts";
 import type { GameState, Phase } from "../shared/types.ts";
 import { CAR_LENGTH, carCentreX } from "../shared/map/map.ts";
 import { buildTrainScene, fitCameraToMap, type RenderHazard, type RenderItem } from "./trainScene.ts";
@@ -18,6 +18,7 @@ import type { RenderPlayer } from "./renderPlayer.ts";
 import { createHudBars } from "./hud.ts";
 import { hudView } from "./hudModel.ts";
 import { createKeyboard, isIdle } from "./keyboard.ts";
+import { createLobby } from "./lobby.ts";
 import { createEndScreen } from "./screens.ts";
 import { buildScenery } from "./scenery.ts";
 import { createMuteButton, createSoundPlayer, eventsBetween, type SoundName } from "./sound.ts";
@@ -71,6 +72,22 @@ window.addEventListener("resize", resize);
 const hud = createHudBars(document.body);
 const help = createHelp(document.body);
 help.update("playing");
+
+// The main menu (#12). The room socket plugs in at `sendToRoom` (#145/#80).
+const sendToRoom = (_message: ClientMessage): void => {};
+
+const lobby = createLobby(document.body, {
+  onCreate: (name) => {
+    sendToRoom({ type: "createRoom", name });
+    // Until the temporary server (#145) answers, show a code so the screen can
+    // be checked by hand; the reply will drive this instead.
+    lobby.showRoom("K7QF");
+  },
+  onJoin: (name, code) => {
+    sendToRoom({ type: "joinRoom", name, code });
+    lobby.showRoom(code);
+  },
+});
 
 // Sound effects (#31): the player and its mute button.
 const sound = createSoundPlayer();
