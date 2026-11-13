@@ -135,13 +135,13 @@ in state (`eliminated`). No mid-run revival v1.
 | --- | --- | --- |
 | 🔧 Wrench | Car 3 lockers | Seals pipes, force-opens locked bulkheads |
 | 🧯 Extinguisher | Car 3 lockers | Finite foam, refill dock in Car 4 |
-| 🔋 Battery cell | Car 4/5 bins | Heavy: carrier speed −30%, tossable |
+| 🔋 Battery cell | Car 4/5 bins | Heavy: carrier speed −30% |
 | ⚡ Coal | Car 4 bin | Boiler fuel |
 | 🔩 Spare parts / fuses | Car 4 bin | Repairs & fuse task |
 | 🔦 Flashlight | Car 4 locker | Directional light cone while held |
 
 Server owns item state (`items` map: type, holderId, fuel). The client renders
-carrying/tossing; toss physics are simulated server-side in fixed ticks.
+items on the ground or carried by players.
 
 ### 7.1 Item Interaction Rules
 
@@ -150,26 +150,17 @@ carrying/tossing; toss physics are simulated server-side in fixed ticks.
 - Coordinate units are Three.js world units.
 - The pickup radius is 1.5 units.
 - Each player can hold one item.
-- Pickup requires the item to exist, be unheld, and be within pickup radius.
+- Items have only two states: on the ground or held by a player.
+- Pickup requires the item to exist, be on the ground, be unheld, and be within
+  pickup radius.
 - Drop requires the requested `itemId` to match the player's `holdingItemId`.
 - Dropped items appear at the player's current position.
 
 #### Invalid Actions
 
-- Failed pickup and toss operations return `false`.
+- Failed pickup operations return `false`.
 - Invalid actions leave game state unchanged.
 - Invalid drop operations also leave state unchanged.
-
-#### Toss
-
-- Flight is purely horizontal and deterministic. The item travels from the
-  player's position toward target coordinates (`tx`, `ty`) at 8 units/second
-  and lands after the smaller of the distance to the target or 6 units.
-- Gravity is 12 units/second² for the client's visual arc only; it never
-  affects the simulation.
-- Items cannot be picked up while airborne.
-- On collision, the item stops and becomes available for pickup.
-- Toss physics use fixed ticks and are deterministic.
 
 #### Extinguisher
 
@@ -272,7 +263,6 @@ All inputs zod-validated in `shared/input.ts`; movement is server-simulated
 | `interactDown` / `interactUp` | `{ stationId }` | press/release pairs drive hold-channels (wrench 5s, crank, brake) and taps |
 | `progress` | `{ taskId, amount }` | task director clamps amount 1–4 |
 | `pickup` / `drop` | `{ itemId }` | items module, distance check vs player |
-| `toss` | `{ itemId, tx, ty }` | target point; sim integrates toss physics |
 | `startRun` | — | lobby → running (host only) |
 | debug `commands` | per `@sdm/core/sim` | recorded in replays, rejected in production |
 
@@ -328,7 +318,7 @@ intervals, drain rates) — validated by the config schema in `shared/`:
   journey strip with schedule ghost** (#78), Power/Pressure, per-car alarms,
   interact prompt, win/lose screens.
 - `input.ts` — keyboard → throttled input sends (~10 Hz move, events for
-  interact/pickup/toss).
+  interact/pickup/drop).
 
 ## 9. Reference snippets
 
