@@ -6,8 +6,13 @@
 // y runs across the train; the Three.js client draws (x, y) at scene (x, 0, y).
 // Every box is given by its centre and its size, like the client's FloorBox.
 //
-// The sizes match the client's temporary layout (client/trainMap.ts, #10), so the
-// renderer can switch to this map without changing how the train looks.
+// The car, gap, door and wall sizes match the client's temporary layout
+// (client/trainMap.ts, #10), but the shapes are not a drop-in swap: boxes here use
+// floor `y` where the client uses scene `z`, and a door box here is CAR_GAP wide
+// (the walkable floor across the gap) where the client's is CAR_GAP + WALL_THICKNESS.
+//
+// carAt() returns null in a doorway on purpose: a player crossing a door is still on
+// the train. Movement (#7) uses the walls, not carAt(), so doorways never block anyone.
 
 import { CAR_COUNT, PLAYER_RADIUS } from "../constants.ts";
 import type { ItemKind, Station, StationKind, Vec2 } from "../types.ts";
