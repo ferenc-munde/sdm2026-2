@@ -1,17 +1,16 @@
-// Builds the Three.js scene for the train cutaway and the players.
+// Builds the Three.js scene for the train, the players and everything in the
+// game state: stations, items, hazards and repair progress (#19).
 //
 // The renderer is a pure function of the state it is given: `buildTrainScene`
-// creates the scene, and `updatePlayers` replaces the player figures when new
+// creates the static map, and `updateState` replaces the dynamic parts when new
 // state arrives. It never changes the game state itself.
-//
-// The train is drawn as simple boxes seen from above at an angle, which gives
-// the cutaway look without any art assets (PLAN.md section 1).
 
 import {
   AmbientLight,
   BoxGeometry,
   CanvasTexture,
   Color,
+  ConeGeometry,
   CylinderGeometry,
   DirectionalLight,
   Group,
@@ -24,30 +23,61 @@ import {
   SpriteMaterial,
   type Object3D,
 } from "three";
+import { createTrainMap, type TrainMap } from "../shared/map/map.ts";
+import type { Hazard, Item, ItemKind, StationKind } from "../shared/types.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
-import { WALL_HEIGHT, createTrainMap, type TrainMap } from "./trainMap.ts";
 
 /** One distinct colour per seat, in the order the players joined. */
 export const PLAYER_COLORS = ["#e5484d", "#3e63dd", "#30a46c", "#f5d90a"] as const;
 
-/** Player figure radius, in world units. Matches PLAYER_RADIUS in the shared contract once #5 lands. */
+/** Player figure radius, in world units. Matches PLAYER_RADIUS in the shared contract. */
 export const PLAYER_RADIUS = 12;
 /** Player figure height, in world units. */
 export const PLAYER_HEIGHT = 34;
 
+/** Only the fields the renderer reads, so tests can pass small objects. */
+export type RenderItem = Pick<Item, "id" | "kind" | "position" | "heldBy">;
+export type RenderHazard = Pick<Hazard, "id" | "kind" | "position" | "progress">;
+
+/** The dynamic part of the state the scene draws. */
+export interface RenderWorld {
+  players?: readonly RenderPlayer[];
+  items?: readonly RenderItem[];
+  hazards?: readonly RenderHazard[];
+}
+
 const FLOOR_THICKNESS = 8;
+const WALL_HEIGHT = 30;
 const DOOR_THICKNESS = 2;
 const LABEL_HEIGHT = 62;
+const HAZARD_BAR_HEIGHT = 46;
+const HAZARD_BAR_WIDTH = 44;
 
 const FLOOR_COLOR = "#2a2a33";
 const WALL_COLOR = "#71717f";
 const DOOR_COLOR = "#c9a227";
 
+const STATION_COLORS: Record<StationKind, string> = {
+  engine: "#b3541e",
+  coalDispenser: "#5c5c66",
+  wrenchRack: "#9aa0a6",
+  extinguisherRack: "#c0392b",
+  steeringConsole: "#3e63dd",
+};
+
+const ITEM_COLORS: Record<ItemKind, string> = {
+  coal: "#26262c",
+  wrench: "#9aa0a6",
+  extinguisher: "#c0392b",
+};
+
+const HAZARD_COLORS = { breach: "#3e63dd", fire: "#f76b15", course: "#e5484d" } as const;
+
 /** A sprite-like label above a player's head. Injected in tests so no canvas is needed. */
 export type LabelFactory = (name: string) => Object3D;
 
 export interface TrainSceneOptions {
-  /** The layout to draw. Defaults to the deterministic three-car train. */
+  /** The layout to draw. Defaults to the shared train map. */
   map?: TrainMap;
   /** Builds the name label above a player. Defaults to a canvas sprite. */
   labelFactory?: LabelFactory;
@@ -56,12 +86,16 @@ export interface TrainSceneOptions {
 export interface TrainScene {
   scene: Scene;
   camera: PerspectiveCamera;
-  /** Holds one group per player; replaced by `updatePlayers`. */
+  /** One group per player; replaced by `updateState`. */
   playersGroup: Group;
-  /** Holds the floor, the walls and the doors. */
+  /** One group per item on the floor; held items live in their player group. */
+  itemsGroup: Group;
+  /** One group per hazard, with its repair bar. */
+  hazardsGroup: Group;
+  /** The floor, walls, doors and stations. */
   mapGroup: Group;
   map: TrainMap;
-  updatePlayers(players: readonly RenderPlayer[]): void;
+  updateState(world: RenderWorld): void;
   dispose(): void;
 }
 
@@ -102,11 +136,30 @@ export function fitCameraToMap(camera: PerspectiveCamera, map: TrainMap, aspect:
   camera.updateProjectionMatrix();
 }
 
-/** Creates the camera already fitted to the default 16:9 viewport. */
 function createCamera(map: TrainMap): PerspectiveCamera {
   const camera = new PerspectiveCamera(45, 16 / 9, 1, 6000);
   fitCameraToMap(camera, map, 16 / 9);
   return camera;
+}
+
+function buildStation(kind: StationKind, position: { x: number; y: number }): Group {
+  const group = new Group();
+  group.name = `station-${kind}`;
+  group.userData = { kind: "station", stationKind: kind };
+  group.position.set(position.x, 0, position.y);
+
+  const color = new Color(STATION_COLORS[kind]);
+  const pad = new Mesh(new BoxGeometry(44, 6, 44), new MeshStandardMaterial({ color, roughness: 0.7 }));
+  pad.position.y = 3;
+  pad.userData = { kind: "stationPad", stationKind: kind };
+  group.add(pad);
+
+  const post = new Mesh(new BoxGeometry(12, 28, 12), new MeshStandardMaterial({ color, roughness: 0.5 }));
+  post.position.y = 20;
+  post.userData = { kind: "stationPost", stationKind: kind };
+  group.add(post);
+
+  return group;
 }
 
 function buildMapGroup(map: TrainMap): Group {
@@ -119,7 +172,7 @@ function buildMapGroup(map: TrainMap): Group {
 
   for (const car of map.cars) {
     const mesh = new Mesh(new BoxGeometry(car.width, FLOOR_THICKNESS, car.depth), floorMaterial);
-    mesh.position.set(car.x, -FLOOR_THICKNESS / 2, car.z);
+    mesh.position.set(car.x, -FLOOR_THICKNESS / 2, car.y);
     mesh.name = `car-${car.index}`;
     mesh.userData = { kind: "car", index: car.index };
     group.add(mesh);
@@ -127,7 +180,7 @@ function buildMapGroup(map: TrainMap): Group {
 
   for (const wall of map.walls) {
     const mesh = new Mesh(new BoxGeometry(wall.width, WALL_HEIGHT, wall.depth), wallMaterial);
-    mesh.position.set(wall.x, WALL_HEIGHT / 2, wall.z);
+    mesh.position.set(wall.x, WALL_HEIGHT / 2, wall.y);
     mesh.name = "wall";
     mesh.userData = { kind: "wall" };
     group.add(mesh);
@@ -135,10 +188,14 @@ function buildMapGroup(map: TrainMap): Group {
 
   for (const door of map.doors) {
     const mesh = new Mesh(new BoxGeometry(door.width, DOOR_THICKNESS, door.depth), doorMaterial);
-    mesh.position.set(door.x, DOOR_THICKNESS / 2, door.z);
+    mesh.position.set(door.x, DOOR_THICKNESS / 2, door.y);
     mesh.name = `door-${door.fromCar}-${door.toCar}`;
     mesh.userData = { kind: "door", fromCar: door.fromCar, toCar: door.toCar };
     group.add(mesh);
+  }
+
+  for (const station of map.stations) {
+    group.add(buildStation(station.kind, station.position));
   }
 
   return group;
@@ -164,16 +221,29 @@ export function createNameLabel(name: string): Object3D {
 
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
-  const sprite = new Sprite(
-    new SpriteMaterial({ map: texture, transparent: true, depthWrite: false }),
-  );
+  const sprite = new Sprite(new SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
   sprite.scale.set(96, 24, 1);
   sprite.name = `label-${name}`;
   sprite.userData = { kind: "label", name };
   return sprite;
 }
 
-function buildPlayerGroup(player: RenderPlayer, seat: number, labelFactory: LabelFactory): Group {
+function buildItemMesh(item: RenderItem, scale = 1): Mesh {
+  const mesh = new Mesh(
+    new BoxGeometry(16 * scale, 12 * scale, 16 * scale),
+    new MeshStandardMaterial({ color: new Color(ITEM_COLORS[item.kind]), roughness: 0.6 }),
+  );
+  mesh.name = `item-${item.id}`;
+  mesh.userData = { kind: "item", itemId: item.id, itemKind: item.kind };
+  return mesh;
+}
+
+function buildPlayerGroup(
+  player: RenderPlayer,
+  seat: number,
+  labelFactory: LabelFactory,
+  heldItems: readonly RenderItem[],
+): Group {
   const group = new Group();
   group.name = `player-${player.id}`;
   group.userData = { kind: "player", playerId: player.id, name: player.name };
@@ -192,8 +262,68 @@ function buildPlayerGroup(player: RenderPlayer, seat: number, labelFactory: Labe
   label.position.y = LABEL_HEIGHT;
   group.add(label);
 
-  // Floor position (x, y) becomes scene position (x, 0, z).
+  // A held item is drawn next to its player, not on the floor.
+  const held = heldItems.find((item) => item.heldBy === player.id);
+  if (held) {
+    const mesh = buildItemMesh(held, 0.7);
+    mesh.name = `held-${held.id}`;
+    mesh.position.set(PLAYER_RADIUS + 8, PLAYER_HEIGHT * 0.6, 0);
+    mesh.userData = { ...mesh.userData, kind: "heldItem", heldBy: player.id };
+    group.add(mesh);
+  }
+
   group.position.set(player.position.x, 0, player.position.y);
+  return group;
+}
+
+function buildHazardGroup(hazard: RenderHazard): Group {
+  const group = new Group();
+  group.name = `hazard-${hazard.id}`;
+  group.userData = { kind: "hazard", hazardId: hazard.id, hazardKind: hazard.kind };
+  group.position.set(hazard.position.x, 0, hazard.position.y);
+
+  const color = new Color(HAZARD_COLORS[hazard.kind]);
+  const material = new MeshStandardMaterial({ color, roughness: 0.5, emissive: color, emissiveIntensity: 0.35 });
+
+  if (hazard.kind === "fire") {
+    const flame = new Mesh(new ConeGeometry(14, 28, 16), material);
+    flame.position.y = 16;
+    flame.name = "fire";
+    flame.userData = { kind: "hazardShape", hazardKind: hazard.kind };
+    group.add(flame);
+  } else {
+    const mark = new Mesh(new CylinderGeometry(18, 18, 4, 20), material);
+    mark.position.y = 4;
+    mark.name = hazard.kind === "breach" ? "breach" : "course";
+    mark.userData = { kind: "hazardShape", hazardKind: hazard.kind };
+    group.add(mark);
+  }
+
+  // Repair progress (#19): a bar above the hazard that follows `hazard.progress`.
+  const progress = Math.min(1, Math.max(0, hazard.progress));
+  const bar = new Group();
+  bar.name = "progress";
+  bar.position.y = HAZARD_BAR_HEIGHT;
+  bar.userData = { kind: "progressBar", hazardId: hazard.id, progress };
+
+  const back = new Mesh(
+    new BoxGeometry(HAZARD_BAR_WIDTH, 5, 3),
+    new MeshStandardMaterial({ color: 0x101018, roughness: 1 }),
+  );
+  back.name = "progressBack";
+  bar.add(back);
+
+  const fill = new Mesh(
+    new BoxGeometry(HAZARD_BAR_WIDTH, 5, 3.2),
+    new MeshStandardMaterial({ color: 0x30a46c, roughness: 0.6 }),
+  );
+  fill.name = "progressFill";
+  fill.scale.x = progress;
+  fill.position.x = -(HAZARD_BAR_WIDTH / 2) * (1 - progress);
+  fill.userData = { kind: "progressFill", hazardId: hazard.id, progress };
+  bar.add(fill);
+
+  group.add(bar);
   return group;
 }
 
@@ -212,11 +342,11 @@ function disposeObject(object: Object3D): void {
 }
 
 /**
- * Creates the scene, camera, lights and train for `players`.
- * Call `updatePlayers` whenever a new game state arrives.
+ * Creates the scene, camera, lights and static map. Call `updateState` whenever
+ * a new game state arrives.
  */
 export function buildTrainScene(
-  players: readonly RenderPlayer[] = [],
+  world: RenderWorld = {},
   options: TrainSceneOptions = {},
 ): TrainScene {
   const map = options.map ?? createTrainMap();
@@ -238,29 +368,59 @@ export function buildTrainScene(
   const mapGroup = buildMapGroup(map);
   scene.add(mapGroup);
 
+  const itemsGroup = new Group();
+  itemsGroup.name = "items";
+  scene.add(itemsGroup);
+
+  const hazardsGroup = new Group();
+  hazardsGroup.name = "hazards";
+  scene.add(hazardsGroup);
+
   const playersGroup = new Group();
   playersGroup.name = "players";
   scene.add(playersGroup);
 
-  const updatePlayers = (next: readonly RenderPlayer[]): void => {
-    for (const child of [...playersGroup.children]) {
-      playersGroup.remove(child);
+  const clear = (group: Group): void => {
+    for (const child of [...group.children]) {
+      group.remove(child);
       disposeObject(child);
     }
-    next.forEach((player, seat) => {
-      playersGroup.add(buildPlayerGroup(player, seat, labelFactory));
-    });
   };
 
-  updatePlayers(players);
+  const updateState = (next: RenderWorld): void => {
+    const players = next.players ?? [];
+    const items = next.items ?? [];
+    const hazards = next.hazards ?? [];
+
+    clear(playersGroup);
+    clear(itemsGroup);
+    clear(hazardsGroup);
+
+    players.forEach((player, seat) => {
+      playersGroup.add(buildPlayerGroup(player, seat, labelFactory, items));
+    });
+
+    for (const item of items) {
+      if (item.heldBy !== null) continue;
+      const mesh = buildItemMesh(item);
+      mesh.position.set(item.position.x, 10, item.position.y);
+      itemsGroup.add(mesh);
+    }
+
+    for (const hazard of hazards) hazardsGroup.add(buildHazardGroup(hazard));
+  };
+
+  updateState(world);
 
   return {
     scene,
     camera,
     playersGroup,
+    itemsGroup,
+    hazardsGroup,
     mapGroup,
     map,
-    updatePlayers,
+    updateState,
     dispose: () => {
       disposeObject(scene);
     },
