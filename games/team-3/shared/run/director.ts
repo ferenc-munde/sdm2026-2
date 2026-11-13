@@ -3,6 +3,7 @@
 // always give the same result.
 
 import {
+  HAZARD_INTERVAL_BY_PLAYERS,
   HAZARD_INTERVAL_LATE_SECONDS,
   HAZARD_INTERVAL_SECONDS,
   HAZARD_LATE_PROGRESS,
@@ -29,9 +30,14 @@ export interface DirectorState {
 /** The hazard kinds the director starts. The course hazard (#28) has its own trigger. */
 export const DIRECTOR_HAZARD_KINDS: readonly HazardKind[] = ["breach", "fire"];
 
-/** A fresh director for a new run: the first hazard comes after one full interval. */
-export function createDirector(): DirectorState {
-  return { secondsUntilNext: HAZARD_INTERVAL_SECONDS, spawnedCount: 0 };
+/** A fresh director for a new run: the first hazard comes after one full interval for that crew size. */
+export function createDirector(playerCount = 0): DirectorState {
+  return { secondsUntilNext: hazardInterval(0, playerCount), spawnedCount: 0 };
+}
+
+/** How many players are connected: the crew the difficulty is scaled to. */
+export function crewSize(state: GameState): number {
+  return Object.values(state.players).filter((player) => player.connected).length;
 }
 
 /** How far the train has travelled, from 0 (start) to 1 (destination). */
@@ -39,9 +45,15 @@ export function journeyProgress(state: GameState): number {
   return Math.min(1, Math.max(0, state.journey.distance / WIN_DISTANCE));
 }
 
-/** Seconds between hazards: 12, and 7 once more than 65% of the distance is covered. */
-export function hazardInterval(progress: number): number {
-  return progress > HAZARD_LATE_PROGRESS ? HAZARD_INTERVAL_LATE_SECONDS : HAZARD_INTERVAL_SECONDS;
+/**
+ * Seconds between hazards. A bigger crew gets hazards more often (14, 11 and 9 seconds for
+ * 2, 3 and 4 players; 12 for any other count). Once more than 65% of the distance is covered
+ * the interval shrinks by the plan's late ratio, 7 / 12.
+ */
+export function hazardInterval(progress: number, playerCount = 0): number {
+  const base = HAZARD_INTERVAL_BY_PLAYERS[playerCount] ?? HAZARD_INTERVAL_SECONDS;
+  if (progress <= HAZARD_LATE_PROGRESS) return base;
+  return base * (HAZARD_INTERVAL_LATE_SECONDS / HAZARD_INTERVAL_SECONDS);
 }
 
 /** The spots that have no hazard on them. */
@@ -85,7 +97,7 @@ export function stepDirector(
   };
 
   // `remaining` is zero or negative here: carry the overshoot so the rhythm does not drift.
-  const next = Math.max(0, hazardInterval(journeyProgress(state)) + remaining);
+  const next = Math.max(0, hazardInterval(journeyProgress(state), crewSize(state)) + remaining);
   return {
     director: { secondsUntilNext: next, spawnedCount },
     state: { ...state, hazards: { ...state.hazards, [hazard.id]: hazard } },
