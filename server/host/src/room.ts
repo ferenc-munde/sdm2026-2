@@ -29,18 +29,18 @@ export interface HostDeps {
   config: unknown;
 }
 
-export function createGameRoom<S extends BaseState, C extends RoomSettings, I>(
-  game: GameDefinition<S, C, I>,
+export function createGameRoom<S extends BaseState, C extends RoomSettings, I, J = unknown>(
+  game: GameDefinition<S, C, I, J>,
   deps: HostDeps,
 ) {
   return class GameRoom extends Room<{ state: S }> {
     private config!: C;
-    private ctx!: GameContext;
+    private ctx!: GameContext<C>;
     private pending: PlayerInput<I>[] = [];
 
     onCreate(): void {
       this.config = game.configSchema.parse(deps.config);
-      this.ctx = { random: new SeededRandom(randomInt(0, 2 ** 31)) };
+      this.ctx = { random: new SeededRandom(randomInt(0, 2 ** 31)), config: this.config };
       this.maxClients = this.config.maxPlayers;
       this.patchRate = Math.round(1000 / this.config.patchRate);
 
@@ -58,11 +58,13 @@ export function createGameRoom<S extends BaseState, C extends RoomSettings, I>(
       deps.logger.info("room created", { roomId: this.roomId, code: this.state.code });
     }
 
-    onJoin(client: Client): void {
+    onJoin(client: Client, options?: unknown): void {
+      // Checked before the seat exists, so a rejected join leaves no trace in the state.
+      const joinOptions = this.parseJoinOptions(client, options);
       const seat = new Seat();
       seat.playerId = client.sessionId;
       this.state.seats.set(client.sessionId, seat);
-      game.join(this.state, client.sessionId, this.ctx);
+      game.join(this.state, client.sessionId, this.ctx, joinOptions);
       deps.logger.info("player joined", this.fields(client));
     }
 
@@ -90,6 +92,15 @@ export function createGameRoom<S extends BaseState, C extends RoomSettings, I>(
     onDispose(): void {
       deps.registry.unregister(this.state.code);
       deps.logger.info("room disposed", { roomId: this.roomId });
+    }
+
+    private parseJoinOptions(client: Client, options: unknown): J {
+      if (!game.joinOptionsSchema) return undefined as J;
+      const parsed = game.joinOptionsSchema.safeParse(options ?? {});
+      if (parsed.success) return parsed.data;
+      const reason = parsed.error.issues.map((issue) => issue.message).join("; ");
+      deps.logger.info("join rejected", { roomId: this.roomId, playerId: client.sessionId, reason });
+      throw new Error(`can't join: ${reason}`);
     }
 
     private handleInput(client: Client, raw: unknown): void {

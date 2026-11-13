@@ -24,7 +24,10 @@ globalThis.cancelAnimationFrame = (id) => pendingFrames.delete(id);
 
 const vite = await createTestViteServer();
 try {
-  const { mountTrainScene } = await vite.ssrLoadModule("/client/player-scene.ts");
+  const { mountTrainScene, PLAYER_INSET } = await vite.ssrLoadModule("/client/player-scene.ts");
+  const { TRAIN_LAYOUT } = await vite.ssrLoadModule("/client/environment/TrainEnvironment.ts");
+  // Normalized snapshot x (0..1) to world x: along the train, inset from both end walls.
+  const worldX = (x) => -TRAIN_LAYOUT.length / 2 + PLAYER_INSET.length + x * (TRAIN_LAYOUT.length - PLAYER_INSET.length * 2);
   const { createPreviewSnapshot } = await vite.ssrLoadModule("/client/game-state-adapter.mjs");
 
   function createHarness() {
@@ -43,7 +46,7 @@ try {
     const avatars = () => {
       const groups = [];
       renderedScene.traverse((object) => {
-        if (object.type === "Group" && object.children.length === 3) groups.push(object);
+        if (object.type === "Group" && object.name === "player") groups.push(object);
       });
       return groups;
     };
@@ -79,7 +82,7 @@ try {
     scene.train.update(snapshot);
     const [first, second] = scene.avatars();
     assert.equal(scene.avatars().length, 2);
-    assert.equal(first.position.x, -5.8 + snapshot.players[0].position.x * 11.6);
+    assert.equal(first.position.x, worldX(snapshot.players[0].position.x));
     const updated = createPreviewSnapshot([
       { id: "p1", name: "Engineer", connected: false },
       { id: "p2", name: "Signal Keeper", connected: true },
@@ -88,7 +91,7 @@ try {
     scene.train.update(updated);
     const [updatedFirst, updatedSecond] = scene.avatars();
     assert.equal(updatedFirst.uuid, first.uuid);
-    assert.ok(Math.abs(updatedFirst.position.x - 2.9) < 1e-9);
+    assert.ok(Math.abs(updatedFirst.position.x - worldX(0.75)) < 1e-9);
     assert.equal(updatedFirst.children[0].material.opacity, 0.38);
     assert.equal(updatedSecond.uuid, second.uuid);
     scene.train.dispose();

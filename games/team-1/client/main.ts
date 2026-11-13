@@ -1,11 +1,7 @@
-import "./styles.css";
 import { MockSessionAdapter, SessionError, type LobbyPlayer, type SessionAdapter, type SessionEvent } from "./session-adapter.mjs";
 import { createPreviewSnapshot, MockGameStateAdapter } from "./game-state-adapter.mjs";
 import { mountGameplayView, type PreviewAction } from "./gameplay-view";
 
-const appElement = document.querySelector<HTMLDivElement>("#app");
-if (!appElement) throw new Error("Lobby root element #app was not found.");
-const app: HTMLDivElement = appElement;
 function getAppRoot(): HTMLDivElement {
   const root = document.querySelector<HTMLDivElement>("#app");
   if (!root) throw new Error("Lobby root element #app was not found.");
@@ -193,7 +189,6 @@ function applyPreviewAction(action: PreviewAction): void {
 }
 
 function renderRoom(): void {
-  room.hidden = !roomCode;
   room.hidden = !roomCode || Boolean(gameplayAdapter);
   app.querySelector<HTMLElement>("#active-code")!.textContent = roomCode;
   app.querySelector<HTMLElement>("#room-capacity")!.textContent = `${crew.length} / 4 CREW ABOARD`;
