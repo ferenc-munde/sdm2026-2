@@ -165,6 +165,124 @@
         border-color: rgba(247, 107, 21, 0.6);
         color: #f76b15;
       }
+
+      /* Main menu (#12). */
+      .lobby {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(8, 8, 12, 0.9);
+        z-index: 20;
+      }
+
+      .lobby[hidden] {
+        display: none;
+      }
+
+      .lobby-panel {
+        box-sizing: border-box;
+        width: min(420px, calc(100vw - 32px));
+        padding: 24px 28px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: #17171f;
+      }
+
+      .lobby h2 {
+        margin: 0 0 6px;
+        font-size: 24px;
+      }
+
+      .lobby-panel > p {
+        margin: 0 0 18px;
+        opacity: 0.75;
+      }
+
+      .lobby-form {
+        display: grid;
+        gap: 8px;
+      }
+
+      .lobby label {
+        margin-top: 6px;
+        font-size: 12px;
+        opacity: 0.75;
+      }
+
+      .lobby input {
+        box-sizing: border-box;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: #101018;
+        color: #e6e6ee;
+        font: inherit;
+      }
+
+      .lobby-code {
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+      }
+
+      .lobby button {
+        padding: 10px 14px;
+        border: 0;
+        border-radius: 8px;
+        background: #3e63dd;
+        color: #ffffff;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .lobby button:hover {
+        background: #4f74ee;
+      }
+
+      .lobby .lobby-join {
+        background: #2f2f3a;
+      }
+
+      .lobby .lobby-divider {
+        margin: 14px 0 4px;
+        font-size: 12px;
+        opacity: 0.6;
+        text-align: center;
+      }
+
+      .lobby-error {
+        margin: 12px 0 0;
+        color: #e5484d;
+      }
+
+      .lobby-status {
+        margin: 12px 0 0;
+        opacity: 0.75;
+      }
+
+      .lobby-error[hidden],
+      .lobby-status[hidden],
+      .lobby-room[hidden],
+      .lobby-form[hidden] {
+        display: none;
+      }
+
+      .lobby-room {
+        display: grid;
+        gap: 8px;
+      }
+
+      .lobby-room-code {
+        margin: 0;
+        font-size: 32px;
+        letter-spacing: 0.2em;
+      }
+
+      .lobby-room-link {
+        font-size: 12px;
+        opacity: 0.7;
+        word-break: break-all;
+      }
     </style>
   </head>
   <body>
