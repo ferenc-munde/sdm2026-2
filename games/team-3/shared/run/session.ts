@@ -173,7 +173,11 @@ export function leaveSession(session: GameSession, playerId: PlayerId): GameSess
   };
 }
 
-/** Starts the run from the lobby; refused with `notEnoughPlayers` unless two to four players are connected. */
+/**
+ * Starts the run from the lobby; refused with `notEnoughPlayers` unless two to four players are connected.
+ * It does not check who asked: the room uses `departSession` for `startGame` (#148). This is
+ * for tests and internal use.
+ */
 export function startSession(session: GameSession): SessionResult {
   if (session.state.phase !== "lobby") return refuse(session, "gameInProgress");
   if (!canStartRun(session.state)) return refuse(session, "notEnoughPlayers");

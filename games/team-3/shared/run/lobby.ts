@@ -28,7 +28,12 @@ export function isRoomFull(state: GameState): boolean {
   return Object.keys(state.players).length >= state.lobby.crewSize;
 }
 
-/** The smallest crew size the host may pick right now: never below the players already in. */
+/**
+ * The smallest crew size the host may pick right now: never below the players already in.
+ * A disconnected player still counts: their seat is kept for the reconnect window
+ * (`reconnectSeconds`), so the crew waits for them, and the host can neither shrink the crew
+ * below them nor depart without them until they return or their seat is freed.
+ */
 export function smallestCrewSize(state: GameState): number {
   return Math.max(MIN_PLAYERS, Object.keys(state.players).length);
 }
