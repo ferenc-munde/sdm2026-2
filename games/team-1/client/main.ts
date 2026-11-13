@@ -189,7 +189,7 @@ function applyPreviewAction(action: PreviewAction): void {
 }
 
 function renderRoom(): void {
-  room.hidden = !roomCode;
+  room.hidden = !roomCode || Boolean(gameplayAdapter);
   app.querySelector<HTMLElement>("#active-code")!.textContent = roomCode;
   app.querySelector<HTMLElement>("#room-capacity")!.textContent = `${crew.length} / 4 CREW ABOARD`;
   playerList.innerHTML = crew.slice(0, 4).map((player, index) => `

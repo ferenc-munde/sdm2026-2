@@ -69,6 +69,31 @@ try {
     assert.equal(app.querySelectorAll("#player-list .player-row:not(.player-empty)").length, 2);
   });
 
+  await test("roster events keep gameplay active and returning shows the latest crew", async () => {
+    const { MockSessionAdapter } = await vite.ssrLoadModule("/client/session-adapter.mjs");
+    const guest = new MockSessionAdapter();
+    app.querySelector("#board-train").click();
+    try {
+      assert.equal(app.querySelector("#crew-room").hidden, true);
+      await guest.joinSession("DEMO", "Late Passenger");
+      await tick();
+      assert.equal(app.querySelector("#crew-room").hidden, true);
+      assert.equal(app.querySelector("#game-screen").hidden, false);
+      assert.equal(app.querySelector("#crew-count").textContent, "3 / 4");
+      await guest.leaveSession();
+      await tick();
+      assert.equal(app.querySelector("#crew-room").hidden, true);
+      assert.equal(app.querySelector("#crew-count").textContent, "2 / 4");
+    } finally {
+      await guest.leaveSession();
+      app.querySelector("#return-crew").click();
+    }
+    assert.equal(app.querySelector("#crew-room").hidden, false);
+    assert.equal(app.querySelector("#game-screen").hidden, true);
+    assert.equal(app.querySelector("#room-capacity").textContent, "2 / 4 CREW ABOARD");
+    assert.doesNotMatch(app.querySelector("#player-list").textContent, /Late Passenger/);
+  });
+
   await test("HUD DOM reflects snapshots and displays both terminal results", async () => {
     const { mountGameplayView } = await vite.ssrLoadModule("/client/gameplay-view.ts");
     const { MockGameStateAdapter, createPreviewSnapshot } = await vite.ssrLoadModule("/client/game-state-adapter.mjs");
