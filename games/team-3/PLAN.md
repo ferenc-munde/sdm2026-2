@@ -12,7 +12,7 @@ This plan covers 12–15 working hours for four developers. It is planned to 12 
 | Starting point | A copy of the platform template (`server/template/`), once the platform team has built it | It will provide rooms with join codes, the fixed tick, reconnection, replays and deployment. We only write the game. |
 | Until then | Pure rules in `shared/` with their own tests | The platform is being built during the hackathon. Rules written as pure, deterministic functions (no `Math.random()`, no clock) can be wrapped in the platform's game definition later without a rewrite. |
 | Authority | The server simulates everything, including movement | This is how the platform works: clients send inputs, never state. The rules can be tested without a browser. |
-| Client | Vite + HTML canvas, no game engine | Simple shapes are enough for a top-down cutaway. |
+| Client | Vite + Three.js | Requested by the platform team. The train is drawn as simple 3D boxes seen from above at an angle, which gives the cutaway look of the idea document without any art assets. |
 | Tests | Vitest on the shared rules | The rules are one pure game definition (`createState`, `join`, `leave`, `step`) with a seeded random generator, so every test is repeatable. |
 | Map | The train only | Ship, plane and spaceship are out of scope. |
 
@@ -67,7 +67,7 @@ games/team-3/
 ├── shared/           the game definition: state, inputs, rules (pure, tested)
 │   └── hazards/      breach, fire, hazard director
 ├── room/             connects the game definition to the platform room
-└── client/           canvas drawing, input, screens
+└── client/           Three.js scene, input, screens
 ```
 
 ## 5. Roles
@@ -120,7 +120,7 @@ Each line is one GitHub issue titled `[team-3] <title>`, labelled `team-3`, assi
 | 5 | Player movement with wall collision | Dev 1 | Tests: moves in 8 directions, stops at walls, passes doors |
 | 6 | Room setup: 2 to 4 players, join by code (provided by the platform) | Dev 2 | `config/game.json` allows 4 players; test: a fifth player is refused; joining by code works |
 | 7 | Run phases in the game definition: lobby, running, finished | Dev 2 | Tests: the run starts when the players are ready; a replay of a run gives the same state |
-| 8 | Canvas renderer: train cutaway and players | Dev 3 | Train and coloured players with names are drawn |
+| 8 | Three.js renderer: train cutaway and players | Dev 3 | A Three.js scene shows the train from above at an angle, with coloured players and names |
 | 9 | Keyboard input sent to the server | Dev 3 | WASD and arrow keys move your player |
 | 10 | Lobby screen: name, create room, join with code | Dev 3 | Two browsers end up in the same room |
 
