@@ -1,0 +1,21 @@
+{
+  "name": "@team-2/game",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Last Train: a 5-carriage co-operative survival train (Team 2)",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "^0.170.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.170.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
