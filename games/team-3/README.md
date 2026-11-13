@@ -1,6 +1,8 @@
 # Team 3 — The Last Train
 
-A co-operative, non-violent, online multiplayer game for 2–4 players. The players are the maintenance crew of a moving train: they carry coal, repair leaks and put out fires so the train reaches its destination before the hull fails.
+This folder holds the game of Team 3 (package `@team-3/game`, label `team-3`).
+
+**The Last Train** is a co-operative, non-violent, online multiplayer game for 2–4 players. The players are the maintenance crew of a moving train: they carry coal, repair leaks and put out fires so the train reaches its destination before the hull fails.
 
 - **Plan, scope, roles and backlog:** [PLAN.md](PLAN.md)
 - **Project board:** <https://github.com/users/favyabils234-hash/projects/1>
@@ -11,11 +13,11 @@ A co-operative, non-violent, online multiplayer game for 2–4 players. The play
 | Developer | GitHub | Area |
 |---|---|---|
 | 1 | `Abmuminfav` | Game rules |
-| 2 | `favyabils234-hash` | Server, hazards, release |
+| 2 | `favyabils234-hash` | Room, hazards, release |
 | 3 | `Main-66` | Client |
 
-## Running the game
+## Working here
 
-The game is built on the shared course platform. Run instructions are added with the project skeleton (issue #4).
+Work only inside this folder unless an issue says otherwise. Start from the template game once the platform team has built it: the layout of a game package is in [server/template/README.md](../../server/template/README.md), the rules in [server/CLAUDE.md](../../server/CLAUDE.md).
 
-Work only inside this folder unless an issue says otherwise. Shared code (platform, tooling, CI) lives outside `games/` and changes through its own issue and PR.
+Until the platform packages exist, the game rules are written in `shared/` as pure, deterministic functions with tests, so they can be wrapped in the platform's game definition later without being rewritten.

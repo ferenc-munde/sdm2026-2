@@ -9,7 +9,8 @@ This plan covers 12–15 working hours for three developers. It is planned to 12
 | Decision | Choice | Reason |
 |---|---|---|
 | Platform | Browser game on the shared course platform, not Godot | The repository rules fix the stack for every team: TypeScript, Vite and Colyseus, hosted by the platform team. The game design from the idea document is kept unchanged. |
-| Starting point | A copy of the platform template (`server/template/`) | It already provides rooms with join codes, the fixed tick, reconnection, replays and deployment. We only write the game. |
+| Starting point | A copy of the platform template (`server/template/`), once the platform team has built it | It will provide rooms with join codes, the fixed tick, reconnection, replays and deployment. We only write the game. |
+| Until then | Pure rules in `shared/` with their own tests | The platform is being built during the hackathon. Rules written as pure, deterministic functions (no `Math.random()`, no clock) can be wrapped in the platform's game definition later without a rewrite. |
 | Authority | The server simulates everything, including movement | This is how the platform works: clients send inputs, never state. The rules can be tested without a browser. |
 | Client | Vite + HTML canvas, no game engine | Simple shapes are enough for a top-down cutaway. |
 | Tests | Vitest on the shared rules | The rules are one pure game definition (`createState`, `join`, `leave`, `step`) with a seeded random generator, so every test is repeatable. |
@@ -107,7 +108,7 @@ Each line is one GitHub issue titled `[team-3] <title>`, labelled `team-3`, assi
 | # | Title | Owner | Done when |
 |---|---|---|---|
 | 1 | Add project plan and README | Dev 2 | Plan and run instructions are in the team folder |
-| 2 | Project skeleton: copy the platform template into `games/team-3/` | Dev 2 | `pnpm --filter @team-3/game dev` shows "Server OK"; template tests pass; `GAME_ID` is `team-3` |
+| 2 | Project skeleton: `@team-3/game` package with the template layout and a test runner | Dev 2 | `shared/`, `room/`, `client/` and `config/` exist; the tests run with one command; one passing test; README says how to run them |
 | 3 | Shared contract: state types, messages, constants | Dev 1 | Types compile; constants match section 3; all three approved |
 
 ### Phase 1 — walking skeleton
@@ -135,7 +136,7 @@ Each line is one GitHub issue titled `[team-3] <title>`, labelled `team-3`, assi
 | 17 | Draw items, stations, hazards and repair progress | Dev 3 | Every object in the state is visible |
 | 18 | Heads-up display: hull, fuel, distance | Dev 3 | Bars follow the server state; fuel bar changes colour when low |
 | 19 | Win and lose screens with "play again" | Dev 3 | Both screens appear; play again restarts the room |
-| 20 | Put the game online through the platform | Dev 2 | `feature/team-3` merged into `main`; a `platform` issue adds team 3 to the game list; the game works under `/team-3` |
+| 20 | Put the game online through the platform | Dev 2 | The game runs on the platform host; a `platform` issue adds team 3 to the game list; the game works under `/team-3` |
 
 ### Phase 3 — complete
 
@@ -161,21 +162,21 @@ Each line is one GitHub issue titled `[team-3] <title>`, labelled `team-3`, assi
 
 The repository rules in the root `CLAUDE.md` and `GETTING_STARTED.md` apply. In short:
 
-- **Issue first.** No branch without an issue. Branch name: `team-3/<issue number>-<short-name>`, created from `feature/team-3`.
-- **One issue, one pull request, into `feature/team-3`.** Aim for under 200 changed lines. The title uses the commit format, for example `feat(team-3): add fire hazard`. The description fills in the template and ends with `Closes #<number>`.
+- **Issue first.** No branch without an issue. Branch name: `team-3/<issue number>-<short-name>`, created from an up-to-date `main`.
+- **One issue, one pull request, into `main`.** Aim for under 200 changed lines. The title uses the commit format, for example `feat(team-3): add fire hazard`. The description says what changed and how it was tested, and ends with `Closes #<number>`.
 - **Commits** use `type(team-3): subject` with `Refs #<number>` in the body.
-- **Run `pnpm preflight` before pushing.** It runs lint, type checks, tests and the build.
+- **Run the tests before pushing.** Once the platform has continuous integration, every check must be green.
 - **Tests with every rule change.** Client-only drawing changes say how they were checked by hand.
 - **Review within 15 minutes.** A waiting review comes before starting new work.
 - **Contract changes are announced.** Anything in the shared state or inputs is agreed by all three before it is merged.
 - **Stay in `games/team-3/`.** Anything needed from the platform team is an issue with the `platform` label.
-- **`feature/team-3` goes into `main`** at the end of each phase, when its checks are green, so the game is deployed to the development environment early.
 
 ## 9. Open points and risks
 
 | Risk | Action | Owner |
 |---|---|---|
-| The platform files are not all on `main` yet (pull request #33 and the root workspace files), so the template cannot be copied or run | Follow the platform pull requests; start the skeleton (task 2) the moment they are merged. Until then, write rules and tests that do not depend on the platform | Dev 2 |
+| The platform is only a skeleton: the workspace, `@sdm/core`, `@sdm/host` and the template are still to be built by the platform team | Write rules and tests that do not depend on the platform; follow the platform pull requests and wire the game into the room as soon as `@sdm/core` and `@sdm/host` are merged | Dev 2 |
+| The platform is not ready in time | The rules, tests and client still count as delivered work; ask the platform team early which parts they will finish | Dev 2 |
 | Code written before the template lands uses a different folder layout | Move it into `shared/` and shape it as the game definition when the skeleton is merged | Dev 1 |
 | The platform needs Node.js 22 and pnpm 10.28.0 | Everyone installs them before the skeleton lands | all |
 | Merge conflicts in shared files | One owner per folder; contract merged first | Dev 1 |
