@@ -8,7 +8,11 @@ export const gameConfigSchema = z
 		reconnectSeconds: z.number().int().min(5).max(120),
 		timeLimitSeconds: z.number().int().min(60).max(1200),
 	})
-	.passthrough();
+	.passthrough()
+	.refine(
+		(c) => c.patchRate <= c.tickRate,
+		{ message: "patchRate must not exceed tickRate" },
+	);
 
 export type GameConfig = z.infer<typeof gameConfigSchema>;
 

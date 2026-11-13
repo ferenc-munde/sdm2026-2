@@ -16,6 +16,12 @@ This mirrors the platform template layout (`server/template/README.md`).
 host and template exist. See `SPEC.md` for the game design and
 `WORKFLOW.md` for who owns which files.
 
+`shared/config.ts` mirrors the platform's `RoomSettingsSchema` fields; once
+`@sdm/core` lands it will extend it directly instead of redefining them
+(tracked with the platform in #73). The tsconfig adds
+`experimentalDecorators` + `useDefineForClassFields: false` on top of the
+team-3 conventions — required by `@colyseus/schema` state classes in #64.
+
 ## Run the tests
 
 From `games/team-2/`:
