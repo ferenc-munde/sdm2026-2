@@ -39,7 +39,9 @@ function teamSection({ team, linesAdded, prsMerged, members }) {
           <div class="track"><span style="width:${(m.share * 100).toFixed(2)}%;background:${color(i)}"></span></div>
           <div class="stats"><span><b class="num">${m.prsMerged}</b> ${m.prsMerged === 1 ? "PR" : "PRs"} merged</span><span><b class="num">${m.issuesAssignedClosed}/${m.issuesAssigned}</b> issues closed</span><span><b class="num">${m.reviewsGiven}</b> ${m.reviewsGiven === 1 ? "review" : "reviews"}</span></div>
         </div>
-        <p class="summary">${esc(m.summary)}</p>
+        <div class="summary"><p>${esc(m.summary)}</p>${m.ruleProblems?.length
+          ? `<p class="rules" title="${esc(m.ruleProblems.join("\n"))}">${m.ruleProblems.length} rule ${m.ruleProblems.length === 1 ? "problem" : "problems"}: ${esc(m.ruleProblems.slice(0, 3).join("; "))}${m.ruleProblems.length > 3 ? " …" : ""}</p>`
+          : ""}</div>
         <div class="grade" title="Delivery ${s.delivery}/4 · Process ${s.process}/3 · Collaboration ${s.collaboration}/3">
           <span class="chip g${s.grade}">${s.grade}</span><small>${s.points}/10 points<br>${GRADE_WORDS[s.grade]}</small>
         </div>
@@ -59,7 +61,20 @@ function teamSection({ team, linesAdded, prsMerged, members }) {
   </section>`;
 }
 
-export function toHtml(report, { repo, generatedAt = new Date() } = {}) {
+function rulesTable(rules) {
+  if (!rules?.length) return "";
+  const rows = rules
+    .map((r) => `<tr><td>${esc(r.text)}</td><td class="num">${esc(r.since.slice(0, 16).replace("T", " "))} UTC</td></tr>`)
+    .join("");
+  return `
+  <section class="sheet" aria-labelledby="rules-title">
+    <h2 id="rules-title">Rules checked</h2>
+    <p class="note">Every issue and pull request is judged by the rules in force when it was created. A rule added later never costs anyone points.</p>
+    <div style="overflow-x:auto"><table><thead><tr><th>Rule</th><th>In force since</th></tr></thead><tbody>${rows}</tbody></table></div>
+  </section>`;
+}
+
+export function toHtml(report, { repo, generatedAt = new Date(), rules = [] } = {}) {
   const when = generatedAt.toISOString().slice(0, 16).replace("T", " ");
   const nav = report.map(({ team }) => `<a href="#${anchor(team)}">${esc(team)}</a>`).join("");
   return `<!doctype html>
@@ -122,7 +137,9 @@ nav a:hover, nav a:focus-visible { border-color: var(--accent); outline: none; }
 .track span { display: block; height: 100%; border-radius: 4px; }
 .stats { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); font-size: 0.82rem; }
 .stats b { color: var(--ink); font-weight: 500; }
-.summary { margin: 0; font-size: 0.93rem; min-width: 0; }
+.summary { font-size: 0.93rem; min-width: 0; display: grid; gap: 4px; }
+.summary p { margin: 0; }
+.summary .rules { font-size: 0.8rem; color: var(--g2); }
 .grade { display: grid; justify-items: center; gap: 4px; cursor: help; }
 .chip { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; color: var(--chip-fg); }
 .grade small { font-size: 0.72rem; color: var(--muted); text-align: center; line-height: 1.25; }
@@ -135,6 +152,7 @@ table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
 th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
 th { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 footer { color: var(--muted); font-size: 0.82rem; }
+.note { margin: 0; color: var(--muted); font-size: 0.92rem; max-width: 65ch; }
 @media (max-width: 860px) {
   .colhead { display: none; }
   .student { grid-template-columns: 1fr auto; grid-template-areas: "who grade" "share share" "summary summary"; gap: 10px 16px; }
@@ -167,13 +185,14 @@ footer { color: var(--muted); font-size: 0.82rem; }
         <thead><tr><th>Area</th><th>Points</th></tr></thead>
         <tbody>
           <tr><td>Delivery: merged PRs (5+ / 2–4 / 1 / only open)</td><td class="num">4 / 3 / 2 / 1</td></tr>
-          <tr><td>Process: PRs link issues · issues follow the rules · assigned issue closed</td><td class="num">+1 each</td></tr>
+          <tr><td>Process: PRs follow the rules · issues follow the rules · assigned issue closed</td><td class="num">+1 each</td></tr>
           <tr><td>Collaboration: reviews (5+ / 1–4) · at least half an equal share</td><td class="num">2 / 1 · +1</td></tr>
           <tr><td>Points → grade: 8–10 / 5–7 / 3–4 / 1–2 / 0</td><td class="num">5 / 4 / 3 / 2 / 1</td></tr>
         </tbody>
       </table>
     </div>
   </section>
+  ${rulesTable(rules)}
   <footer>Contains per-person evaluation data. Do not commit or publish it.</footer>
 </div>
 </body>
