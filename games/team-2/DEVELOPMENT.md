@@ -51,6 +51,9 @@ root will replace them.
 ## Coming next
 
 - The shared contract (state schema, input contract, `GameDefinition`
-  wiring) lands in #64 — `@colyseus/schema` and the Colyseus SDK versions are
-  pinned there after checking the Colyseus 0.18 docs.
+  wiring) lands in #64. `@colyseus/schema@^5.0.0` is pinned there, paired with
+  the Colyseus 0.18 SDK (`colyseus@0.18.12` uses `@colyseus/core@^0.18.10`,
+  which pairs with schema 5.x) — the SDK itself joins with the platform host
+  (#73). `shared/types.ts` shims `BaseState`/`GameDefinition`/`Rng` until
+  `@sdm/core` exists; only that file changes when the platform lands.
 - The Three.js renderer starts with #37; the lobby with #70.
