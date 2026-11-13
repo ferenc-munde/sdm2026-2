@@ -162,11 +162,11 @@ carrying/tossing; toss physics are simulated server-side in fixed ticks.
 
 #### Toss
 
-- Initial speed is 8 units/second.
-- Maximum travel distance is 6 units.
-- Gravity is 12 units/second².
-- Toss direction is from the player's position toward target coordinates
-  (`tx`, `ty`).
+- Flight is purely horizontal and deterministic. The item travels from the
+  player's position toward target coordinates (`tx`, `ty`) at 8 units/second
+  and lands after the smaller of the distance to the target or 6 units.
+- Gravity is 12 units/second² for the client's visual arc only; it never
+  affects the simulation.
 - Items cannot be picked up while airborne.
 - On collision, the item stops and becomes available for pickup.
 - Toss physics use fixed ticks and are deterministic.
@@ -176,6 +176,9 @@ carrying/tossing; toss physics are simulated server-side in fixed ticks.
 - Fuel capacity is 100.
 - Fuel consumption is 20 per second.
 - The extinguisher cannot spray when empty.
+- Spraying means holding `interactDown` while holding the extinguisher.
+- Spray direction comes from the player's facing (`anim`).
+- Fuel drains server-side in fixed ticks.
 - The refill location is the extinguisher refill dock in Carriage 4.
 - Refilling restores fuel to 100 and takes 3 seconds.
 
