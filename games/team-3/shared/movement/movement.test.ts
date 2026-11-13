@@ -135,6 +135,19 @@ describe("stepMovement", () => {
     expect(recovered.players.p1!.position.x).toBeGreaterThan(stunned.players.p1!.position.x);
   });
 
+  it("moves players within reach of a breach 40% slower", () => {
+    const state = makeState({ phase: "playing" }, ["p1", "p2"]);
+    state.players.p1!.position = { x: 0, y: 0 };
+    state.players.p2!.position = { x: 0, y: 60 };
+    state.hazards.breach = {
+      id: "breach", kind: "breach", car: 0, spotId: "test", position: { x: 0, y: 0 },
+      age: 0, progress: 0, countdown: null,
+    };
+    const next = stepMovement(state, { p1: dir(1, 0), p2: dir(1, 0) }, 0.5, map);
+    expect(next.players.p1!.position.x).toBeCloseTo(48);
+    expect(next.players.p2!.position.x).toBeCloseTo(80);
+  });
+
   const start = (): ReturnType<typeof makeState> =>
     makeState({
       players: {

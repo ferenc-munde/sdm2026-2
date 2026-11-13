@@ -6,6 +6,7 @@ import type { GameState, Station } from "../types.ts";
 import type { HazardSpot } from "../run/director.ts";
 import type { StepSystem } from "../run/session.ts";
 import type { Interactions } from "./interactions.ts";
+import { isStationDisabledByFire } from "./fire.ts";
 
 /** Stable left/right direction for a course event, independent of object order. */
 export function courseImpulseDirection(hazardId: string): -1 | 1 {
@@ -39,7 +40,7 @@ export function startCourse(state: GameState, spot: HazardSpot): GameState {
 /** Hold the console continuously throughout the final two seconds. No tool is required. */
 export function stepCourses(state: GameState, inputs: Interactions, dt: number, console: Station): GameState {
   if (state.phase !== "playing" || !Number.isFinite(dt) || dt <= 0 || console.kind !== "steeringConsole") return state;
-  const steering = Object.values(state.players).some(p => p.connected && inputs[p.id] === true &&
+  const steering = !isStationDisabledByFire(state, console) && Object.values(state.players).some(p => p.connected && inputs[p.id] === true &&
     Math.hypot(p.position.x - console.position.x, p.position.y - console.position.y) <= INTERACT_RANGE);
   const hazards = { ...state.hazards };
   let damage = 0;

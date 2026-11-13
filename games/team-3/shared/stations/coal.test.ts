@@ -7,6 +7,18 @@ const dispenser: Station = { kind: "coalDispenser", car: 0, position: { x: 0, y:
 const engine: Station = { ...dispenser, kind: "engine" };
 
 describe("coal stations (#15)", () => {
+  it("cannot use a station beside an active fire", () => {
+    const burning = makeState();
+    burning.players.p1!.position = { ...dispenser.position };
+    burning.hazards.fire = {
+      id: "fire", kind: "fire", car: dispenser.car, spotId: "near-dispenser",
+      position: { ...dispenser.position }, age: 0, progress: 0, countdown: null,
+    };
+    expect(useCoalStation(burning, "p1", dispenser)).toBe(burning);
+    const extinguished = { ...burning, hazards: {} };
+    expect(useCoalStation(extinguished, "p1", dispenser)).not.toBe(extinguished);
+  });
+
   it("gives one coal to an empty-handed player without mutating the input", () => {
     const initial = makeState();
     const next = useCoalStation(initial, "p1", dispenser);

@@ -24,6 +24,15 @@ describe("course warning", () => {
     expect(applyCourseFailure(state, "course-1")).not.toBe(state);
   });
 
+  it("cannot steer with a fire beside the console", () => {
+    const state = start();
+    state.hazards.fire = {
+      id: "fire", kind: "fire", car: console.car, spotId: "console-fire",
+      position: { ...console.position }, age: 0, progress: 0, countdown: null,
+    };
+    expect(stepCourses(state, { p1: true }, 5, console).journey.hull).toBe(88);
+  });
+
   it("starts with a five-second countdown", () => {
     expect(Object.values(start().hazards)[0]?.countdown).toBe(5);
   });

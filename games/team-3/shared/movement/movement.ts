@@ -10,6 +10,7 @@
 
 import { COURSE_STUN_SECONDS, PLAYER_RADIUS, PLAYER_SPEED, THROW_FRICTION } from "../constants.ts";
 import type { FloorBox, TrainMap } from "../map/map.ts";
+import { movementFactorAtBreaches } from "../hazards/breach.ts";
 
 /** Anything with walls to collide with: the train (#83) or the lobby platform (#148). */
 export type Walled = Pick<TrainMap, "walls">;
@@ -122,13 +123,13 @@ export function stepMovement(
       continue;
     }
     if (!direction || isStill(direction)) {
-      if ((player.stunnedSeconds ?? 0) > 0 || player.velocity) {
+      if ((player.stunnedSeconds ?? 0) > 0 || (player.velocity && (player.velocity.x !== 0 || player.velocity.y !== 0))) {
         players ??= { ...state.players };
         players[id] = { ...player, velocity: { x: 0, y: 0 }, stunnedSeconds: 0 };
       }
       continue;
     }
-    const position = movePosition(map, player.position, direction, dt);
+    const position = movePosition(map, player.position, direction, dt * movementFactorAtBreaches(state, id));
     players ??= { ...state.players };
     players[id] = { ...player, position, facing: { dx: direction.dx, dy: direction.dy } };
   }
