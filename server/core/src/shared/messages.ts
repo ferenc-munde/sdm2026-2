@@ -6,6 +6,9 @@ export const MESSAGES = {
   notice: "notice",
 } as const;
 
+/** The room name every game registers on the host and every client creates or joins. */
+export const GAME_ROOM_NAME = "game";
+
 export const ROUTES = {
   health: "/health",
   joinRoom: "/api/rooms/join",

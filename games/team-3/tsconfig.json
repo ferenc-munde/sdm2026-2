@@ -14,12 +14,16 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false
   },
   "include": [
     "shared",
     "room",
     "client",
-    "config"
+    "config",
+    "server.ts",
+    "vitest.config.ts"
   ]
 }

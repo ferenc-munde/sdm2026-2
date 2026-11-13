@@ -21,8 +21,16 @@ export interface JoinRoomMessage {
   code: string;
 }
 
+/** The host departs: starts the run once the crew is complete (#148). Refused for anyone else. */
 export interface StartGameMessage {
   type: "startGame";
+}
+
+/** The host changes the pre-game setup in the lobby (#148). */
+export interface ConfigureRoomMessage {
+  type: "configureRoom";
+  /** How many players the crew will have, from MIN_PLAYERS to MAX_PLAYERS. */
+  crewSize: number;
 }
 
 /** Sent whenever the held movement keys change. */
@@ -51,6 +59,7 @@ export type ClientMessage =
   | CreateRoomMessage
   | JoinRoomMessage
   | StartGameMessage
+  | ConfigureRoomMessage
   | InputMessage
   | PickUpOrDropMessage
   | ThrowMessage
@@ -77,7 +86,9 @@ export type ErrorCode =
   | "invalidName"
   | "invalidMessage"
   /** A run needs at least MIN_PLAYERS connected players to start. */
-  | "notEnoughPlayers";
+  | "notEnoughPlayers"
+  /** Only the host can change the room setup or depart (#148). */
+  | "notHost";
 
 export interface ErrorMessage {
   type: "error";

@@ -24,8 +24,10 @@ export const RoomSettingsSchema = z.object({
 });
 export type RoomSettings = z.infer<typeof RoomSettingsSchema>;
 
-export interface GameContext {
+export interface GameContext<C extends RoomSettings = RoomSettings> {
   random: SeededRandom;
+  /** The game's validated config (config/game.json): tuning values for the rules. */
+  config: C;
 }
 
 export interface PlayerInput<I> {
@@ -37,18 +39,25 @@ export interface GameDefinition<
   S extends BaseState = BaseState,
   C extends RoomSettings = RoomSettings,
   I = unknown,
+  J = unknown,
 > {
   id: string;
   configSchema: z.ZodType<C, unknown>;
   inputSchema: z.ZodType<I, unknown>;
+  /**
+   * Checks what a client sends when it creates or joins a room (for example `{ name }`). Options that
+   * fail it reject the join. Without it the game gets no join options at all.
+   */
+  joinOptionsSchema?: z.ZodType<J, unknown>;
   createState(config: C): S;
-  init(state: S, ctx: GameContext): void;
-  join(state: S, playerId: string, ctx: GameContext): void;
-  leave(state: S, playerId: string, ctx: GameContext): void;
+  init(state: S, ctx: GameContext<C>): void;
+  /** `options` passed `joinOptionsSchema`; it is `undefined` when the game has no such schema. */
+  join(state: S, playerId: string, ctx: GameContext<C>, options: J): void;
+  leave(state: S, playerId: string, ctx: GameContext<C>): void;
   /** Runs once per fixed tick with the inputs received since the last tick. */
-  step(state: S, inputs: PlayerInput<I>[], ctx: GameContext): void;
-  disconnect?(state: S, playerId: string, ctx: GameContext): void;
-  reconnect?(state: S, playerId: string, ctx: GameContext): void;
+  step(state: S, inputs: PlayerInput<I>[], ctx: GameContext<C>): void;
+  disconnect?(state: S, playerId: string, ctx: GameContext<C>): void;
+  reconnect?(state: S, playerId: string, ctx: GameContext<C>): void;
   /** Debug commands: recorded in replays, rejected in production. */
-  commands?: Record<string, (state: S, args: unknown, ctx: GameContext) => void>;
+  commands?: Record<string, (state: S, args: unknown, ctx: GameContext<C>) => void>;
 }

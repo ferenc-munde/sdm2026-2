@@ -27,13 +27,14 @@ const distance = (a: Vec2, b: Vec2): number => Math.hypot(a.x - b.x, a.y - b.y);
 
 /**
  * The free item nearest to `position`, within INTERACT_RANGE, or null. Ties are broken by
- * item id, so the result never depends on the order the items were stored in.
+ * item id, so the result never depends on the order the items were stored in. An item still
+ * flying from a throw (#29) is not free until it lands.
  */
 export function nearestFreeItem(state: GameState, position: Vec2): Item | null {
   let best: Item | null = null;
   let bestDistance = Infinity;
   for (const item of Object.values(state.items)) {
-    if (item.heldBy !== null) continue;
+    if (item.heldBy !== null || item.velocity.x !== 0 || item.velocity.y !== 0) continue;
     const d = distance(item.position, position);
     if (d > INTERACT_RANGE) continue;
     if (d < bestDistance || (d === bestDistance && best !== null && item.id < best.id)) {
