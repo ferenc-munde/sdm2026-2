@@ -27,7 +27,8 @@ export function createConductor(container: HTMLElement, service?: AnnouncementSe
   return {
     update(state: GameState): void {
       const events = announcementEvents(previous, state);
-      previous = state;
+      // Room clients may mutate a state object in place between patches.
+      previous = { ...state, hazards: { ...state.hazards }, journey: { ...state.journey } };
       if (state.phase !== "playing") {
         cancel();
         panel.hidden = true;

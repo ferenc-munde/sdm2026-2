@@ -24,6 +24,19 @@ describe("conductor", () => {
     expect(announcementEvents(null, next)).toEqual([{ kind: "hazard", hazard: "fire", car: 0 }]);
     expect(announcementEvents(next, next)).toEqual([]);
   });
+  it("detects patches even when a room mutates its state object in place", () => {
+    const { panel, container } = panelHarness();
+    const conductor = createConductor(container);
+    const mutable = state();
+    conductor.update(mutable);
+    mutable.hazards.fire1 = fire;
+    conductor.update(mutable);
+    expect(panel.textContent).toContain("Fire");
+    mutable.journey.fuel = 20;
+    conductor.update(mutable);
+    expect(panel.textContent).toContain("fuel");
+    conductor.dispose();
+  });
   it("announces low fuel on crossing and after refuelling, never in lobby", () => {
     expect(announcementEvents(state(26), state(25))).toEqual([{ kind: "lowFuel" }]);
     expect(announcementEvents(state(25), state(24))).toEqual([]);
