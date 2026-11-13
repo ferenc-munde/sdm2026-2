@@ -1,5 +1,20 @@
 # HUD handoff
 
+## Journey HUD (#78)
+
+The player sees train position, percent distance left, remaining time, current
+speed and the schedule ghost. The read-only presenter uses the active
+GameSession, preserving both the lobby/network session and offline `?local`.
+Speed uses percent of the route per second (SPEC's distance += speed * dt),
+not an invented km/h conversion. The observed-run clock excludes lobby age
+and paused ticks, freezes on results, and resets on session/run changes.
+It does not claim to reconstruct time spent in a run before this client joined;
+exact late-join timing needs an authoritative run-start/elapsed field.
+
+Normal pages hide developer controls. In the dev server only, use `?debug=1`
+(or `?local&debug=1` offline) to inspect fixtures. Production builds do not
+enable them. No controls change the authoritative game state.
+
 Run the independent example from `games/team-2/`:
 
 ```powershell
