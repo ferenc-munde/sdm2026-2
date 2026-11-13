@@ -41,6 +41,10 @@ export interface Player {
   /** Item currently held; a player holds at most one item. */
   heldItem: ItemId | null;
   connected: boolean;
+  /** Course-failure knockback velocity; absent/zero outside an impact. */
+  velocity?: Vec2;
+  /** Remaining time during which movement input is ignored after hitting a wall. */
+  stunnedSeconds?: number;
 }
 
 export type StationKind = "engine" | "coalDispenser" | "wrenchRack" | "extinguisherRack" | "steeringConsole";

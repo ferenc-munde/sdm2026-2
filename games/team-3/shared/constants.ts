@@ -66,6 +66,8 @@ export const HAZARD_INTERVAL_BY_PLAYERS: Readonly<Record<number, number>> = {
 export const COURSE_WARNING_SECONDS = 5; // from #28
 export const COURSE_HOLD_WINDOW_SECONDS = 2; // from #28 (hold in the last 2 seconds)
 export const COURSE_HULL_DAMAGE = 12; // from #28
+export const COURSE_IMPULSE_SPEED = 450; // idea document §3
+export const COURSE_STUN_SECONDS = 1.5; // idea document §3
 
 // --- Throwing (stretch, #29) ---
 // A throw flies THROW_SPEED² / (2 × THROW_FRICTION) = 200 units, about half a car, so coal
