@@ -18,7 +18,7 @@ export function courseWarningView(state: GameState): { seconds: number; progress
 export function createCourseWarning(container: HTMLElement) {
   const panel = document.createElement("aside");
   panel.setAttribute("aria-label", "Course warning");
-  panel.style.cssText = "position:fixed;top:100px;left:50%;transform:translateX(-50%);" +
+  panel.style.cssText = "position:fixed;bottom:96px;left:50%;transform:translateX(-50%);" +
     "max-width:80vw;padding:16px;border:2px solid #ffbd69;border-radius:8px;" +
     "background:#291c13;color:#fff;font:16px system-ui;text-align:center;z-index:14";
   const instruction = document.createElement("p");
