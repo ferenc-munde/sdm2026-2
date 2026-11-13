@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Last Train — renderer check</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #101018;
+        color: #e6e6ee;
+        font-family: system-ui, sans-serif;
+      }
+
+      #app {
+        width: 100vw;
+        height: 100vh;
+      }
+
+      .hud {
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: rgba(16, 16, 24, 0.7);
+        pointer-events: none;
+      }
+
+      .hud h1 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .hud p {
+        margin: 4px 0 0;
+        font-size: 12px;
+        opacity: 0.7;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="hud">
+      <h1>The Last Train</h1>
+      <p>Renderer check (#10)</p>
+    </div>
+    <div id="app"></div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>
