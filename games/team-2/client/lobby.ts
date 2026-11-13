@@ -209,10 +209,14 @@ export function mountLobby(
 			: "The crew is aboard. Starting the journey…";
 		const isHost = state.hostSessionId === room?.sessionId;
 		startNowButton.hidden = !isHost;
-		startNowButton.textContent = state.playerCount < 2 ? "NEED 2 CREW TO DEPART" : "DEPART NOW · CURRENT CREW";
-		hostHint.textContent = state.playerCount < 2
-			? "At least two players are required. Keep waiting for your crew."
-			: isHost ? "Skip the countdown and depart with everyone aboard." : "Only the crew host can choose departure.";
+		startNowButton.textContent = "SKIP THE TIMER";
+		hostHint.textContent = isHost
+			? state.playerCount === 1
+				? "You can depart solo now or wait for more crew."
+				: "Skip the countdown and depart with everyone aboard."
+			: state.playerCount === 1
+				? "The host can start solo or wait for more crew."
+				: "Only the crew host can choose departure.";
 
 		if (state.status === "running" && !matchStarted) {
 			startMatch({

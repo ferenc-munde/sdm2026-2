@@ -33,11 +33,12 @@ describe("multiplayer lobby rules", () => {
 		expect(startLobby(state)).toBe(false);
 	});
 
-	it("lets the host start early with the current crew, but never with one player", () => {
+	it("lets the host start early with the current crew, including one player", () => {
 		const solo = createLobbyState(4);
 		addLobbyPlayer(solo, "a", "A");
-		expect(startLobby(solo)).toBe(false);
-		expect(solo.status).toBe("waiting");
+		expect(startLobby(solo)).toBe(true);
+		expect(solo.status).toBe("running");
+		expect(solo.startedPlayerCount).toBe(1);
 
 		const crew = createLobbyState(4);
 		addLobbyPlayer(crew, "a", "A");
@@ -46,7 +47,7 @@ describe("multiplayer lobby rules", () => {
 		expect(crew.startedPlayerCount).toBe(2);
 	});
 
-	it("cancels after 120 seconds if only one player joined", () => {
+	it("starts solo after the countdown expires", () => {
 		const state = createLobbyState(4);
 		addLobbyPlayer(state, "a", "A");
 
@@ -56,10 +57,9 @@ describe("multiplayer lobby rules", () => {
 		expect(state.secondsRemaining).toBe(1);
 		expect(state.status).toBe("waiting");
 
-		expect(advanceLobbyCountdown(state)).toBe(false);
-		expect(state.status).toBe("cancelled");
-		expect(state.cancellationReason).toContain("two players");
-		expect(state.startedPlayerCount).toBe(0);
+		expect(advanceLobbyCountdown(state)).toBe(true);
+		expect(state.status).toBe("running");
+		expect(state.startedPlayerCount).toBe(1);
 	});
 
 	it("starts with all joined players when the countdown expires with a crew", () => {

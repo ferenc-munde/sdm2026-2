@@ -1,7 +1,6 @@
 import { Room, type Client } from "colyseus";
 import {
 	addLobbyPlayer,
-	cancelLobby,
 	createLobbyState,
 	isTeamSize,
 	LOBBY_COUNTDOWN_SECONDS,
@@ -19,7 +18,6 @@ export class TrainLobbyRoom extends Room<{ state: LobbyState }> {
 	private countdownTask?: { clear: () => void };
 	private countdownStartedAt = 0;
 	private matchAnnounced = false;
-	private cancellationAnnounced = false;
 
 	onCreate(options: CreateOptions): void {
 		if (!isTeamSize(options.teamSize)) {
@@ -50,12 +48,7 @@ export class TrainLobbyRoom extends Room<{ state: LobbyState }> {
 	}
 
 	onLeave(client: Client): void {
-		const previousCount = this.state.playerCount;
 		removeLobbyPlayer(this.state, client.sessionId);
-		if (this.state.status === "waiting" && previousCount > 1 && this.state.playerCount === 1) {
-			this.cancelForSoloPlayer();
-			return;
-		}
 		if (this.state.playerCount === 0 && this.state.status === "waiting") {
 			this.stopCountdown();
 		}
@@ -76,7 +69,6 @@ export class TrainLobbyRoom extends Room<{ state: LobbyState }> {
 			}
 			if (this.state.secondsRemaining === 0) {
 				if (startLobby(this.state)) this.finishMatch();
-				else if (this.state.playerCount === 1) this.cancelForSoloPlayer();
 			}
 		}, 100);
 	}
@@ -86,20 +78,7 @@ export class TrainLobbyRoom extends Room<{ state: LobbyState }> {
 			client.send("lobby-error", "The crew host controls departure.");
 			return;
 		}
-		if (this.state.playerCount < 2) {
-			client.send("lobby-error", "At least two crew members are needed to start. Keep waiting for players.");
-			return;
-		}
 		if (startLobby(this.state)) this.finishMatch();
-	}
-
-	private cancelForSoloPlayer(): void {
-		if (!cancelLobby(this.state, "Not enough crew members joined. At least two players are required.")) return;
-		this.stopCountdown();
-		this.lock();
-		if (this.cancellationAnnounced) return;
-		this.cancellationAnnounced = true;
-		this.broadcast("lobby-cancelled", { reason: this.state.cancellationReason });
 	}
 
 	private stopCountdown(): void {

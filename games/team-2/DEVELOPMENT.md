@@ -42,8 +42,8 @@ From `games/team-2/`, run `npm install` once and then `npm run dev`. The dev
 script starts Vite on port 5173 and the Colyseus lobby server on port 2567.
 Use two browser tabs, choose the same team size, and join with distinct player
 names. The server-owned countdown is 30 seconds; the host can skip it to start
-with the current crew once at least two players have joined. A solo lobby is
-cancelled when its timer expires.
+with the current crew, including one player. When time expires, the game
+starts with whoever joined.
 
 ## Rules for code in `shared/`
 

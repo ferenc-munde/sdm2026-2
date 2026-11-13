@@ -94,14 +94,11 @@ export function removeLobbyPlayer(state: LobbyState, sessionId: string): boolean
 
 /** Advance the single server-owned countdown by one second. */
 export function advanceLobbyCountdown(state: LobbyState): boolean {
-	if (state.status !== "waiting" || state.playerCount < 2) return false;
+	if (state.status !== "waiting" || state.playerCount === 0) return false;
 	if (state.playerCount >= state.teamSize) return startLobby(state);
 
 	state.secondsRemaining = Math.max(0, state.secondsRemaining - 1);
-	if (state.secondsRemaining === 0) {
-		if (state.playerCount >= 2) return startLobby(state);
-		cancelLobby(state, "Not enough crew members joined. At least two players are required.");
-	}
+	if (state.secondsRemaining === 0) return startLobby(state);
 	return false;
 }
 
@@ -114,9 +111,9 @@ export function cancelLobby(state: LobbyState, reason: string): boolean {
 	return true;
 }
 
-/** Starting requires at least two players; empty or solo rooms cannot start. */
+/** Starting requires at least one player; empty rooms cannot start. */
 export function startLobby(state: LobbyState): boolean {
-	if (state.status !== "waiting" || state.playerCount < 2) return false;
+	if (state.status !== "waiting" || state.playerCount === 0) return false;
 	state.status = "running";
 	state.secondsRemaining = 0;
 	state.startedPlayerCount = state.playerCount;

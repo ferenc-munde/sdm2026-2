@@ -25,8 +25,8 @@ the Vite client on `http://127.0.0.1:5173/` and the Colyseus lobby server on
 `http://127.0.0.1:2567`. Open two browser tabs, enter different names, select
 the same crew size, and choose **Create / Join Game** in both tabs. A full crew
 starts immediately. The host can skip the 30-second countdown to start with
-the current crew once at least two players have joined; a solo lobby is
-cancelled when its timer expires.
+the current crew, including a solo player. If the timer expires, the game
+starts with whoever joined.
 
 The train world and HUD remain the existing local gameplay demo after the
 lobby starts; gameplay simulation and movement are not networked yet.
