@@ -1,13 +1,17 @@
 // Browser entry point: draws the train and the crew in a Three.js canvas.
 //
-// This is a hand-check page for the renderer (#10). The real client gets the
-// state from the room once the platform host exists; until then it shows a
-// small demo crew walking through the cars.
+// This is a hand-check page for the renderer (#10) and the heads-up display
+// (#20). The real client gets the state from the room once the platform host
+// exists; until then it shows a small demo crew walking through the cars and a
+// demo journey counting down, so the bars and the low-fuel colour can be seen.
 
 import { WebGLRenderer } from "three";
+import { FUEL_MAX, HULL_MAX, WIN_DISTANCE } from "../shared/constants.ts";
 import { buildTrainScene, fitCameraToMap } from "./trainScene.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import { CAR_LENGTH, carCentreX } from "./trainMap.ts";
+import { createHudBars } from "./hud.ts";
+import { hudView } from "./hudModel.ts";
 
 const container = document.getElementById("app");
 if (!container) throw new Error("#app is missing from index.html");
@@ -34,7 +38,10 @@ const resize = (): void => {
 resize();
 window.addEventListener("resize", resize);
 
-// Walk the crew along their car so it is obvious that the scene updates.
+const hud = createHudBars(document.body);
+
+// Walk the crew along their car and drain a demo journey so it is obvious that
+// the scene and the bars follow the state.
 const walk = (time: number): void => {
   const seconds = time / 1000;
   const moved = demoPlayers.map((player, seat) => {
@@ -43,6 +50,18 @@ const walk = (time: number): void => {
     return { ...player, position: { x: base + offset, y: player.position.y } };
   });
   train.updatePlayers(moved);
+
+  // A ~3 minute run: fuel and hull fall, distance grows.
+  const progress = (seconds % 180) / 180;
+  hud.update(
+    hudView({
+      fuel: Math.max(0, FUEL_MAX - seconds * 0.6),
+      hull: Math.max(0, HULL_MAX - seconds * 0.3),
+      distance: progress * WIN_DISTANCE,
+      speedFactor: 1,
+    }),
+  );
+
   renderer.render(train.scene, train.camera);
   requestAnimationFrame(walk);
 };
