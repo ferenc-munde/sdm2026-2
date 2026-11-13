@@ -44,6 +44,7 @@ app.innerHTML = `
       <label class="field-label code-label" for="room-code">CREW CODE</label>
       <input id="room-code" class="text-input code-input" maxlength="4" autocomplete="off" placeholder="— — — —" aria-describedby="code-help" />
       <span id="code-help" class="visually-hidden">Enter the four-character crew code from your host.</span>
+      <span class="field-hint">Local preview room: <strong>DEMO</strong></span>
       <button id="join-session" class="button button-secondary" type="button"><span>Join session</span><span aria-hidden="true">→</span></button>
     </article>
   </section>

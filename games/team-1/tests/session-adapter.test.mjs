@@ -55,6 +55,15 @@ await test("reports invalid names and unknown room codes", async () => {
   await assert.rejects(client.joinSession("NOPE", "Passenger"), { code: "NOT_FOUND" });
 });
 
+await test("joins the labeled local demo room and leaves its preview host intact", async () => {
+  const guest = new MockSessionAdapter();
+  const session = await guest.joinSession("demo", "Passenger");
+  assert.deepEqual(session.players.map((player) => player.name), ["Preview Conductor", "Passenger"]);
+  await guest.leaveSession();
+  const nextGuest = await new MockSessionAdapter().joinSession("DEMO", "Next Passenger");
+  assert.deepEqual(nextGuest.players.map((player) => player.name), ["Preview Conductor", "Next Passenger"]);
+});
+
 await test("rejects a second room until leaving the current one", async () => {
   const host = new MockSessionAdapter();
   const guest = new MockSessionAdapter();

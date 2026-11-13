@@ -5,6 +5,10 @@
 
 const MAX_PLAYERS = 4;
 const sessions = new Map();
+sessions.set("DEMO", {
+  players: [{ id: "preview-conductor", name: "Preview Conductor", connected: true }],
+  members: new Set(),
+});
 let nextCode = 1;
 let nextPlayer = 1;
 
