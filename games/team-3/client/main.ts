@@ -74,7 +74,7 @@ window.addEventListener("resize", resize);
 const hud = createHudBars(document.body);
 const courseWarning = createCourseWarning(document.body);
 const conductor = createConductor(document.body);
-const help = createHelp(document.body);
+const help = createHelp(document.body, () => keyboard.reset());
 help.update("playing");
 
 // The main menu (#12). The room socket plugs in at `sendToRoom` (#145/#80).
