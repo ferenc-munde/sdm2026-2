@@ -183,6 +183,7 @@ const walk = (time: number): void => {
     const demoState: GameState = {
       roomCode: "DEMO",
       phase: "playing",
+      lobby: { hostId: null, crewSize: 4 },
       time: seconds,
       players: {},
       items: {},

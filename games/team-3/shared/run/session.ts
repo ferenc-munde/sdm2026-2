@@ -11,6 +11,7 @@ import type { ErrorCode, InputMessage } from "../messages.ts";
 import type { Direction, GameState, PlayerId, Vec2 } from "../types.ts";
 import { createDirector, crewSize, type DirectorState, type HazardSpot, stepDirector } from "./director.ts";
 import { advanceRunClock, canStartRun, evaluateOutcome, newJourney, returnToLobby, startRun } from "./phases.ts";
+import { canDepart, isRoomFull, isValidCrewSize, newLobby, withHost } from "./lobby.ts";
 import { disconnectPlayer, reconnectPlayer, removePlayer } from "./presence.ts";
 import type { RandomSource } from "./random.ts";
 
@@ -60,6 +61,7 @@ export function createSession(roomCode: string): GameSession {
   const state: GameState = {
     roomCode,
     phase: "lobby",
+    lobby: newLobby(),
     time: 0,
     players: {},
     items: {},
@@ -95,7 +97,9 @@ export function joinSession(
   const cleanName = cleanPlayerName(name);
   if (cleanName === null) return refuse(session, "invalidName");
   if (state.phase !== "lobby") return refuse(session, "gameInProgress");
-  if (Object.keys(state.players).length >= roomSettings.maxPlayers) return refuse(session, "roomFull");
+  if (isRoomFull(state) || Object.keys(state.players).length >= roomSettings.maxPlayers) {
+    return refuse(session, "roomFull");
+  }
 
   const player = {
     id: playerId,
@@ -105,7 +109,9 @@ export function joinSession(
     heldItem: null,
     connected: true,
   };
-  return accept({ ...session, state: { ...state, players: { ...state.players, [playerId]: player } } });
+  const joined = { ...state, players: { ...state.players, [playerId]: player } };
+  // The first player to join becomes the host (#148).
+  return accept({ ...session, state: withHost(joined) });
 }
 
 /** The same inputs without one player's entry. */
@@ -161,7 +167,8 @@ export function disconnectFromSession(session: GameSession, playerId: PlayerId):
 export function leaveSession(session: GameSession, playerId: PlayerId): GameSession {
   return {
     ...session,
-    state: removePlayer(session.state, playerId),
+    // If the host left, the player who joined next becomes host (#148).
+    state: withHost(removePlayer(session.state, playerId)),
     inputs: withoutInput(session.inputs, playerId),
   };
 }
@@ -172,6 +179,31 @@ export function startSession(session: GameSession): SessionResult {
   if (!canStartRun(session.state)) return refuse(session, "notEnoughPlayers");
   const state = startRun(session.state);
   return accept({ state, director: createDirector(crewSize(state)), inputs: {} });
+}
+
+/**
+ * The host changes the crew size in the lobby (#148): 2 to 4, never below the players
+ * already in the room. Refused for anyone but the host and outside the lobby.
+ */
+export function configureRoom(session: GameSession, playerId: PlayerId, crewSize: number): SessionResult {
+  const { state } = session;
+  if (state.phase !== "lobby") return refuse(session, "gameInProgress");
+  if (state.lobby.hostId !== playerId) return refuse(session, "notHost");
+  if (!isValidCrewSize(state, crewSize)) return refuse(session, "invalidMessage");
+  return accept({ ...session, state: { ...state, lobby: { ...state.lobby, crewSize } } });
+}
+
+/**
+ * The host departs (`startGame`, or the departure lever in #153): starts the run once the
+ * crew is complete. The room calls this rather than `startSession`, which does not check
+ * who asked.
+ */
+export function departSession(session: GameSession, playerId: PlayerId): SessionResult {
+  const { state } = session;
+  if (state.phase !== "lobby") return refuse(session, "gameInProgress");
+  if (state.lobby.hostId !== playerId) return refuse(session, "notHost");
+  if (!canDepart(state, playerId)) return refuse(session, "notEnoughPlayers");
+  return startSession(session);
 }
 
 /** "Play again" after a run has ended: the same crew goes back to the lobby. */
