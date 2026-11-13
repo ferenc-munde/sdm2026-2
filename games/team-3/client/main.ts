@@ -28,6 +28,7 @@ import { createMuteButton, createSoundPlayer, eventsBetween, type SoundName } fr
 import { createWaitingRoom } from "./waitingRoom.ts";
 import { waitingView } from "./waitingRoomModel.ts";
 import { platformSpawn } from "../shared/map/platform.ts";
+import { createPlatformBoard } from "./platformBoard.ts";
 
 const container = document.getElementById("app");
 if (!container) throw new Error("#app is missing from index.html");
@@ -68,6 +69,7 @@ train.scene.add(scenery.group);
 
 // The waiting platform (#146) and its crew, drawn while the room is in the lobby.
 const platformScene = buildPlatformScene();
+const platformBoard = createPlatformBoard(document.body);
 
 const resize = (): void => {
   const width = container.clientWidth;
@@ -234,6 +236,7 @@ function enterWaiting(code: string): void {
   waitingMode = true;
   mockState = mockRoom(code);
   platformScene.updatePlayers(Object.values(mockState.players));
+  platformBoard.update(mockState, me, platformScene.map.objects);
   waiting.update(waitingView(mockState, me));
   waiting.show();
   hud.root.hidden = true;
@@ -245,11 +248,13 @@ const waiting = createWaitingRoom(document.body, {
     if (!mockState) return;
     mockState = { ...mockState, lobby: { ...mockState.lobby, crewSize: size } };
     waiting.update(waitingView(mockState, me));
+    platformBoard.update(mockState, me, platformScene.map.objects);
   },
   onDepart: () => {
     if (!mockState) return;
     if (!waitingView(mockState, me).canDepart) return;
     waiting.hide();
+    platformBoard.hide();
     waitingMode = false;
     demoStart = performance.now();
     previousDemoState = null;
@@ -260,6 +265,7 @@ const waiting = createWaitingRoom(document.body, {
   },
   onLeave: () => {
     waiting.hide();
+    platformBoard.hide();
     waitingMode = false;
     mockState = null;
     platformScene.updatePlayers([]);
@@ -281,6 +287,7 @@ const walk = (time: number): void => {
 
   // While the crew waits, draw the platform instead of the train (#146).
   if (waitingMode) {
+    if (mockState) platformBoard.update(mockState, me, platformScene.map.objects);
     renderer.render(platformScene.scene, platformScene.camera);
     requestAnimationFrame(walk);
     return;
