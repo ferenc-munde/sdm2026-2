@@ -236,3 +236,23 @@ describe("keyboard listener", () => {
     expect(seen).toEqual(["0,-1,false"]);
   });
 });
+
+
+describe("modal input reset", () => {
+  it("sends idle once when help takes over held movement and interaction", () => {
+    const target = new EventTarget();
+    const { keyboard, seen } = listen(target);
+    press(target, "KeyW");
+    press(target, "KeyE");
+    keyboard.reset();
+    expect(isIdle(keyboard.current())).toBe(true);
+    expect(keyboard.pressed.size).toBe(0);
+    expect(seen.at(-1)).toBe("0,0,false");
+    const count = seen.length;
+    keyboard.reset();
+    release(target, "KeyW");
+    release(target, "KeyE");
+    expect(seen.length).toBe(count);
+    keyboard.dispose();
+  });
+});

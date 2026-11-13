@@ -121,6 +121,33 @@ describe("never leaves the train", () => {
 });
 
 describe("stepMovement", () => {
+  it("knocks a player sideways, slows the impulse, and stuns on a wall", () => {
+    const state = makeState({ phase: "playing" }, ["p1"]);
+    state.players.p1!.position = { x: carCentreX(1), y: SIDE_LIMIT - 2 };
+    state.players.p1!.velocity = { x: 0, y: 450 };
+    const hit = stepMovement(state, { p1: dir(1, 0) }, 0.1, map);
+    expect(hit.players.p1!.position.y).toBeLessThanOrEqual(SIDE_LIMIT);
+    expect(hit.players.p1!.velocity).toEqual({ x: 0, y: 0 });
+    expect(hit.players.p1!.stunnedSeconds).toBe(1.5);
+    const stunned = stepMovement(hit, { p1: dir(1, 0) }, 1, map);
+    expect(stunned.players.p1!.position).toEqual(hit.players.p1!.position);
+    const recovered = stepMovement(stunned, { p1: dir(1, 0) }, 0.6, map);
+    expect(recovered.players.p1!.position.x).toBeGreaterThan(stunned.players.p1!.position.x);
+  });
+
+  it("moves players within reach of a breach 40% slower", () => {
+    const state = makeState({ phase: "playing" }, ["p1", "p2"]);
+    state.players.p1!.position = { x: 0, y: 0 };
+    state.players.p2!.position = { x: 0, y: 60 };
+    state.hazards.breach = {
+      id: "breach", kind: "breach", car: 0, spotId: "test", position: { x: 0, y: 0 },
+      age: 0, progress: 0, countdown: null,
+    };
+    const next = stepMovement(state, { p1: dir(1, 0), p2: dir(1, 0) }, 0.5, map);
+    expect(next.players.p1!.position.x).toBeCloseTo(48);
+    expect(next.players.p2!.position.x).toBeCloseTo(80);
+  });
+
   const start = (): ReturnType<typeof makeState> =>
     makeState({
       players: {
