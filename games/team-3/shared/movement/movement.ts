@@ -10,6 +10,9 @@
 
 import { PLAYER_RADIUS, PLAYER_SPEED } from "../constants.ts";
 import type { FloorBox, TrainMap } from "../map/map.ts";
+
+/** Anything with walls to collide with: the train (#83) or the lobby platform (#148). */
+export type Walled = Pick<TrainMap, "walls">;
 import type { Direction, GameState, PlayerId, Vec2 } from "../types.ts";
 
 /**
@@ -43,7 +46,7 @@ export function circleOverlapsBox(center: Vec2, radius: number, box: FloorBox): 
 }
 
 /** True when a player standing at `position` would overlap any wall. */
-export function hitsWall(map: TrainMap, position: Vec2, radius = PLAYER_RADIUS): boolean {
+export function hitsWall(map: Walled, position: Vec2, radius = PLAYER_RADIUS): boolean {
   return map.walls.some((wall) => circleOverlapsBox(position, radius, wall));
 }
 
@@ -52,7 +55,7 @@ export function hitsWall(map: TrainMap, position: Vec2, radius = PLAYER_RADIUS):
  * wall. Moving the two axes separately lets a player slide along a wall when they walk
  * into it at an angle.
  */
-function moveAxis(map: TrainMap, start: Vec2, axis: "x" | "y", distance: number): Vec2 {
+function moveAxis(map: Walled, start: Vec2, axis: "x" | "y", distance: number): Vec2 {
   if (distance === 0) return start;
   const steps = Math.ceil(Math.abs(distance) / MAX_SUBSTEP);
   const step = distance / steps;
@@ -66,7 +69,7 @@ function moveAxis(map: TrainMap, start: Vec2, axis: "x" | "y", distance: number)
 }
 
 /** Where a player at `position` ends up after moving in `direction` for `dt` seconds. */
-export function movePosition(map: TrainMap, position: Vec2, direction: Direction, dt: number): Vec2 {
+export function movePosition(map: Walled, position: Vec2, direction: Direction, dt: number): Vec2 {
   if (dt <= 0 || isStill(direction)) return position;
   const velocity = velocityFor(direction);
   const afterX = moveAxis(map, position, "x", velocity.x * dt);
@@ -82,7 +85,7 @@ export function stepMovement(
   state: GameState,
   inputs: Readonly<Record<PlayerId, Direction>>,
   dt: number,
-  map: TrainMap,
+  map: Walled,
 ): GameState {
   if (dt <= 0) return state;
   let players: GameState["players"] | null = null;
