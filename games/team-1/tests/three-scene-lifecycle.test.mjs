@@ -26,6 +26,10 @@ const vite = await createTestViteServer();
 try {
   const { mountTrainScene } = await vite.ssrLoadModule("/client/player-scene.ts");
   const { createPreviewSnapshot } = await vite.ssrLoadModule("/client/game-state-adapter.mjs");
+  const { TRAIN_LAYOUT } = await vite.ssrLoadModule("/client/environment/TrainEnvironment.ts");
+  const horizontalInset = 1.5;
+  const expectedX = (normalizedX) =>
+    -TRAIN_LAYOUT.length / 2 + horizontalInset + normalizedX * (TRAIN_LAYOUT.length - horizontalInset * 2);
 
   function createHarness() {
     const observerStart = createdObservers.length;
@@ -79,7 +83,7 @@ try {
     scene.train.update(snapshot);
     const [first, second] = scene.avatars();
     assert.equal(scene.avatars().length, 2);
-    assert.equal(first.position.x, -5.8 + snapshot.players[0].position.x * 11.6);
+    assert.equal(first.position.x, expectedX(snapshot.players[0].position.x));
     const updated = createPreviewSnapshot([
       { id: "p1", name: "Engineer", connected: false },
       { id: "p2", name: "Signal Keeper", connected: true },
@@ -88,7 +92,7 @@ try {
     scene.train.update(updated);
     const [updatedFirst, updatedSecond] = scene.avatars();
     assert.equal(updatedFirst.uuid, first.uuid);
-    assert.ok(Math.abs(updatedFirst.position.x - 2.9) < 1e-9);
+    assert.ok(Math.abs(updatedFirst.position.x - expectedX(0.75)) < 1e-9);
     assert.equal(updatedFirst.children[0].material.opacity, 0.38);
     assert.equal(updatedSecond.uuid, second.uuid);
     scene.train.dispose();
