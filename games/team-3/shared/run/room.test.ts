@@ -9,6 +9,7 @@ import {
   createRoomWorld,
   disconnectFromRoom,
   handleMessage,
+  leaveRoom,
   parseClientMessage,
   roomView,
   stepRoom,
@@ -95,6 +96,22 @@ describe("the lobby", () => {
     expect(room.lobby.session.state.players.crew).toMatchObject({ connected: true, position: platformSpawn(world.platform, 1) });
   });
 
+  it("never seats a new player on top of another after a middle seat leaves", () => {
+    let room = readyRoom();
+    room = send(room, "host", { type: "configureRoom", crewSize: 4 });
+    room = send(room, "third", { type: "joinRoom", name: "Cy", code: "ROOM" });
+    room = leaveRoom(room, "crew"); // the middle seat leaves
+    room = send(room, "fourth", { type: "joinRoom", name: "Di", code: "ROOM" });
+    const players = Object.values(room.lobby.session.state.players);
+    expect(players.map((p) => p.id).sort()).toEqual(["fourth", "host", "third"]);
+    for (const a of players) {
+      for (const b of players) {
+        if (a.id < b.id) expect(Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y)).toBeGreaterThan(0);
+      }
+    }
+    expect(room.lobby.session.state.players.fourth!.position).toEqual(platformSpawn(world.platform, 1));
+  });
+
   it("walks players on the platform by their input", () => {
     let room = send(readyRoom(), "host", { type: "input", direction: { dx: 1, dy: 0 }, interacting: false });
     const before = room.lobby.session.state.players.host!.position.x;
@@ -112,6 +129,14 @@ describe("the lobby", () => {
     expect(state.players.host!.position).toEqual(world.train.playerSpawns[0]);
     expect(state.players.crew!.position).toEqual(world.train.playerSpawns[1]);
     expect(Object.values(state.items).map((item) => item.kind).sort()).toEqual(["extinguisher", "wrench"]);
+  });
+
+  it("keeps a held direction across the departure, so nobody stands frozen on the train", () => {
+    let room = send(readyRoom(), "crew", { type: "input", direction: { dx: 1, dy: 0 }, interacting: false });
+    room = send(room, "host", { type: "startGame" });
+    const start = room.lobby.session.state.players.crew!.position.x;
+    room = ticks(room, 10);
+    expect(room.lobby.session.state.players.crew!.position.x).toBeGreaterThan(start);
   });
 
   it("refuses to throw on the platform", () => {

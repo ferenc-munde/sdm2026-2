@@ -6,7 +6,7 @@
 // There is no server here: no network, no clock and no Math.random(). The room passes in the
 // elapsed time and owns one seeded random source per room.
 
-import { INTERACT_RANGE, PLAYER_NAME_MAX_LENGTH } from "../constants.ts";
+import { INTERACT_RANGE, PLAYER_NAME_MAX_LENGTH, PLAYER_RADIUS } from "../constants.ts";
 import { journeySystem } from "../journey/journey.ts";
 import { breachSystem } from "../hazards/breach.ts";
 import { courseSystem } from "../hazards/course.ts";
@@ -19,7 +19,7 @@ import { createPlatformMap, platformSpawn, type PlatformMap } from "../map/platf
 import type { ClientMessage, ErrorCode } from "../messages.ts";
 import { stepMovement } from "../movement/movement.ts";
 import { useCoalStation } from "../stations/coal.ts";
-import type { GameState, PlayerId, Station } from "../types.ts";
+import type { GameState, PlayerId, Station, Vec2 } from "../types.ts";
 import {
   createPlatformLobby,
   departAndBoard,
@@ -123,6 +123,11 @@ const refuse = (room: Room, error: ErrorCode, message?: string): RoomResult =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 const isStep = (value: unknown): value is -1 | 0 | 1 => value === -1 || value === 0 || value === 1;
+/**
+ * Only a loose bound here: the rules trim the name and give the friendly `invalidName` error for
+ * 1–16 characters (`cleanPlayerName`), so a name with surrounding spaces still works. This only
+ * stops absurdly long strings before they reach the rules.
+ */
 const isName = (value: unknown): value is string =>
   typeof value === "string" && value.length <= PLAYER_NAME_MAX_LENGTH * 4;
 
@@ -146,6 +151,7 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
       return { type: "input", direction: { dx: direction.dx, dy: direction.dy }, interacting: raw.interacting };
     }
     case "configureRoom":
+      // Any number passes here (even NaN); `isValidCrewSize` refuses non-integers and out-of-range sizes.
       return typeof raw.crewSize === "number" ? { type: "configureRoom", crewSize: raw.crewSize } : null;
     case "startGame":
     case "pickUpOrDrop":
@@ -159,10 +165,25 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
 
 // --- Players arriving and leaving ---
 
-/** A player joins (or rejoins) the room. New players appear on the next free platform start. */
+const distance = (a: { x: number; y: number }, b: { x: number; y: number }): number => Math.hypot(a.x - b.x, a.y - b.y);
+
+/**
+ * The first platform start nobody is standing on, so a new player never appears on top of
+ * another one, even after someone in the middle left. If every start is taken (players are
+ * standing on all of them), the start for the next seat is used.
+ */
+export function freePlatformSpawn(state: GameState, world: RoomWorld): Vec2 {
+  const players = Object.values(state.players);
+  const starts = world.platform.playerSpawns;
+  const taken = (spot: Vec2): boolean => players.some((p) => distance(p.position, spot) < 2 * PLAYER_RADIUS);
+  const free = starts.find((spot) => !taken(spot));
+  return free ? { ...free } : platformSpawn(world.platform, players.length);
+}
+
+/** A player joins (or rejoins) the room. New players appear on a free platform start. */
 export function joinRoom(room: Room, playerId: PlayerId, name: string, world: RoomWorld): RoomResult {
-  const seat = Object.keys(room.lobby.session.state.players).length;
-  return fromSession(room, joinSession(room.lobby.session, playerId, name, platformSpawn(world.platform, seat)));
+  const spawn = freePlatformSpawn(room.lobby.session.state, world);
+  return fromSession(room, joinSession(room.lobby.session, playerId, name, spawn));
 }
 
 /** A player's connection dropped: they keep their seat until they reconnect or time out. */
@@ -177,7 +198,6 @@ export function leaveRoom(room: Room, playerId: PlayerId): Room {
 
 // --- The action key during a run ---
 
-const distance = (a: { x: number; y: number }, b: { x: number; y: number }): number => Math.hypot(a.x - b.x, a.y - b.y);
 
 /**
  * The action key in a run: at the coal dispenser or the engine it takes or delivers coal;
@@ -198,8 +218,29 @@ export function useRunAction(state: GameState, playerId: PlayerId, train: TrainM
 
 // --- Messages ---
 
+/**
+ * Departing and "play again" start a fresh session, which clears every player's held keys. The
+ * keyboard only sends `input` when the keys change, so a player still holding a direction would
+ * stand frozen until they let go and press again. Carry the held keys over for players still here.
+ */
+function keepHeldKeys(before: Room, after: RoomResult): RoomResult {
+  if (!after.ok) return after;
+  const previous = before.lobby.session.inputs;
+  const session = after.room.lobby.session;
+  if (session.state.phase === before.lobby.session.state.phase) return after;
+  const inputs = { ...session.inputs };
+  for (const [id, input] of Object.entries(previous)) {
+    if (session.state.players[id]?.connected && !(id in inputs)) inputs[id] = input;
+  }
+  return { ok: true, room: withSession(after.room, { ...session, inputs }) };
+}
+
 /** Applies one message from `playerId`. The message must already be checked by `parseClientMessage`. */
 export function handleMessage(room: Room, playerId: PlayerId, message: ClientMessage, world: RoomWorld): RoomResult {
+  return keepHeldKeys(room, applyMessage(room, playerId, message, world));
+}
+
+function applyMessage(room: Room, playerId: PlayerId, message: ClientMessage, world: RoomWorld): RoomResult {
   const { session } = room.lobby;
   const phase = session.state.phase;
 
