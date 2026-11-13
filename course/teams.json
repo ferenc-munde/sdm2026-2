@@ -6,12 +6,7 @@
     { "login": "favyabils234-hash", "name": "Abilogun-Wole Favour Oluwasayo", "team": "" },
     { "login": "ahmadaftabx", "name": "Aftab Butt Ahmad Mohammad", "team": "" },
     { "login": "ahmedif12", "name": "Iftikhar Ahmed", "team": "" },
-    {
-      "login": "",
-      "name": "Khalil Zeyad Tarek Abdelmoniem Ahmed",
-      "team": "",
-      "note": "GitHub username not provided yet."
-    },
+    { "login": "Zackaziko", "name": "Khalil Zeyad Tarek Abdelmoniem Ahmed", "team": "" },
     { "login": "hamdankhkh2005-wq", "name": "Khan Hamdan", "team": "" },
     { "login": "Ahmed-Mahmoud124", "name": "Mahmoud Ahmed Walid Abdelsatar", "team": "" },
     { "login": "Rawan-Ahmed-Mohamed", "name": "Mostafa Rawan Ahmed Mohamed Ahmed", "team": "" },
@@ -23,6 +18,7 @@
       "note": "GitHub username not provided yet."
     },
     { "login": "Wasay-3435", "name": "Shah Syed Wasia Ali", "team": "" },
-    { "login": "Main-66", "name": "Sisoulath Phongpasith", "team": "" }
+    { "login": "Main-66", "name": "Sisoulath Phongpasith", "team": "" },
+    { "login": "elok9", "name": "Ude Ikenna Chukwueloka", "team": "" }
   ]
 }
