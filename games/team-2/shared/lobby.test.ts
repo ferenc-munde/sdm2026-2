@@ -98,4 +98,4 @@ describe("multiplayer lobby rules", () => {
 		expect(state.hostSessionId).toBe("");
 		expect(state.secondsRemaining).toBe(LOBBY_COUNTDOWN_SECONDS);
 	});
-});\n
+});

@@ -135,4 +135,4 @@ function reindexPlayers(state: LobbyState): void {
 		player.avatarIndex = slot % 4;
 		slot += 1;
 	}
-}\n
+}

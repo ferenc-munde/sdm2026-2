@@ -121,4 +121,4 @@ export class TrainLobbyRoom extends Room<{ state: LobbyState }> {
 			})),
 		});
 	}
-}\n
+}
