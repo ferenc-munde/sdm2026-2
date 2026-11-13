@@ -51,3 +51,14 @@ The grading rules are presented at the opening on the first day. The results are
 - **Collaboration:** contributions spread across the team members, reviews of other people's PRs.
 
 Only work that is visible in this repository counts, so keep your issues and PRs up to date.
+
+### Student activity report (instructors)
+
+```bash
+node course/tooling/student-report.mjs > .private/student-report.md
+node course/tooling/student-report.mjs --json > .private/student-report.json
+```
+
+One table per team, one row per student (from [`teams.json`](teams.json)): issues assigned (closed / all), issues opened, work pull requests opened and merged, and reviews given on other people's pull requests. Promotion and sync pull requests between integration branches (`main`, `development`, `staging`, `Team_N_Feature`) are not counted. Accounts that are active but not in the roster are listed under *(not in roster)*.
+
+It needs Node and the [GitHub CLI](https://cli.github.com/), logged in with `gh auth login`, and works the same on Windows, macOS and Linux. **The output has per-person numbers: never commit it.**
