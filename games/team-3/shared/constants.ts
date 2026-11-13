@@ -68,5 +68,8 @@ export const COURSE_HOLD_WINDOW_SECONDS = 2; // from #28 (hold in the last 2 sec
 export const COURSE_HULL_DAMAGE = 12; // from #28
 
 // --- Throwing (stretch, #29) ---
-export const THROW_SPEED = 320; // units per second at release, TO CONFIRM
-export const THROW_FRICTION = 640; // deceleration in units per second², TO CONFIRM
+// A throw flies THROW_SPEED² / (2 × THROW_FRICTION) = 200 units, about half a car, so coal
+// thrown near a door lands in the next car. Tune in the play-test (#27).
+export const THROW_SPEED = 400; // units per second at release
+export const THROW_FRICTION = 400; // deceleration in units per second²
+export const ITEM_RADIUS = 8; // a flying item stops this far from a wall
