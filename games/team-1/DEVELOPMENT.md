@@ -6,6 +6,8 @@ The lobby is a standalone DOM screen and does not own or create a Three.js rende
 
 Issue #62 adds the `GameStateAdapter` boundary and a separate `MockGameStateAdapter`. Its snapshots model players, countdown, train condition, repair tasks, and outcomes for UI work. The mock only publishes snapshots supplied by the preview; it does not simulate authoritative rules or connect to other browsers.
 
+Issue #63 adds a minimal Three.js train view that consumes typed player positions from the game-state adapter. The scene does not implement movement physics or game rules.
+
 ## Commands
 
 - `npm install`
