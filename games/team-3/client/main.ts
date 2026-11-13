@@ -8,16 +8,18 @@
 // low fuel and stops when the train stalls.
 
 import { createConductor } from "./conductor.ts";
+import { createHelp } from "./help.ts";
 import { WebGLRenderer } from "three";
 import { FUEL_MAX, HULL_MAX, LOW_FUEL_THRESHOLD, WIN_DISTANCE } from "../shared/constants.ts";
-import type { InputMessage } from "../shared/messages.ts";
+import type { ClientMessage, InputMessage } from "../shared/messages.ts";
 import type { GameState, Phase } from "../shared/types.ts";
-import { buildTrainScene, fitCameraToMap } from "./trainScene.ts";
+import { CAR_LENGTH, carCentreX } from "../shared/map/map.ts";
+import { buildTrainScene, fitCameraToMap, type RenderHazard, type RenderItem } from "./trainScene.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
-import { CAR_LENGTH, carCentreX } from "./trainMap.ts";
 import { createHudBars } from "./hud.ts";
 import { hudView } from "./hudModel.ts";
 import { createKeyboard, isIdle } from "./keyboard.ts";
+import { createLobby } from "./lobby.ts";
 import { createEndScreen } from "./screens.ts";
 import { buildScenery } from "./scenery.ts";
 import { createMuteButton, createSoundPlayer, eventsBetween, type SoundName } from "./sound.ts";
@@ -36,7 +38,19 @@ const demoPlayers: RenderPlayer[] = [
   { id: "p3", name: "Mechanic", position: { x: carCentreX(2), y: 30 } },
 ];
 
-const train = buildTrainScene(demoPlayers);
+// Everything the state can contain: items on the floor, one in a hand, a fire
+// and a breach with their repair bars (#19).
+const demoItems: RenderItem[] = [
+  { id: "item-wrench", kind: "wrench", position: { x: carCentreX(1) + 60, y: 70 }, heldBy: null },
+  { id: "item-coal", kind: "coal", position: { x: carCentreX(2), y: 0 }, heldBy: null },
+  { id: "item-extinguisher", kind: "extinguisher", position: { x: carCentreX(0), y: 0 }, heldBy: "p1" },
+];
+const demoHazards: RenderHazard[] = [
+  { id: "hazard-fire", kind: "fire", position: { x: carCentreX(1), y: 55 }, progress: 0 },
+  { id: "hazard-breach", kind: "breach", position: { x: carCentreX(2), y: -55 }, progress: 0.5 },
+];
+
+const train = buildTrainScene({ players: demoPlayers, items: demoItems, hazards: demoHazards });
 
 // The ground and sleepers that scroll past the train (#25).
 const carXs = train.map.cars.map((car) => car.x);
@@ -58,6 +72,24 @@ window.addEventListener("resize", resize);
 
 const hud = createHudBars(document.body);
 const conductor = createConductor(document.body);
+const help = createHelp(document.body);
+help.update("playing");
+
+// The main menu (#12). The room socket plugs in at `sendToRoom` (#145/#80).
+const sendToRoom = (_message: ClientMessage): void => {};
+
+const lobby = createLobby(document.body, {
+  onCreate: (name) => {
+    sendToRoom({ type: "createRoom", name });
+    // Until the temporary server (#145) answers, show a code so the screen can
+    // be checked by hand; the reply will drive this instead.
+    lobby.showRoom("K7QF");
+  },
+  onJoin: (name, code) => {
+    sendToRoom({ type: "joinRoom", name, code });
+    lobby.showRoom(code);
+  },
+});
 
 // Sound effects (#31): the player and its mute button.
 const sound = createSoundPlayer();
@@ -102,6 +134,7 @@ const endScreen = createEndScreen(document.body, {
     demoStart = performance.now();
     demoPhase = "playing";
     endScreen.update("playing");
+    help.update("playing");
   },
 });
 
@@ -120,6 +153,7 @@ const addDemoButton = (label: string, phase: Phase): void => {
     demoPhase = phase;
     endScreen.update(phase);
     if (previousDemoState) conductor.update({ ...previousDemoState, phase });
+    help.update(phase);
   });
   demoBar.append(button);
 };
@@ -165,7 +199,13 @@ const walk = (time: number): void => {
       const offset = Math.sin(seconds * 0.8 + seat) * (CAR_LENGTH / 3);
       return { ...player, position: { x: base + offset, y: player.position.y } };
     });
-    train.updatePlayers(moved);
+
+    // Repair progress moves so the bars can be seen following the state (#19).
+    const hazards = demoHazards.map((hazard, index) => ({
+      ...hazard,
+      progress: (Math.sin(seconds * 0.7 + index) + 1) / 2,
+    }));
+    train.updateState({ players: moved, items: demoItems, hazards });
 
     // A ~3 minute run: fuel and hull fall, distance grows, then the win screen.
     // The train slows at low fuel and stops when the tank is empty (#25).
@@ -184,7 +224,21 @@ const walk = (time: number): void => {
       time: seconds,
       players: {},
       items: {},
-      hazards: {},
+      hazards: Object.fromEntries(
+        hazards.map((hazard) => [
+          hazard.id,
+          {
+            id: hazard.id,
+            kind: hazard.kind,
+            car: 0,
+            spotId: hazard.id,
+            position: hazard.position,
+            age: 0,
+            progress: hazard.progress,
+            countdown: null,
+          },
+        ]),
+      ),
       journey,
     };
     if (previousDemoState) {
@@ -197,6 +251,7 @@ const walk = (time: number): void => {
       demoPhase = "won";
       endScreen.update("won");
       conductor.update({ ...demoState, phase: "won" });
+      help.update("won");
     }
   }
 
