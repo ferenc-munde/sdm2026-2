@@ -143,6 +143,42 @@ in state (`eliminated`). No mid-run revival v1.
 Server owns item state (`items` map: type, holderId, fuel). The client renders
 carrying/tossing; toss physics are simulated server-side in fixed ticks.
 
+### 7.1 Item Interaction Rules
+
+#### Pickup and Drop
+
+- Coordinate units are Three.js world units.
+- The pickup radius is 1.5 units.
+- Each player can hold one item.
+- Pickup requires the item to exist, be unheld, and be within pickup radius.
+- Drop requires the requested `itemId` to match the player's `holdingItemId`.
+- Dropped items appear at the player's current position.
+
+#### Invalid Actions
+
+- Failed pickup and toss operations return `false`.
+- Invalid actions leave game state unchanged.
+- Invalid drop operations also leave state unchanged.
+
+#### Toss
+
+- Initial speed is 8 units/second.
+- Maximum travel distance is 6 units.
+- Gravity is 12 units/second².
+- Toss direction is from the player's position toward target coordinates
+  (`tx`, `ty`).
+- Items cannot be picked up while airborne.
+- On collision, the item stops and becomes available for pickup.
+- Toss physics use fixed ticks and are deterministic.
+
+#### Extinguisher
+
+- Fuel capacity is 100.
+- Fuel consumption is 20 per second.
+- The extinguisher cannot spray when empty.
+- The refill location is the extinguisher refill dock in Carriage 4.
+- Refilling restores fuel to 100 and takes 3 seconds.
+
 ## 8. Netcode & state contract
 
 ### 8.1 What the platform gives us (never rebuild these)
