@@ -23,6 +23,7 @@ export function createPlatformBoard(container: HTMLElement) {
     update(lobby: GameState, playerId: string, layout: PlatformObjectLayout): void {
       panel.hidden = !isNearPlatformBoard(lobby, playerId, layout);
     },
+    hide(): void { panel.hidden = true; },
     dispose(): void { panel.remove(); },
   };
 }
