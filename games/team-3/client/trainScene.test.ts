@@ -186,4 +186,11 @@ describe("updateState", () => {
     const train = build();
     expect(() => train.dispose()).not.toThrow();
   });
+  it("draws each crew member with a head and turns them to face where they walk (#217)", () => {
+    const train = build({ players: [{ id: "a", name: "Ada", position: { x: 0, y: 0 }, facing: { dx: 0, dy: 1 } }] });
+    const group = train.playersGroup.children[0]!;
+    expect(group.children.some((child) => child.name === "head")).toBe(true);
+    expect(group.children.some((child) => child.name === "facing")).toBe(true);
+    expect(group.rotation.y).toBeCloseTo(-Math.PI / 2);
+  });
 });

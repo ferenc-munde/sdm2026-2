@@ -8,6 +8,7 @@
 import {
   AmbientLight,
   BoxGeometry,
+  CapsuleGeometry,
   CanvasTexture,
   Color,
   ConeGeometry,
@@ -18,6 +19,7 @@ import {
   MeshStandardMaterial,
   PerspectiveCamera,
   SRGBColorSpace,
+  SphereGeometry,
   Scene,
   Sprite,
   SpriteMaterial,
@@ -109,9 +111,9 @@ export function mapCentreX(map: TrainMap): number {
 }
 
 /** How far down the camera looks: 55 degrees below the horizon. */
-const CAMERA_ELEVATION_DEGREES = 55;
+const CAMERA_ELEVATION_DEGREES = 48;
 /** Free space kept around the train so the outer walls are not at the screen edge. */
-const CAMERA_MARGIN = 120;
+const CAMERA_MARGIN = 90;
 
 /**
  * Places the camera above the train at an angle and far enough away that the
@@ -137,7 +139,7 @@ export function fitCameraToMap(camera: PerspectiveCamera, map: TrainMap, aspect:
 }
 
 function createCamera(map: TrainMap): PerspectiveCamera {
-  const camera = new PerspectiveCamera(45, 16 / 9, 1, 6000);
+  const camera = new PerspectiveCamera(35, 16 / 9, 1, 8000);
   fitCameraToMap(camera, map, 16 / 9);
   return camera;
 }
@@ -248,15 +250,45 @@ function buildPlayerGroup(
   group.name = `player-${player.id}`;
   group.userData = { kind: "player", playerId: player.id, name: player.name };
 
+  // A tiny crew member (#217): a colour-coded capsule body, a head, a nose that shows where they
+  // face, and a soft shadow on the floor so they read as standing in the car.
   const color = new Color(PLAYER_COLORS[seat % PLAYER_COLORS.length] ?? PLAYER_COLORS[0]);
-  const body = new Mesh(
-    new CylinderGeometry(PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_HEIGHT, 20),
-    new MeshStandardMaterial({ color, roughness: 0.6 }),
+  const shadow = new Mesh(
+    new CylinderGeometry(PLAYER_RADIUS * 1.15, PLAYER_RADIUS * 1.15, 0.5, 20),
+    new MeshStandardMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }),
   );
-  body.position.y = PLAYER_HEIGHT / 2;
+  shadow.position.y = 0.6;
+  shadow.name = "shadow";
+  group.add(shadow);
+
+  const bodyHeight = PLAYER_HEIGHT * 0.62;
+  const body = new Mesh(
+    new CapsuleGeometry(PLAYER_RADIUS * 0.85, bodyHeight - PLAYER_RADIUS * 1.7, 6, 16),
+    new MeshStandardMaterial({ color, roughness: 0.55 }),
+  );
+  body.position.y = bodyHeight / 2;
   body.name = `body-${player.id}`;
   body.userData = { kind: "playerBody", playerId: player.id, seat };
   group.add(body);
+
+  const headRadius = PLAYER_RADIUS * 0.62;
+  const head = new Mesh(
+    new SphereGeometry(headRadius, 16, 12),
+    new MeshStandardMaterial({ color: color.clone().lerp(new Color("#ffe0c4"), 0.65), roughness: 0.5 }),
+  );
+  head.position.y = bodyHeight + headRadius * 0.8;
+  head.name = "head";
+  group.add(head);
+
+  const nose = new Mesh(new BoxGeometry(5, 4, 4), new MeshStandardMaterial({ color: 0x20202a }));
+  nose.position.set(headRadius, head.position.y, 0);
+  nose.name = "facing";
+  group.add(nose);
+
+  // Turn the crew member to face their walking direction: local +x points along `facing`.
+  if (player.facing && (player.facing.dx !== 0 || player.facing.dy !== 0)) {
+    group.rotation.y = -Math.atan2(player.facing.dy, player.facing.dx);
+  }
 
   const label = labelFactory(player.name);
   label.position.y = LABEL_HEIGHT;
@@ -353,7 +385,7 @@ export function buildTrainScene(
   const labelFactory = options.labelFactory ?? createNameLabel;
 
   const scene = new Scene();
-  scene.background = new Color("#101018");
+  scene.background = new Color("#1a2130");
 
   const camera = createCamera(map);
   scene.add(camera);
