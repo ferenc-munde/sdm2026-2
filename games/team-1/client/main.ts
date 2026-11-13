@@ -1,6 +1,7 @@
 import { MockSessionAdapter, SessionError, type LobbyPlayer, type SessionAdapter, type SessionEvent } from "./session-adapter.mjs";
 import { createPreviewSnapshot, MockGameStateAdapter } from "./game-state-adapter.mjs";
 import { mountGameplayView, type PreviewAction } from "./gameplay-view";
+import { PlayerPreviewController } from "./player-preview-controller";
 
 function getAppRoot(): HTMLDivElement {
   const root = document.querySelector<HTMLDivElement>("#app");
@@ -74,6 +75,8 @@ const joinButton = app.querySelector<HTMLButtonElement>("#join-session")!;
 const gameScreen = app.querySelector<HTMLElement>("#game-screen")!;
 let gameplayAdapter: MockGameStateAdapter | undefined;
 let disposeGameplay: (() => void) | undefined;
+let playerPreview: PlayerPreviewController | undefined;
+let playerPreviewFrame = 0;
 
 createButton.addEventListener("click", () => void connect("create"));
 joinButton.addEventListener("click", () => void connect("join"));
@@ -151,9 +154,24 @@ function startGameplayPreview(): void {
     onExit: returnToCrew,
     onPreviewAction: applyPreviewAction,
   });
+  const localPlayer = crew.find((player) => player.id === ownId);
+  if (localPlayer) {
+    playerPreview = new PlayerPreviewController(ownId, gameplayAdapter);
+    let previousFrame = performance.now();
+    const updateLocalPlayer = (now: number) => {
+      if (!playerPreview) return;
+      playerPreview.update(now - previousFrame);
+      previousFrame = now;
+      playerPreviewFrame = requestAnimationFrame(updateLocalPlayer);
+    };
+    playerPreviewFrame = requestAnimationFrame(updateLocalPlayer);
+  }
 }
 
 function returnToCrew(): void {
+  cancelAnimationFrame(playerPreviewFrame);
+  playerPreview?.dispose();
+  playerPreview = undefined;
   disposeGameplay?.();
   disposeGameplay = undefined;
   gameplayAdapter = undefined;
