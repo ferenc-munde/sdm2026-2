@@ -13,7 +13,6 @@ These rules apply to every agent and every human working in this repository. If 
 | `games/team-1/` | Team 1      | `team-1`          |
 | `games/team-2/` | Team 2      | `team-2`          |
 | `games/team-3/` | Team 3      | `team-3`          |
-| `games/team-4/` | Team 4      | `team-4`          |
 | `server/`       | Platform    | `platform`        |
 | `course/`       | Instructors | `team-instructor` |
 
@@ -25,7 +24,7 @@ Work inside your own team's folder. Changes to another team's folder or to the s
 
 Everyone uses the same stack. Don't introduce alternatives without an issue that explains why.
 
-- **Language:** TypeScript everywhere, in one pnpm workspace.
+- **Language:** TypeScript everywhere, in one pnpm workspace. Team 1 may use plain JavaScript (#48).
 - **Frontend:** Vite + TypeScript, one app per team in `games/team-N/` (started from `server/template/` once the platform team has built it).
 - **Multiplayer:** Colyseus 0.18 on the server, `@colyseus/sdk` in the clients. Colyseus 0.18 changed many APIs: read [server/CLAUDE.md](server/CLAUDE.md) before writing Colyseus code.
 - **Hosting:** Railway, set up by the platform team (see [server/ARCHITECTURE.md](server/ARCHITECTURE.md)).
@@ -47,7 +46,7 @@ team-N/<issue>-<description>  →  Team_N_Feature  →  development  →  stagin
 | Branch | What it is | Changes through |
 |---|---|---|
 | `team-N/<issue>-<description>` | Short-lived work branch for one issue | Your commits |
-| `Team_N_Feature` | Team N's own integration branch (`Team_1_Feature` … `Team_4_Feature`) | PRs from that team's work branches |
+| `Team_N_Feature` | Team N's own integration branch (`Team_1_Feature` … `Team_3_Feature`) | PRs from that team's work branches |
 | `development` | Integration branch for all teams | PRs from `Team_N_Feature`, and from `platform` and `team-instructor` work branches |
 | `staging` | Release candidate | PRs from `development` only |
 | `main` | Production (prod): the stable, released state | PRs from `staging` only |
@@ -59,7 +58,7 @@ team-N/<issue>-<description>  →  Team_N_Feature  →  development  →  stagin
 ### 1. Issue first
 
 - Open an issue before writing any code. No issue, no branch, no PR.
-- The issue carries exactly one team label: `team-1`, `team-2`, `team-3`, `team-4`, `platform` or `team-instructor`.
+- The issue carries exactly one team label: `team-1`, `team-2`, `team-3`, `platform` or `team-instructor`.
 - The title starts with the team label: `[team-2] Add login page`.
 - Describe what is changing and why, and what "done" looks like (a short checklist).
 

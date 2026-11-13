@@ -1,6 +1,6 @@
 # Architecture
 
-> **Target architecture.** This describes how the system is built. The repository is a skeleton: the platform team and the game teams build these parts during the hackathon. Each folder's `README.md` says what goes in it. [Current status](#current-status) shows what exists so far.
+> **Target architecture.** This describes how the system is built. The repository is a skeleton: the platform team and the game teams build these parts during the hackathon. Each folder's `README.md` says what goes in it.
 
 Every team builds its own real-time multiplayer browser game in `games/team-N/`. All games share one platform in `server/`: the same server host, contract, tooling and CI.
 
@@ -10,7 +10,7 @@ What has been done so far:
 
 | Area | Status |
 |---|---|
-| Repository skeleton | Done: rules (`CLAUDE.md`), getting started guide, `server/` structure with a README per package, `games/team-1` to `team-4` folders, course info |
+| Repository skeleton | Done: rules (`CLAUDE.md`), getting started guide, `server/` structure with a README per package, `games/team-1` to `team-3` folders, course info |
 | Team roster | Done: `course/teams.json` lists instructors, students and their team |
 | Branches | Done: `main` (production), `staging`, `development`, `Team_1_Feature`, `Team_2_Feature`, `Team_3_Feature`. Work flows `Team_N_Feature` → `development` → `staging` → `main` (see [Branch structure](#branch-structure)) |
 | CI workflows | In progress (platform team, build-order step 2): GitHub Actions on every PR |
@@ -123,7 +123,7 @@ Rules:
 - `platform` and `team-instructor` have no feature branch. Their work branches start from `development` and their pull requests go into `development`.
 - A team keeps its `Team_N_Feature` up to date by merging `development` into it.
 
-Only three feature branches exist so far; `Team_4_Feature` is created when Team 4 starts. The same rules, with the commit and pull request format, are in [../CLAUDE.md](../CLAUDE.md#branches).
+The same rules, with the commit and pull request format, are in [../CLAUDE.md](../CLAUDE.md#branches).
 
 ## Environments (Railway)
 

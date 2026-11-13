@@ -1,28 +1,21 @@
 {
   "name": "@team-1/game",
-  "version": "1.0.0",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "node tests/session-adapter.test.mjs && node tests/game-state-adapter.test.mjs && node tests/presentation-model.test.mjs && node tests/hud-presentation.test.mjs && node tests/three-scene-lifecycle.test.mjs && node tests/dom-integration.test.mjs"
   },
   "dependencies": {
     "three": "^0.180.0"
   },
   "devDependencies": {
-    "vite": "^6.4.1"
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "test": "node tests/session-adapter.test.mjs && node tests/game-state-adapter.test.mjs && node tests/presentation-model.test.mjs && node tests/hud-presentation.test.mjs"
-  },
-  "dependencies": {
-    "three": "^0.170.0"
-  },
-  "devDependencies": {
-    "@types/three": "^0.170.0",
+    "@types/three": "^0.180.0",
+    "happy-dom": "^21.0.4",
     "typescript": "^5.7.0",
-    "vite": "^6.0.0"
+    "vite": "^6.4.1"
   }
 }

@@ -91,6 +91,80 @@
         border-radius: inherit;
         transition: width 120ms linear, background 120ms linear;
       }
+
+      /* Win and lose screens (#21). */
+      .endscreen {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(8, 8, 12, 0.82);
+        z-index: 10;
+      }
+
+      .endscreen[hidden] {
+        display: none;
+      }
+
+      .endscreen-panel {
+        width: min(420px, calc(100vw - 32px));
+        padding: 24px 28px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: #17171f;
+        text-align: center;
+      }
+
+      .endscreen h2 {
+        margin: 0 0 8px;
+        font-size: 24px;
+      }
+
+      .endscreen[data-outcome="won"] h2 {
+        color: #30a46c;
+      }
+
+      .endscreen[data-outcome="lost"] h2 {
+        color: #e5484d;
+      }
+
+      .endscreen p {
+        margin: 0 0 18px;
+        opacity: 0.8;
+      }
+
+      .endscreen-action {
+        padding: 10px 16px;
+        border: 0;
+        border-radius: 8px;
+        background: #3e63dd;
+        color: #ffffff;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .endscreen-action:hover {
+        background: #4f74ee;
+      }
+
+      /* Sound on/off (#31). */
+      .mute {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(16, 16, 24, 0.8);
+        color: #e6e6ee;
+        font: 12px system-ui, sans-serif;
+        cursor: pointer;
+      }
+
+      .mute[aria-pressed="true"] {
+        border-color: rgba(247, 107, 21, 0.6);
+        color: #f76b15;
+      }
     </style>
   </head>
   <body>

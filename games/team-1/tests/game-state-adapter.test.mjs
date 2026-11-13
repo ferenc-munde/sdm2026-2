@@ -64,6 +64,24 @@ await test("publishes victory and failure outcome snapshots", () => {
   assert.equal(client.getSnapshot().outcome.kind, "failure");
 });
 
+await test("isolates repair counters across inputs, snapshots and subscribers", () => {
+  const initial = createPreviewSnapshot();
+  const client = new MockGameStateAdapter(initial);
+  initial.repairs.completed = 99;
+  assert.equal(client.getSnapshot().repairs.completed, 0);
+  client.getSnapshot().repairs.total = 99;
+  assert.equal(client.getSnapshot().repairs.total, 3);
+  const received = [];
+  client.subscribe((snapshot) => { snapshot.repairs.completed = 99; });
+  client.subscribe((snapshot) => received.push(snapshot.repairs.completed));
+  const next = createPreviewSnapshot();
+  next.repairs.completed = 1;
+  client.publish(next);
+  assert.deepEqual(received, [1]);
+  next.repairs.completed = 99;
+  assert.equal(client.getSnapshot().repairs.completed, 1);
+});
+
 console.log(`${passed}/${passed + failures.length} game state adapter tests passed.`);
 export const testResult = { passed, failed: failures.length };
 if (failures.length > 0) throw new AggregateError(failures.map(({ error }) => error), "Game state adapter tests failed.");

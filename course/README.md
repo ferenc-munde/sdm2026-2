@@ -15,7 +15,7 @@ During the hackathon we use this Google Meet room:
 - **One shared repository:** every team works in this repository. No private forks or side repositories.
 - **Everything in English:** code, comments, commit messages, issues, pull requests and documentation.
 - **AI first:** use AI agents for as much of the work as possible.
-- **Your own folder:** each game team works only in its own folder under `games/` (`games/team-1/` … `games/team-4/`), and the platform team in `server/`.
+- **Your own folder:** each game team works only in its own folder under `games/` (`games/team-1/` … `games/team-3/`), and the platform team in `server/`.
 - **Test everything:** no change is merged without being tested.
 
 ## Teams
@@ -24,11 +24,11 @@ Every issue and pull request carries exactly one team label:
 
 | Label               | Who             | Folder          |
 |---------------------|-----------------|-----------------|
-| `team-1` … `team-4` | the game teams  | `games/team-N/` |
+| `team-1` … `team-3` | the game teams  | `games/team-N/` |
 | `platform`          | the platform team | `server/`     |
 | `team-instructor`   | the instructors | `course/`       |
 
-**Team roster.** [`teams.json`](teams.json) is the official list of who is in which team, with each student's GitHub login, name and nickname, and the instructors. Everyone can read it; only the instructors change it. The `team` field stays empty until the teams are formed at the hackathon; then it is set to `team-1` … `team-4` or `platform`.
+**Team roster.** [`teams.json`](teams.json) is the official list of who is in which team, with each student's GitHub login, name and nickname, and the instructors. Everyone can read it; only the instructors change it. The `team` field stays empty until the teams are formed at the hackathon; then it is set to `team-1` … `team-3` or `platform`.
 
 ## Tracking progress
 
@@ -55,9 +55,16 @@ Only work that is visible in this repository counts, so keep your issues and PRs
 ### Student activity report (instructors)
 
 ```bash
+node course/tooling/student-report.mjs --html > .private/student-report.html
 node course/tooling/student-report.mjs > .private/student-report.md
 node course/tooling/student-report.mjs --json > .private/student-report.json
 ```
+
+`--html` writes one page with a section per team: a bar with each student's contribution share, and per student the numbers, a short summary built from them, and a grade proposal. Open the file in a browser.
+
+- **Contribution share:** the student's part of the lines added in the team's merged work pull requests. Generated files, dependencies, lockfiles and binary assets are left out. Lines measure size, not quality.
+- **Grade proposal** (0–10 points): Delivery 0–4 (merged PRs: 5+ → 4, 2–4 → 3, 1 → 2, only open → 1); Process 0–3 (+1 most merged PRs link their issue, +1 issues opened follow the label and title rules, +1 closed an assigned issue); Collaboration 0–3 (reviews: 5+ → 2, 1–4 → 1; +1 at least half of an equal share). Points → grade: 8–10 → 5, 5–7 → 4, 3–4 → 3, 1–2 → 2, 0 → 1. The instructor decides the final grade.
+- **Rules of their time:** every issue and pull request is judged by the rules in force when it was created, so a rule added later never costs anyone points. The rules the report checks, and the moment each came into force, are listed in `RULES` at the top of `course/tooling/student-report.mjs` and at the bottom of the HTML page. When `CLAUDE.md` gets a new rule that the report should check, add it there with its date.
 
 One table per team, one row per student (from [`teams.json`](teams.json)): issues assigned (closed / all), issues opened, work pull requests opened and merged, and reviews given on other people's pull requests. Promotion and sync pull requests between integration branches (`main`, `development`, `staging`, `Team_N_Feature`) are not counted. Accounts that are active but not in the roster are listed under *(not in roster)*.
 

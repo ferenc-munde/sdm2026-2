@@ -1,5 +1,5 @@
 {
-  "instructors": ["ferenc-munde", "matyas-munde", "samate-cclab", "nd2003", "muneeebnaveeed"],
+  "instructors": ["ferenc-munde", "matyas-munde", "samate-cclab", "Samate99", "nd2003"],
   "students": [
     {"login": "shahdtamerr", "name": "Abdelhamid Shahd Tamer Ouda", "nickname": "Shahd", "team": "team-2"},
     {"login": "Abmuminfav", "name": "Adekunle Abdulmumin Favour", "nickname": "Favour", "team": "team-3"},
@@ -14,8 +14,6 @@
     {"login": "itx-huzaifa819", "name": "Sajid Muhammad Huzaifa", "nickname": "Huzaifa", "team": "platform"},
     {"login": "Wasay-3435", "name": "Shah Syed Wasia Ali", "nickname": "Wasey", "team": "team-1"},
     {"login": "Main-66", "name": "Sisoulath Phongpasith", "nickname": "Bee", "team": "team-3"},
-    {"login": "elok9", "name": "Ude Ikenna Chukwueloka", "nickname": "Ikenna", "team": "platform"},
-    {"login": "sumaiya-ashfaque", "name": "Ashfaque Sumaiya", "nickname": "", "team": ""},
-    {"login": "talal00777", "name": "Talal Bin Tayyab Muhammad", "nickname": "", "team": ""}
+    {"login": "elok9", "name": "Ude Ikenna Chukwueloka", "nickname": "Ikenna", "team": "platform"}
   ]
 }

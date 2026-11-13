@@ -1,58 +1,67 @@
-# Lobby and join flow
+# Lobby and joining a room
 
-How a player creates a room, joins it by code or invite link, holds a seat and comes back after a refresh. This is the design of the previous hackathon's platform (`sdm2026-1`), written down as the reference for `@sdm/host`, `@sdm/core` and the template game here. Four games ran on it.
+> **Reference from the previous hackathon.** This describes how creating, joining and rejoining a room worked on the platform of `sdm2026-1` (Team 10, 2026-11-06 and 07), where four games ran on it. Nothing here is built in this repository yet. Use it as the design to follow when `@sdm/host`, `@sdm/core` and the template game are written, so every game joins the same way.
 
-It is a description of the target, not of code that exists yet: the packages are built in the order in [../README.md](../README.md#build-order), and [What the platform team builds](#what-the-platform-team-builds) maps each part to a step. Where the previous platform made a choice, this document says so and gives the reason.
+## The short version
 
-Source: the previous platform's code and docs, kept in this repository's history at commit `2f1cd69` (`server/host/src/gameRoom.ts`, `server/host/src/routes.ts`, `server/core/src/server/roomCodes.ts`, `server/core/src/shared/guest.ts`, `server/core/src/client/urlParams.ts`, `server/docs/CLIENT_GUIDE.md`, `server/docs/design-docs/room-base.md`).
+- A player **creates a private room** and gets a **4-letter code**.
+- Another player **joins with the code**, typed in or carried by an invite link (`?room=QXTR`).
+- Joining by code is **two calls**: an HTTP route turns the code into a room id, then the Colyseus SDK joins by id.
+- A player who drops keeps their seat for a while and **reconnects with a token**.
+- The platform has **no lobby screen and no "ready" logic**. It gives every game seats and a room code; the waiting room is part of each game's own state.
 
-## The flow at a glance
-
-```mermaid
-sequenceDiagram
-  participant A as Client A (creator)
-  participant S as Game server
-  participant B as Client B
-  A->>S: client.create("game", { private: true, name, guestId })
-  S-->>A: room, state.code = "QXTR"
-  Note over A,B: A shares https://host/team-2/?room=QXTR
-  B->>S: POST /api/rooms/join { code: "QXTR" }
-  S-->>B: 200 { roomId }
-  B->>S: client.joinById(roomId, { name, guestId })
-  S-->>B: room, seat in state.seats
-  Note over B: page refresh
-  B->>S: client.reconnect(reconnectionToken)
-  S-->>B: same seat, same sessionId
+```
+Player A                         Server                          Player B
+   │  client.create("game",         │                                │
+   │   { private: true, name })     │                                │
+   ├───────────────────────────────►│ makes the room and code "QXTR" │
+   │◄───────────────────────────────┤                                │
+   │  room.state.code = "QXTR"      │                                │
+   │                                │                                │
+   │        A sends B the code or the link  …/team-2/?room=QXTR      │
+   │                                │                                │
+   │                                │  POST /api/rooms/join {code}   │
+   │                                │◄───────────────────────────────┤
+   │                                ├───────────────────────────────►│
+   │                                │  { roomId }                    │
+   │                                │  client.joinById(roomId,       │
+   │                                │   { name, guestId })           │
+   │                                │◄───────────────────────────────┤
+   │  both now see the same state: seats, code, the game's fields    │
 ```
 
-Rooms live in one server process per game, so the code lookup is a plain in-memory map and needs no matchmaker query.
+## Creating a room
 
-## Room codes
-
-- A code is **4 letters from `ABCDEFGHJKLMNPQRSTUVWXYZ`**: A to Z without `I` and `O`, so a code cannot be misread as `1` or `0`.
-- Codes are **unique among the live rooms of the process**. The room picks a random code and retries when it is taken, up to 100 attempts, then fails.
-- The code is chosen **outside the simulation**, before the simulation starts, because it is part of the state and of the replay. It is therefore allowed to use real randomness (`Math.random()` is acceptable here, and nowhere inside game rules).
-- The code is published in `state.code` (from `BaseState`) and in the room metadata. Quick-match rooms have no code: `state.code` is `""`.
-- Lookups are **case-insensitive and trim whitespace**; the server compares upper case.
-- The client accepts exactly the letters the server issues: `^[A-HJ-NP-Z]{4}$`, through `normalizeRoomCode()`. A test keeps the client pattern and the server alphabet in sync. An invalid code in a link becomes `null` on the client, so the player gets an instant error instead of "unknown room".
-
-## Creating a private room
+The client asks Colyseus for a new room and marks it private:
 
 ```ts
 const room = await client.create("game", { private: true, name: "Ada", guestId: getGuestId() });
-// room.state.code is "QXTR"
+// room.state.code is the code to share, for example "QXTR"
 ```
 
-- `private: true` in the create options makes the room private. The room generates a code, stores it in its metadata, and calls `setPrivate(true)`, which hides it from quick match.
-- Without `private: true` the room is a quick-match room: `client.joinOrCreate("game", options)` finds it and `state.code` is `""`.
-- The room reads only the `private` flag from the create options. The creator's options also hold the raw guest id, so the room never logs or stores the options object as a whole (see [Guest id](#guest-id)).
-- The room registers itself in an in-memory **live room registry** (by room id and by code) when it is created, and removes itself when it is disposed.
+On the server, in the room's `onCreate`:
 
-Colyseus excludes private rooms from matchmaking queries, so looking a private room up with `filterBy(["code"])` does not work. That is why the join goes through the registry and an HTTP route.
+1. If `private` is set, the room picks a code and writes it into the state (`state.code`), so every client can show it.
+2. The room registers itself in the **live room registry**: a map of the rooms in this server process, searchable by room id and by code.
+3. The room is hidden from matchmaking (`setPrivate(true)`), so nobody lands in it by accident.
+4. `maxClients` is set from `maxPlayers` in the game's `config/game.json`.
+
+Without `private: true` the room is a **quick-match room**: `client.joinOrCreate("game", options)` finds it, and `state.code` is `""`.
+
+### Room codes
+
+| Rule | Value |
+|---|---|
+| Length | 4 letters |
+| Alphabet | `A`–`Z` without `I` and `O`, so a code is never misread as `1` or `0` |
+| Unique among | the live rooms of one game (the registry is asked before a code is used) |
+| Case | The server compares in upper case and trims spaces, so `qxtr` works |
+
+The client checks the same pattern (`/^[A-HJ-NP-Z]{4}$/`) before it calls the server, so a typo gives an instant message instead of "unknown room". A test kept the client pattern and the server alphabet in sync.
+
+Each game is its own server process, so a code is unique inside one game, not across all games.
 
 ## Joining by code
-
-Two calls: an HTTP route turns the code into a room id, then the SDK joins by id.
 
 ```ts
 const res = await fetch(`${SERVER_URL}/api/rooms/join`, {
@@ -60,121 +69,115 @@ const res = await fetch(`${SERVER_URL}/api/rooms/join`, {
   headers: { "content-type": "application/json" },
   body: JSON.stringify({ code }),
 });
+if (!res.ok) throw new Error((await res.json()).error);
 const { roomId } = await res.json();
 const room = await client.joinById(roomId, { name: "Bo", guestId: getGuestId() });
 ```
 
-`POST /api/rooms/join` (body `{ code }`, at most 1 KB):
+`POST /api/rooms/join` looks the code up in the live room registry:
 
-| Answer | When | Body |
-|---|---|---|
-| `200` | The code belongs to a live room with a free seat | `{ roomId }` |
-| `400` | The body is not `{ code: string }` | `{ error: "expected { code }" }` |
-| `404` | No live room has this code, or the code is empty | `{ error: "unknown room" }` |
-| `409` | The room has as many players as `maxPlayers` | `{ error: "room is full" }` |
+| Answer | When |
+|---|---|
+| `200 { roomId }` | The room exists and has a free seat |
+| `400 { error: "expected { code }" }` | The body is not `{ code: string }` |
+| `404 { error: "unknown room" }` | No live room has this code |
+| `409 { error: "room is full" }` | The room already has `maxPlayers` seats. A dropped player whose seat is still held counts |
 
-Notes:
+Why two calls: the code is looked up in the server's own memory, so no matchmaker query is needed, and the client gets a clear error (unknown or full) before it opens a WebSocket.
 
-- The route only checks that a seat looks free. The seat is taken by the later `joinById`, so two players can race for the last seat: the second `joinById` is rejected by Colyseus (`maxClients` is `maxPlayers`) and the client shows that error.
-- `joinById` checks the join options with the game's `joinOptionsSchema`. A rejected join returns `can't join: <reason>` to the client. A game error during join closes the room instead (`can't join: the room hit an error and closed`).
-- The client reads `error` from the JSON body and shows it. The route stays on in production.
-- Do not put room ids or codes in production stats: `GET /api/stats` leaves them out there, because they would let anyone join private rooms or download their replays.
+### Join options
 
-## Invite links
+The options of `create` and `joinById` (`name` and whatever the game adds) are checked against the game's `joinOptionsSchema` (zod). Invalid options reject the join with the message `can't join: <reason>`, which the client shows in its lobby. A rejected join is logged, and it does not close the room.
 
-An invite link is the game's own page with `?room=CODE`:
+### Invite links
+
+The link is the game's own page with only `?room=<code>`:
 
 ```
-https://host/team-2/?room=QXTR
+https://<address>/team-2/?room=QXTR
 ```
 
-- `buildInviteLink(location.href, code)` builds it: the current page with the query and hash replaced by `?room=<code>`.
-- `readClientParams(location.search).room` reads it back, already normalised.
-- State goes in the **query string, never in the path**. Behind the gateway the game sits under `/team-N/`, and a path such as `/lobby/QXTR` would load `index.html` with its relative assets resolving under `/lobby/`.
-- On page load the client tries, in this order: **reconnect** with a saved token, **join by the `?room=` code**, **show the lobby** (create room, or type a code).
-- `?name=` pre-fills the player name (kept to 24 characters).
+When the page loads, the client tries in this order:
 
-## Seats
+1. **Reconnect** with a saved token (see below).
+2. **Join by the code in the URL**, if there is one.
+3. Otherwise **show the lobby**: a "Create room" button, and a code field with "Join by code".
 
-`BaseState.seats` is a map keyed by `sessionId`, written only by the room, never by the game:
+`?name=Ada` sets the player name the same way (at most 24 characters).
+
+## The seat
+
+Every game state extends a base state that the platform owns. A game never writes these fields itself:
 
 | Field | Meaning |
 |---|---|
-| `connected` | `true` while the player's connection is up |
-| `lastSeq` | The last input sequence number the server applied for this player |
-| `guest` | The player's public fingerprint for this game, or `""` (see [Guest id](#guest-id)) |
+| `code` | The room code, `""` for quick-match rooms |
+| `seats` | One entry per player, keyed by session id |
+| `seats[id].connected` | `false` while the player is dropped and the seat is held |
+| `seats[id].guest` | A short fingerprint that recognises a returning browser (see below) |
+| `tick`, `paused` | Simulation tick and pause flag |
 
-- `maxPlayers` from the game's config sets `maxClients`; a full room answers `409` on the join route.
-- A seat is created on join and freed on `leave`. The game may **read** `seats` inside the simulation, which is deterministic because every seat change is recorded in the replay.
-- The game keeps its own entities (a player map, one shared vehicle) wherever it likes. The platform does not assume one entity per player.
-- Optional game hooks `disconnect(ctx, playerId)` and `reconnect(ctx, playerId)` let the game react, for example a shared vehicle losing its driver.
+When a player takes a seat, the game's `join(ctx, playerId, options, { guest })` hook runs: this is where the game adds its own per-player data (position, role, score).
 
-## Reconnection
+## The waiting room belongs to the game
 
-| Event | What the room does |
+The platform only seats players. "Waiting for the second player", "ready" and "start" are **game state and game inputs**, written by each team. What the four games did:
+
+| Game | How it waited and started |
 |---|---|
-| Unexpected drop (tab closed, network lost) | `connected` becomes `false`, the seat and the player's state stay, and the room holds the seat for `reconnectSeconds` |
-| Player returns within the window | Same `sessionId`, same state, `connected` is `true` again |
-| Window expires | The room records a `leave` and the seat is gone |
-| Consented leave (the player pressed leave) | The seat is freed at once, with no waiting window |
+| Team 1 | `phase` starts as `"waiting"`; a briefing step where each player sends a `ready` input (one bit per player); a `solo` join option to play alone |
+| Team 2 | The clock starts when the second player joins; either player can restart for both |
+| Team 3 | `phase` is `"lobby"`, `"playing"` or `"over"`; the creator picks the loop length as a join option |
+| Team 4 | A `ready` flag per player in the state, set by an input |
 
-- `reconnectSeconds` comes from the game's `config/game.json` (the template used 20). `0` turns the hold off.
-- The client saves `room.reconnectionToken` in **`sessionStorage`** and calls `client.reconnect(token)` after a refresh. Wrap `sessionStorage` in `try/catch`: it throws in private windows.
-- If `reconnect` throws (the seat expired or the room closed), the client clears the token and **joins the saved room code as a new player**.
-- **Sequence reset:** on reconnect the server resets that seat's sequence, so the next input is accepted whatever its `seq`. A refreshed client can start again at `seq` 0 and does not need to remember it.
-- **Replays:** `drop` and `reconnect` are recorded as events, and a `leave` is recorded at the tick the window expires, so a replay re-runs to the same state hash.
-- Storage keys include the game's path (`sdm:${pathname}:reconnectionToken`). All games share one address behind the gateway, so a token saved by `/team-2/` must never be tried on `/team-4/`.
+Guidelines that worked:
 
-## Guest id
+- Keep one `phase` field in the state and let the client draw the screen from it.
+- Start the game from the simulation (`step`), when the conditions hold (enough seats, everyone ready), never from a client message alone.
+- Settings picked in the lobby (difficulty, time limit) are join options of the creator, checked by `joinOptionsSchema`.
 
-A `sessionId` lasts one seat. To know that the same person is back (a second tab, a reload, after the seat expired), the browser sends a guest id on every create and join.
+## Leaving and reconnecting
 
-- **Client:** `getGuestId()` keeps a random UUID in `localStorage` under `sdm:guestId` and sends it as the join option `guestId`. One key for the whole browser, shared by every game on the address. Without usable storage it returns one in-memory id for the page, so the player still joins but is not recognised after a reload.
-- **Server:** the room replaces the raw id with a public **fingerprint**: the first 12 hex characters of `SHA-256("<gameId>:<lowercased id>")`. Anything that is not a UUID gives `""` and **never rejects the join**.
-- The raw id is removed from the options **before** the game's `joinOptionsSchema` sees them, so games do not declare it and a strict schema cannot reject it.
-- The fingerprint is stored in `seats[sessionId].guest` (synced), passed to the game's `join` as `info.guest`, recorded in the replay's join event, and written in the `player joined` log line.
-- The fingerprint includes the game id, so one browser has a different `guest` in each game: players cannot be linked across games.
-- The raw id is never put in state, logs, replays or HTTP responses, because those can be downloaded.
-
-The guest id is a **hint, not a login**. Use it to recognise a returning player in this game (for example to give back their character). Never use it to hand over a seat, a score or ownership: every game on the address can read `sdm:guestId`, and a client can send any UUID, including a fresh one.
-
-Not included: accounts, keeping anything across server restarts, and stopping one guest from holding two seats (two tabs). A game that cares compares `guest` values itself.
-
-## The waiting room and "ready" belong to each game
-
-The platform gives a room, seats, a code, reconnection and a guest id. It has **no lobby phase, no ready flag and no start button**: those differ from game to game, so each game builds them in its own `shared/` rules and client.
-
-The patterns below use only what the platform provides. They are the recommended shape for a game's waiting room; check them against the previous four games before treating them as fixed.
-
-- **Phase in the game state.** A synced field such as `phase: "lobby" | "playing" | "finished"`. `step` does nothing game-related while the phase is `lobby`.
-- **Ready per player.** A boolean on the player entity, set by an input such as `{ type: "ready", value: true }`. It lives in game state, not in `seats`, because `seats` is owned by the room.
-- **Who starts.** Either everyone ready (and at least a minimum number of players), or a host. The host is the first player to join, stored as a `hostId` in the game state, and handed to the next player in `leave` and `disconnect` when the host goes.
-- **Start is a state change inside `step`.** `step` sees the inputs and the seats, flips `phase` to `playing` and seeds the match with `ctx.rng`. Nothing happens outside the tick, so replays reproduce it.
-- **Late joiners.** The game decides: join as spectator, wait for the next round, or take a free slot. `maxPlayers` caps the room either way.
-- **Returning players.** Keep what you want to restore (a character, a team, a ready flag) in synced state keyed by `guest`, so a player whose seat expired gets it back in `join`. Keep it in state, not in a variable, so replays reproduce it.
-- **Test it with debug commands.** A game command such as `start` or `ready all` lets QA reach the playing phase without two browsers. Debug commands are recorded in replays and rejected in production.
-- **The waiting-room UI is the game's client.** The template shows only the minimum: a create button, a code field, a join button and the invite link in the HUD.
-
-Rules that still apply to all of it: randomness only from `ctx.rng`, time only from `ctx.tick` and `ctx.dt`, and `shared/` stays browser-safe.
-
-## What the platform team builds
-
-In the build order of [../README.md](../README.md#build-order). The lobby and join flow needs these parts:
-
-| Step | Package | What this flow needs from it |
+| What happens | Server | State |
 |---|---|---|
-| 3 | `@sdm/core/shared` | `Routes.joinByCode` (`/api/rooms/join`), `JoinByCodeRequestSchema` and `JoinByCodeResponseSchema`, the `guestId` option name, the guest fingerprint pattern and `isGuestId()`, and the replay events `drop` and `reconnect` |
-| 3 | `@sdm/core/sim` | `BaseState` with `tick`, `code`, `paused`, `seats`, and `Seat` with `connected`, `lastSeq` and `guest`; `RoomSettingsSchema` with `maxPlayers` and `reconnectSeconds`; the `join` hook receiving `info.guest`; the optional `disconnect` and `reconnect` hooks |
-| 4 | `@sdm/core/server` and `@sdm/host` | `generateRoomCode()`; `guestFingerprint()` and `withoutGuestId()`; the live room registry; `createGameRoom()` with private rooms, `setPrivate(true)`, `allowReconnection()` in `onDrop`, `onReconnect`, seat expiry and the sequence reset; `POST /api/rooms/join` with the `400`, `404` and `409` answers; a stats route that hides ids and codes in production |
-| 5 | `@sdm/template` | A minimal lobby: create a private room, join by code, show the invite link, reconnect with the saved token, fall back to the saved code, and keys scoped by game path |
-| 6 | Gateway | Games under `/team-N/`, so invite links and storage keys must work behind a path prefix |
-| 7 | `@sdm/core/client` | `getGuestId()`, `normalizeRoomCode()`, `readClientParams()`, `buildInviteLink()` and `serverUrlFromPage()` |
+| Connection drops (refresh, lost wifi) | The seat is held for `reconnectSeconds` from `config/game.json` | `seats[id].connected = false`; the game's optional `disconnect` hook runs |
+| The player comes back in time | Same session id, same seat, same game data | `connected = true`; the optional `reconnect` hook runs |
+| The hold runs out, or the player leaves on purpose | The seat is removed | The game's `leave` hook runs |
 
-The code alphabet, the room code length and the client code pattern must be defined once and tested together, so the client never accepts a code the server cannot issue.
+On the client:
 
-## Not part of this flow
+```ts
+// after joining
+sessionStorage.setItem(TOKEN_KEY, room.reconnectionToken);
 
-- Accounts and login.
-- Matchmaking beyond quick match and join by code.
-- Keeping rooms, seats or replays across a server restart or deploy.
-- Several server processes for one game: the code lookup is in-process, so it would need a shared registry first.
+// when the page loads
+const room = await client.reconnect(sessionStorage.getItem(TOKEN_KEY));
+```
+
+If `reconnect` throws (the seat expired or the room closed), the client drops the token and joins the saved room code again **as a new player**.
+
+### Guest ID
+
+A session id lasts for one seat. To recognise the same person in a second tab or after their seat expired, the client sends a random id that the browser keeps in `localStorage` (`getGuestId()`) as the join option `guestId`.
+
+- The server never stores, logs or syncs the raw id. It keeps a 12-character fingerprint, different in every game, as `seats[id].guest`.
+- A missing or invalid `guestId` never rejects a join; the fingerprint is then `""`.
+- It is a hint, not a login: never use it to hand over a seat, a score or ownership.
+
+## Things that went wrong, and the rule that fixed them
+
+- **The game lives under a path.** Behind the gateway a game is served at `<address>/team-N/`. The server address therefore comes from the page's folder, never from `location.origin`, and no link or `fetch` starts with `/`. In local development the client talks to `http://localhost:2567`.
+- **Browser storage is shared by all games** on the one address. Put the game's path in every storage key (`sdm:/team-2:reconnectionToken`), or a token saved by one game is tried on another. The guest id is the one deliberate exception.
+- **Room state in the query string, not in the path.** `/team-2/?room=QXTR` works; `/team-2/lobby/QXTR` loads the page with broken asset paths.
+- **`sessionStorage` and `localStorage` can throw** (private windows). Wrap every access in `try`/`catch` and keep the player able to join without them.
+
+## What to build for this (platform team)
+
+In build order, matching [../README.md](../README.md#build-order):
+
+1. `@sdm/core/shared`: the route name `/api/rooms/join`, the request and response schemas (`{ code }`, `{ roomId }`).
+2. `@sdm/core/sim`: the base state with `code` and `seats`, and the `join`, `leave`, `disconnect`, `reconnect` hooks of the game definition.
+3. `@sdm/core/server`: the room code generator (alphabet without `I` and `O`, retry while the code is taken).
+4. `@sdm/host`: the live room registry, `createGameRoom()` (code on create, private rooms, seat hold on drop) and the join route with its 400, 404 and 409 answers.
+5. `@sdm/core/client`: reading `?room` and `?name`, building the invite link, the server address under a path, the guest id.
+6. `@sdm/template`: a lobby with "Create room" and "Join by code" that the teams copy.
