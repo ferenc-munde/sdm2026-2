@@ -142,6 +142,8 @@ export function mountTrainScene(
         group.visible = true;
         const material = (group.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial;
         material.color.set(player.color);
+        const markerMaterial = (group.children[2] as THREE.Mesh).material as THREE.MeshBasicMaterial;
+        markerMaterial.color.set(player.color);
         material.transparent = !player.connected;
         material.opacity = player.connected ? 1 : 0.38;
       }

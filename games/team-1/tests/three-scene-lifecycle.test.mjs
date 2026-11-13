@@ -94,6 +94,25 @@ try {
     scene.train.dispose();
   });
 
+  test("keeps the remaining avatar and marker colors synchronized after roster changes", () => {
+    const scene = createHarness();
+    try {
+      scene.train.update(createPreviewSnapshot([
+        { id: "p1", name: "Engineer", connected: true },
+        { id: "p2", name: "Signal Keeper", connected: true },
+      ]));
+      const remaining = scene.avatars()[1];
+      const next = createPreviewSnapshot([{ id: "p2", name: "Signal Keeper", connected: true }]);
+      scene.train.update(next);
+      assert.equal(scene.avatars()[0].uuid, remaining.uuid);
+      const expectedColor = next.players[0].color.slice(1);
+      assert.equal(remaining.children[0].material.color.getHexString(), expectedColor);
+      assert.equal(remaining.children[2].material.color.getHexString(), expectedColor);
+    } finally {
+      scene.train.dispose();
+    }
+  });
+
   test("disposes per-player materials and marker geometry on removal, then shared geometry at scene teardown", () => {
     const scene = createHarness();
     scene.train.update(createPreviewSnapshot([
