@@ -10,6 +10,15 @@ import type { ClientInput } from "./input.ts";
 /** Validated client input (see shared/input.ts). The server applies, never trusts. */
 export type { ClientInput };
 
+/**
+ * One input event routed to `step`. The room shell (or the local harness)
+ * stamps `sessionId` from the message envelope — clients never send it.
+ */
+export interface InputEvent {
+	sessionId: string;
+	input: ClientInput;
+}
+
 /** Deterministic random generator passed into all rules code. Never Math.random. */
 export interface Rng {
 	next(): number;
@@ -39,6 +48,6 @@ export interface GameDefinition<S extends BaseState> {
 	init: (state: S, rng: Rng, config: unknown) => void;
 	join: (state: S, sessionId: string, opts: { name?: string }) => void;
 	leave: (state: S, sessionId: string) => void;
-	step: (state: S, inputs: ClientInput[], dt: number, rng: Rng, config: unknown) => void;
+	step: (state: S, events: readonly InputEvent[], dt: number, rng: Rng, config: unknown) => void;
 	commands?: Record<string, (state: S, args: Record<string, unknown>, rng: Rng) => void>;
 }
