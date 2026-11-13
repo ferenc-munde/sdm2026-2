@@ -131,3 +131,14 @@ export const PLATFORM_GUIDE = [
 export function isNearPlatformBoard(lobby: GameState, playerId: string, layout: PlatformObjectLayout): boolean {
   return lobby.phase === "lobby" && layout.boards.some(board => inReach(lobby.players[playerId], board));
 }
+
+/** True when the connected lobby player can operate the departure lever. */
+export function isNearDepartureLever(lobby: GameState, playerId: string, layout: PlatformObjectLayout): boolean {
+  return lobby.phase === "lobby" && inReach(lobby.players[playerId], layout.departureLever);
+}
+
+/** True near an object handled by the practice action (coal, boiler or wrench). */
+export function isNearPracticeObject(lobby: GameState, playerId: string, layout: PlatformObjectLayout): boolean {
+  return lobby.phase === "lobby" && [layout.coalPile, layout.boiler, layout.wrench]
+    .some(point => inReach(lobby.players[playerId], point));
+}
