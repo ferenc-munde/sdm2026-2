@@ -1,14 +1,24 @@
+// `pnpm dev`: the game server (platform host, port 2567) and the Vite client (port 5173) together.
+// The two tools are started with node directly, so this works the same under pnpm and npm and on
+// every OS, and stopping this script stops both.
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, resolve } from "node:path";
 
-const isWindows = process.platform === "win32";
-const npm = isWindows ? "npm.cmd" : "npm";
-const spawnOptions = {
-	stdio: "inherit",
-	shell: isWindows,
-};
+const require = createRequire(import.meta.url);
+
+/** Path of the script a package runs as its command-line tool. */
+function bin(packageName, binName = packageName) {
+	const manifestPath = require.resolve(`${packageName}/package.json`);
+	const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+	const entry = typeof manifest.bin === "string" ? manifest.bin : manifest.bin[binName];
+	return resolve(dirname(manifestPath), entry);
+}
+
 const children = [
-	spawn(npm, ["run", "dev:server"], spawnOptions),
-	spawn(npm, ["run", "dev:client"], spawnOptions),
+	spawn(process.execPath, [bin("vite-node"), "server.ts"], { stdio: "inherit" }),
+	spawn(process.execPath, [bin("vite"), "client", "--host", "127.0.0.1"], { stdio: "inherit" }),
 ];
 let stopping = false;
 

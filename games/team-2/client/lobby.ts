@@ -1,5 +1,5 @@
-
 import { Client as ColyseusClient, type Room } from "@colyseus/sdk";
+import { GAME_ROOM_MESSAGE, LOBBY_ROOM_NAME, type GameRoomMessage } from "../shared/lobby.ts";
 import "./lobby.css";
 
 interface LobbyPlayerView {
@@ -26,11 +26,29 @@ export interface StartedMatch {
 	players: Array<{ sessionId: string; name: string }>;
 }
 
+/**
+ * What the game needs when the lobby departs. The lobby and the game are two rooms: the host
+ * creates the game room and tells the lobby its code, the lobby passes it on to the crew.
+ */
+export interface LobbyDeparture extends StartedMatch {
+	/** The name this player entered in the lobby. */
+	name: string;
+	/** True for the lobby host, who creates the game room. */
+	isHost: boolean;
+	/** Host: report the code of the game room just created. */
+	shareGameCode(code: string): void;
+	/** Crew: resolves with the code the host reported. */
+	gameCode: Promise<string>;
+	/** Leave the lobby room once this player sits in the game room. */
+	leaveLobby(): void;
+}
+
 const avatarColors = ["mint", "coral", "gold", "blue"];
 
 export function mountLobby(
 	parent: HTMLElement,
-	onMatchStart: (match: StartedMatch) => void,
+	onMatchStart: (match: LobbyDeparture) => void,
+	serverUrl: string = lobbyServerUrl(),
 ): { destroy: () => void } {
 	const root = document.createElement("div");
 	root.id = "last-train-lobby-root";
@@ -119,6 +137,11 @@ export function mountLobby(
 	let room: Room<any, LobbyRoomView> | undefined;
 	let connecting = false;
 	let matchStarted = false;
+	let playerName = "";
+	let resolveGameCode: (code: string) => void = () => {};
+	const gameCode = new Promise<string>((resolve) => {
+		resolveGameCode = resolve;
+	});
 
 	form.addEventListener("submit", (event) => {
 		event.preventDefault();
@@ -141,13 +164,15 @@ export function mountLobby(
 		submit.disabled = true;
 		error.textContent = "Connecting to the crew network…";
 		try {
-			const client = new ColyseusClient(lobbyServerUrl());
-			room = await client.joinOrCreate<LobbyRoomView>("train_lobby", { name, teamSize });
+			const client = new ColyseusClient(serverUrl);
+			room = await client.joinOrCreate<LobbyRoomView>(LOBBY_ROOM_NAME, { name, teamSize });
+			playerName = name;
 			error.textContent = "";
 			setup.hidden = true;
 			waiting.hidden = false;
 			room.onStateChange(sync);
 			room.onMessage("match-started", (match: StartedMatch) => startMatch(match));
+			room.onMessage(GAME_ROOM_MESSAGE, (message: GameRoomMessage) => resolveGameCode(message.code));
 			room.onMessage("lobby-cancelled", ({ reason }: { reason?: string }) => {
 				cancelReason.textContent = reason || "At least two players are needed to depart.";
 				waiting.hidden = true;
@@ -232,7 +257,18 @@ export function mountLobby(
 		if (matchStarted) return;
 		matchStarted = true;
 		root.hidden = true;
-		onMatchStart(match);
+		const lobbyRoom = room;
+		onMatchStart({
+			...match,
+			name: playerName,
+			isHost: lobbyRoom !== undefined && lobbyRoom.state.hostSessionId === lobbyRoom.sessionId,
+			shareGameCode: (code) => lobbyRoom?.send(GAME_ROOM_MESSAGE, { code } satisfies GameRoomMessage),
+			gameCode,
+			leaveLobby: () => {
+				room = undefined;
+				void lobbyRoom?.leave();
+			},
+		});
 	}
 
 	function joinedSlot(

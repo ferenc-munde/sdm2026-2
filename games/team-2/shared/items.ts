@@ -1,5 +1,5 @@
 import type { LastTrainState } from "./state.ts";
-import type { Rng } from "./types.ts";
+import type { SeededRandom } from "@sdm/core/shared";
 
 export interface ItemsModule {
 	pickup(sessionId: string, itemId: string): boolean;
@@ -9,7 +9,7 @@ export interface ItemsModule {
 
 const PICKUP_RADIUS = 1.5;
 
-export function createItems(state: LastTrainState, _rng: Rng, _config: unknown): ItemsModule {
+export function createItems(state: LastTrainState, _rng: SeededRandom, _config: unknown): ItemsModule {
 	return {
 		pickup(sessionId, itemId) {
 			const player = state.players.get(sessionId);

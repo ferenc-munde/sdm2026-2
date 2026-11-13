@@ -1,12 +1,7 @@
-import { defineRoom, defineServer } from "colyseus";
-import { TrainLobbyRoom } from "./room/lobby-room.ts";
+import { startGameServer } from "@sdm/host";
+import config from "./config/game.json" with { type: "json" };
+import { configureMatchmaking, rooms } from "./room/index.ts";
 
-const server = defineServer({
-	rooms: {
-		train_lobby: defineRoom(TrainLobbyRoom).filterBy(["teamSize"]),
-	},
-});
-
-const port = Number(process.env.PORT ?? 2567);
-await server.listen(port);
-console.log("Last Train lobby server listening on http://127.0.0.1:" + port);
+// Port (PORT, default 2567) and environment (APP_ENV) are read by the host.
+await startGameServer({ gameId: "team-2", config, rooms });
+configureMatchmaking();

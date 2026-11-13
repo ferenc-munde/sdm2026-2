@@ -1,5 +1,17 @@
 import * as THREE from "three";
+import { MAP_HEIGHT, MAP_WIDTH, PLAYER_RADIUS } from "../shared/map.ts";
 import { TRAIN_CARS, TRAIN_PASSAGES } from "./train-map";
+
+/** What the scene needs to draw one crew member; positions are map units (shared/map.ts). */
+export interface ScenePlayer {
+  id: string;
+  x: number;
+  y: number;
+  eliminated?: boolean;
+}
+
+/** One colour per seat, in the order players joined (same order as the lobby avatars). */
+export const PLAYER_COLORS = ["#62cdd3", "#e46c63", "#e0bc4e", "#6f9bea"] as const;
 
 /** Flat top-down artwork displayed with Three.js, without 3D perspective. */
 export function createTrainScene(container: HTMLElement) {
@@ -81,11 +93,7 @@ export function createTrainScene(container: HTMLElement) {
     rect(hatch.x, hatch.y, hatch.width, hatch.height, "#343e3a");
     rect(hatch.x + 4, hatch.y + 4, hatch.width - 8, hatch.height - 8, "#d0ba78");
   }
-  for (const [x, y, color] of [[790, 140, "#62cdd3"], [850, 455, "#e46c63"], [755, 635, "#e0bc4e"]] as const) {
-    rect(x - 9, y + 4, 7, 8, "#192327"); rect(x + 2, y + 4, 7, 8, "#192327");
-    rect(x - 11, y - 12, 22, 20, color); rect(x - 10, y - 28, 20, 18, "#e9bc8c");
-    rect(x - 12, y - 31, 24, 8, "#69452f");
-  }
+  // The crew is not painted here: setPlayers() draws one marker per player from the game state.
   const texture = new THREE.CanvasTexture(art);
   texture.magFilter = THREE.NearestFilter; texture.minFilter = THREE.NearestFilter;
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -104,6 +112,17 @@ export function createTrainScene(container: HTMLElement) {
   landscapeMesh.position.z = -0.1;
   scene.add(landscapeMesh);
   scene.add(new THREE.Mesh(geometry, material));
+  // One disc per player, created and removed as the players map changes.
+  const playerGeometry = new THREE.CircleGeometry(PLAYER_RADIUS, 24);
+  const outlineGeometry = new THREE.CircleGeometry(PLAYER_RADIUS + 3, 24);
+  const outlineMaterial = new THREE.MeshBasicMaterial({ color: "#10161a" });
+  const selfOutlineMaterial = new THREE.MeshBasicMaterial({ color: "#ffffff" });
+  const playerMarkers = new Map<string, { group: THREE.Group; outline: THREE.Mesh; material: THREE.MeshBasicMaterial }>();
+  function removeMarker(id: string) {
+    const marker = playerMarkers.get(id);
+    if (!marker) return;
+    scene.remove(marker.group); marker.material.dispose(); playerMarkers.delete(id);
+  }
   const renderer = new THREE.WebGLRenderer({ antialias: false });
   renderer.domElement.setAttribute("aria-label", "2D top-down train with five carriages and forest tracks");
   container.append(renderer.domElement);
@@ -138,8 +157,36 @@ export function createTrainScene(container: HTMLElement) {
     /** Visual multiplier, not a gameplay speed formula. Zero stops the scenery. */
     setSpeed(value: number) { speed = Number.isFinite(value) ? Math.max(0, value) : 0; },
     setPaused(value: boolean) { paused = value; },
+    /** Draw the crew: adds a marker for a new player, moves existing ones, removes those who left. */
+    setPlayers(players: Iterable<ScenePlayer>, localId?: string) {
+      const seen = new Set<string>();
+      let seat = 0;
+      for (const player of players) {
+        seen.add(player.id);
+        let marker = playerMarkers.get(player.id);
+        if (!marker) {
+          const material = new THREE.MeshBasicMaterial({ color: PLAYER_COLORS[seat % PLAYER_COLORS.length], transparent: true });
+          const outline = new THREE.Mesh(outlineGeometry, outlineMaterial);
+          const disc = new THREE.Mesh(playerGeometry, material);
+          disc.position.z = 0.1;
+          const group = new THREE.Group();
+          group.add(outline, disc);
+          marker = { group, outline, material };
+          playerMarkers.set(player.id, marker);
+          scene.add(group);
+        }
+        // Map units have y pointing down from the top-left corner; the camera looks at the map centre.
+        marker.group.position.set(player.x - MAP_WIDTH / 2, MAP_HEIGHT / 2 - player.y, 0.2);
+        marker.outline.material = player.id === localId ? selfOutlineMaterial : outlineMaterial;
+        marker.material.opacity = player.eliminated ? 0.35 : 1;
+        seat += 1;
+      }
+      for (const id of [...playerMarkers.keys()]) if (!seen.has(id)) removeMarker(id);
+    },
     destroy() {
     renderer.setAnimationLoop(null);
+    for (const id of [...playerMarkers.keys()]) removeMarker(id);
+    playerGeometry.dispose(); outlineGeometry.dispose(); outlineMaterial.dispose(); selfOutlineMaterial.dispose();
     window.removeEventListener("resize", resize); geometry.dispose(); material.dispose();
     landscapeTexture.dispose(); landscapeMaterial.dispose();
     texture.dispose(); renderer.dispose(); renderer.domElement.remove();
