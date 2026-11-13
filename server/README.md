@@ -22,5 +22,5 @@ Each step is its own `platform` issue and PR. The game teams can start on their 
 3. **`@sdm/core`**: the contract (`shared`) and the simulation contract (`sim`).
 4. **`@sdm/host`**: `startGameServer()`, `createGameRoom()`, `/health`, the join route.
 5. **`@sdm/template`**: the smallest playable multiplayer game on top of 3 and 4. Teams copy it to `games/team-N/`.
-6. **Deployment**: the Railway project `sdm2026-2` (development from `main`), then `@sdm/gateway`, then production from `prod`.
+6. **Deployment**: the Railway project `sdm2026-2` (development from the `development` branch), then `@sdm/gateway`, then production from `main`.
 7. **The rest**: replays, bug reports, stats, the client core (prediction, interpolation, debug tools).

@@ -12,17 +12,18 @@ This folder holds the game of Team 3 (package `@team-3/game`, label `team-3`).
 
 ## Run it
 
-You need **Node.js 22**. From `games/team-3/`:
+You need **Node.js 22** and **pnpm 10**. The repository is one pnpm workspace, so team 3 installs together with the platform packages (`@sdm/core`, `@sdm/host`). From `games/team-3/`:
 
 ```bash
-npm install
-npm run dev         # the client in the browser: http://localhost:5173
-npm test            # all rule and client tests (Vitest)
-npm run typecheck   # TypeScript
-npm run build       # production build of the client
+pnpm install
+pnpm run dev         # the client in the browser: http://localhost:5173
+pnpm run server      # the game room on the platform host: http://localhost:2567 (PORT to change it)
+pnpm test            # all rule, client and room tests (Vitest)
+pnpm run typecheck   # TypeScript
+pnpm run build       # production build of the client
 ```
 
-`npm test`, `npm run typecheck` and `npm run build` are the same steps the "Team 3 Feature CI" runs on every push to `Team_3_Feature`.
+`pnpm test`, `pnpm run typecheck` and `pnpm run build` are the same steps the "Team 3 Feature CI" runs on every push to `Team_3_Feature`. The server runs with `vite-node`, the same loader as the tests, because the platform's state classes need TypeScript's legacy decorators.
 
 ## What works now
 
@@ -30,9 +31,9 @@ npm run build       # production build of the client
 |---|---|
 | **Game rules** (`shared/`) | ✅ Complete and tested: movement, journey, carrying items, coal, breach and fire repair, engine stall, course hazard, fire spread, hazard director scaled to the crew, run phases, leaving and rejoining, lobby host and crew size, the waiting platform and boarding |
 | **Client** (`client/`) | ✅ Three.js train, players with names, stations, items and hazards with repair progress, HUD bars, keyboard, how-to-play, win and lose screens, scenery, sound, conductor announcements, main menu and shared-link join |
-| **Online play** | ⏳ **Blocked on a server.** The platform host (`@sdm/host`) doesn't exist yet, so the rules can't run for several browsers. Following the repo rules, the team doesn't build its own server: online play waits for `@sdm/host` (#133, #172), and #80 connects the game to it |
+| **Online play** | 🔧 **Server side done (#80):** `pnpm run server` runs the game as a platform room; two players can create a room, join it by code, see each other and play (`room/room.test.ts`). **Next:** the client connects to it (#12, #146), then hosting (#22) |
 
-Until the server exists, `npm run dev` opens a **hand-check page**: the train with a demo crew and a demo journey, showing every client part working. The rules themselves are exercised by the tests, including runs of a real session on the real map.
+Until the client connects to the room (#12, #146), `pnpm run dev` opens a **hand-check page**: the train with a demo crew and a demo journey, showing every client part working. The rules themselves are exercised by the tests, including runs of a real session on the real map.
 
 ## Controls
 
