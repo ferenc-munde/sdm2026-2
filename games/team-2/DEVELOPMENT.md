@@ -35,9 +35,11 @@ npm test
 npm run typecheck
 ```
 
-Until the root pnpm workspace exists, `pnpm` works the same way. Lockfiles in
-this folder are ignored on purpose: the workspace lockfile at the repository
-root will replace them.
+We use **npm** for now because that is what the CI runs (`npm ci` /
+`npm install` in the team-2 workflow) and there is no root pnpm workspace
+yet (`pnpm --filter` cannot resolve without it). When the workspace lands
+(platform build-order step 1), commands move to `pnpm --filter @team-2/game
+…` and lockfiles are ignored on purpose until then.
 
 ## Rules for code in `shared/`
 

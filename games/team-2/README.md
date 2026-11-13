@@ -24,7 +24,7 @@ Work only inside this folder unless an issue says otherwise. The package was sel
 npm install
 npm run dev      # local harness: client on :5173 (placeholder scene + ticking state)
 npm test         # headless rules tests (deterministic sim)
-npm run build    # client build to dist/ (what CI runs)
+npm run build    # client build to client/dist/ (vite root is client/, what CI runs)
 ```
 
 > There is no server yet — the platform host is stalled (#73). The client
