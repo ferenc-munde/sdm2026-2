@@ -8,7 +8,7 @@
 // Direction convention (shared with the keyboard, #84): dx +1 is towards the back of the
 // train (+x), dy +1 is down on screen (+y). Opposite keys cancel out before they get here.
 
-import { PLAYER_RADIUS, PLAYER_SPEED } from "../constants.ts";
+import { COURSE_STUN_SECONDS, PLAYER_RADIUS, PLAYER_SPEED, THROW_FRICTION } from "../constants.ts";
 import type { FloorBox, TrainMap } from "../map/map.ts";
 import { movementFactorAtBreaches } from "../hazards/breach.ts";
 
@@ -69,6 +69,23 @@ function moveAxis(map: Walled, start: Vec2, axis: "x" | "y", distance: number): 
   return position;
 }
 
+function advanceImpulse(map: Walled, position: Vec2, velocity: Vec2, dt: number) {
+  const speed = Math.hypot(velocity.x, velocity.y);
+  if (speed === 0) return { position, velocity, hitWall: false };
+  const nextSpeed = Math.max(0, speed - THROW_FRICTION * dt);
+  const movingTime = Math.min(dt, speed / THROW_FRICTION);
+  const travel = ((speed + nextSpeed) / 2) * movingTime;
+  const direction = { dx: velocity.x / speed, dy: velocity.y / speed };
+  const moved = moveAxis(map, moveAxis(map, position, "x", direction.dx * travel), "y", direction.dy * travel);
+  const expected = { x: position.x + direction.dx * travel, y: position.y + direction.dy * travel };
+  const hitWall = Math.abs(moved.x - expected.x) > 1e-6 || Math.abs(moved.y - expected.y) > 1e-6;
+  return {
+    position: moved,
+    velocity: hitWall || nextSpeed === 0 ? { x: 0, y: 0 } : { x: direction.dx * nextSpeed, y: direction.dy * nextSpeed },
+    hitWall,
+  };
+}
+
 /** Where a player at `position` ends up after moving in `direction` for `dt` seconds. */
 export function movePosition(map: Walled, position: Vec2, direction: Direction, dt: number): Vec2 {
   if (dt <= 0 || isStill(direction)) return position;
@@ -92,7 +109,26 @@ export function stepMovement(
   let players: GameState["players"] | null = null;
   for (const [id, player] of Object.entries(state.players)) {
     const direction = inputs[id];
-    if (!player.connected || !direction || isStill(direction)) continue;
+    if (!player.connected) continue;
+    const stun = Math.max(0, (player.stunnedSeconds ?? 0) - dt);
+    const impulse = advanceImpulse(map, player.position, player.velocity ?? { x: 0, y: 0 }, dt);
+    if (impulse.hitWall || stun > 0 || impulse.velocity.x !== 0 || impulse.velocity.y !== 0) {
+      players ??= { ...state.players };
+      players[id] = {
+        ...player,
+        position: impulse.position,
+        velocity: impulse.velocity,
+        stunnedSeconds: impulse.hitWall ? COURSE_STUN_SECONDS : stun,
+      };
+      continue;
+    }
+    if (!direction || isStill(direction)) {
+      if ((player.stunnedSeconds ?? 0) > 0 || (player.velocity && (player.velocity.x !== 0 || player.velocity.y !== 0))) {
+        players ??= { ...state.players };
+        players[id] = { ...player, velocity: { x: 0, y: 0 }, stunnedSeconds: 0 };
+      }
+      continue;
+    }
     const position = movePosition(map, player.position, direction, dt * movementFactorAtBreaches(state, id));
     players ??= { ...state.players };
     players[id] = { ...player, position, facing: { dx: direction.dx, dy: direction.dy } };

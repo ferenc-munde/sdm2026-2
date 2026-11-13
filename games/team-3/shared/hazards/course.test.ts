@@ -1,11 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { startCourse, stepCourses } from "./course.ts";
+import { applyCourseFailure, courseImpulseDirection, startCourse, stepCourses } from "./course.ts";
 import { makeState } from "../run/testState.ts";
 import type { Station } from "../types.ts";
 const spot = { id: "course-spot", car: 0, position: { x: 0, y: 0 } };
 const console: Station = { kind: "steeringConsole", car: 0, position: { x: 0, y: 0 } };
 const start = () => startCourse(makeState(), spot);
 describe("course warning", () => {
+  it("pushes every player and loose item sideways on failure", () => {
+    const state = start();
+    state.items.loose = { id: "loose", kind: "coal", position: { x: 0, y: 0 }, heldBy: null, velocity: { x: 0, y: 0 } };
+    state.items.held = { id: "held", kind: "wrench", position: { x: 0, y: 0 }, heldBy: "p1", velocity: { x: 0, y: 0 } };
+    state.players.p1!.heldItem = "held";
+    const next = stepCourses(state, {}, 5, console);
+    expect(Math.abs(next.players.p1!.velocity!.y)).toBe(450);
+    expect(next.players.p1!.velocity!.x).toBe(0);
+    expect(next.items.loose!.velocity).toEqual(next.players.p1!.velocity);
+    expect(next.items.held!.velocity).toEqual({ x: 0, y: 0 });
+  });
+
+  it("chooses a deterministic impulse direction", () => {
+    expect(courseImpulseDirection("course-1")).toBe(courseImpulseDirection("course-1"));
+    const state = makeState();
+    expect(applyCourseFailure(state, "course-1")).not.toBe(state);
+  });
+
   it("cannot steer with a fire beside the console", () => {
     const state = start();
     state.hazards.fire = {
