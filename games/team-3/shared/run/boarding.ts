@@ -6,7 +6,18 @@ import { createStartItems } from "../items/items.ts";
 import type { TrainMap } from "../map/map.ts";
 import { platformSpawn, type PlatformMap } from "../map/platform.ts";
 import { stepMovement } from "../movement/movement.ts";
+import {
+  createPlatformPractice,
+  isNearDepartureLever,
+  isNearPracticeObject,
+  platformPracticeView,
+  stepPlatformPractice,
+  useDepartureLever,
+  usePracticeObject,
+  type PlatformPractice,
+} from "../stations/platform.ts";
 import type { GameState, PlayerId, Vec2 } from "../types.ts";
+import { canDepart } from "./lobby.ts";
 import { departSession, inputDirections, playAgain, type GameSession, type SessionResult } from "./session.ts";
 
 /** Puts every player at the start for their seat (join order) from `spawnFor`. */
@@ -44,4 +55,62 @@ export function playAgainOnPlatform(session: GameSession, platform: PlatformMap)
   if (!result.ok) return result;
   const onPlatform = placePlayers(result.session.state, (seat) => platformSpawn(platform, seat));
   return { ok: true, session: { ...result.session, state: { ...onPlatform, items: {} } } };
+}
+
+/** Server-owned lobby state: the real room plus its deliberately isolated practice state. */
+export interface PlatformLobbySession {
+  session: GameSession;
+  practice: PlatformPractice;
+}
+
+export type PlatformActionResult =
+  | { ok: true; platform: PlatformLobbySession }
+  | { ok: false; platform: PlatformLobbySession; message: string };
+
+export function createPlatformLobby(session: GameSession, platform: PlatformMap): PlatformLobbySession {
+  return { session, practice: createPlatformPractice(platform.objects) };
+}
+
+/** One authoritative lobby tick: walk and advance held practice repairs. */
+export function stepPlatformLobby(current: PlatformLobbySession, dt: number, platform: PlatformMap): PlatformLobbySession {
+  const session = stepLobby(current.session, dt, platform);
+  const interactions = Object.fromEntries(Object.entries(session.inputs).map(([id, input]) => [id, input.interacting]));
+  const practice = stepPlatformPractice(session.state, current.practice, interactions, dt, platform.objects);
+  return session === current.session && practice === current.practice ? current : { session, practice };
+}
+
+/** State synced while waiting: real lobby data plus isolated practice objects. */
+export function platformLobbyView(current: PlatformLobbySession, platform: PlatformMap): GameState {
+  return platformPracticeView(current.session.state, current.practice, platform.objects);
+}
+
+/** Uses the real departure rule at the lever; otherwise operates practice objects. */
+export function usePlatformAction(
+  current: PlatformLobbySession, playerId: PlayerId, platform: PlatformMap, train: TrainMap,
+): PlatformActionResult {
+  if (isNearDepartureLever(current.session.state, playerId, platform.objects)) {
+    const result = useDepartureLever(
+      current.session, current.session.state, current.session.state.lobby.hostId, playerId, platform.objects,
+      {
+        canDepart: (session, id) => canDepart(session.state, id),
+        start: (session, id) => {
+          const departure = departAndBoard(session, id, train);
+          if (departure.ok) return { ok: true as const, session: departure.session };
+          const message = departure.error === "notHost" ? "Only the host can depart"
+            : departure.error === "notEnoughPlayers" ? "Waiting for the crew" : departure.error;
+          return { ok: false as const, session, message };
+        },
+      },
+    );
+    return result.ok
+      ? { ok: true, platform: { session: result.session, practice: current.practice } }
+      : { ok: false, platform: current, message: result.message };
+  }
+  if (!isNearPracticeObject(current.session.state, playerId, platform.objects)) {
+    return { ok: false, platform: current, message: "Action unavailable" };
+  }
+  const practice = usePracticeObject(current.session.state, current.practice, playerId, platform.objects);
+  return practice === current.practice
+    ? { ok: false, platform: current, message: "Walk to a platform object" }
+    : { ok: true, platform: { ...current, practice } };
 }
