@@ -1,0 +1,94 @@
+name: Development to Staging CI
+
+on:
+  push:
+    branches:
+      - development
+      - staging
+  pull_request:
+    branches:
+      - staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: development-to-staging-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-server:
+    if: github.event_name == 'push' || github.head_ref == 'development'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip pytest
+          if [[ -f server/requirements.txt ]]; then
+            python -m pip install -r server/requirements.txt
+          fi
+
+      - name: Test Python server
+        run: |
+          if ! find server -type f \( -name 'test_*.py' -o -name '*_test.py' \) -print -quit | grep -q .; then
+            echo "::error::No Python tests found under server/."
+            exit 1
+          fi
+          python -m pytest server
+
+  threejs-frontends:
+    if: github.event_name == 'push' || github.head_ref == 'development'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        team:
+          - team-1
+          - team-2
+          - team-3
+          - team-4
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check frontend manifests
+        working-directory: games/${{ matrix.team }}
+        run: |
+          if [[ ! -f package.json ]]; then
+            echo "::error::games/${{ matrix.team }} must contain package.json."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        working-directory: games/${{ matrix.team }}
+        run: |
+          if [[ -f package-lock.json ]]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Test frontend
+        working-directory: games/${{ matrix.team }}
+        run: npm test
+
+      - name: Type-check frontend
+        working-directory: games/${{ matrix.team }}
+        run: npm run typecheck --if-present
+
+      - name: Build frontend
+        working-directory: games/${{ matrix.team }}
+        run: npm run build --if-present
