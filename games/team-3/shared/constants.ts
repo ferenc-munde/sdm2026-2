@@ -14,7 +14,9 @@ export const TICK_SECONDS = 1 / TICK_RATE;
 export const JOIN_CODE_LENGTH = 4; // TO CONFIRM
 export const PLAYER_NAME_MAX_LENGTH = 16; // TO CONFIRM
 
-// --- Map and movement (world units = pixels) ---
+// --- Map and movement ---
+// Positions are world units on the flat train floor, not pixels. The rules stay 2D;
+// the Three.js client maps a floor position (x, y) to the scene as (x, 0, y).
 export const CAR_COUNT = 3; // plan §2 (three-car train)
 export const PLAYER_SPEED = 160; // units per second, TO CONFIRM
 export const PLAYER_RADIUS = 12; // TO CONFIRM

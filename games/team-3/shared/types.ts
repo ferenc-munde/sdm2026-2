@@ -1,5 +1,9 @@
 // Game state types. The server owns the state; clients only render it.
 
+/**
+ * A position on the train floor in world units. The game rules are 2D; the Three.js
+ * client draws it at (x, 0, y), with y = 0 as the floor height.
+ */
 export interface Vec2 {
   x: number;
   y: number;
