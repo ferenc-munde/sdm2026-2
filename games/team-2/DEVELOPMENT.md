@@ -51,7 +51,7 @@ root will replace them.
 ## Coming next
 
 - The shared contract (state schema, input contract, `GameDefinition`
-  wiring) lands in #64. `@colyseus/schema@^5.0.0` is pinned there, paired with
+  wiring) landed in #64 (PR #91). `@colyseus/schema@^5.0.0` is pinned there, paired with
   the Colyseus 0.18 SDK (`colyseus@0.18.12` uses `@colyseus/core@^0.18.10`,
   which pairs with schema 5.x) — the SDK itself joins with the platform host
   (#73). `shared/types.ts` shims `BaseState`/`GameDefinition`/`Rng` until

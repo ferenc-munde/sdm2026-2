@@ -26,7 +26,7 @@ Roster (from `course/teams.json`): **A = Zeyad** (`Zackaziko`), **B = Shahd**
 | **`shared/` (pure rules)** | `game.ts` (composition), `state.ts`, `input.ts` | `tasks.ts` + test | `items.ts` + test | `sim.ts` (incl. #77 speed model), `stations.ts`, `hazards.ts` + tests |
 | **`client/`** | `net.ts`, join/lobby UI, `render.ts` (Three.js map, camera, doors) | `hud.ts` (checklist, train-on-track strip, win/lose) + `minigames/` | local input, player avatars/anims, item visuals | station visuals, hazard fx, darkness/audio |
 | **Other** | `room/index.ts`, `server.ts`, `config/game.json`, `package.json` | — | — | — |
-| **Issues** | #35, #37 + contract/journey/lobby (to open) | tasks+HUD (to open) | #39, #44, #40, #45 + items/death (to open) | sim/hazards/juice (to open) |
+| **Issues** | #35, #37, #64, #66, #70, #73 (platform) | #65, #76, #78 | #39, #44, #40, #45, #67, #71 | #68, #77, #69, #72 |
 
 Cross-file *imports* are fine (any module may call `tasks.requestProgress` or
 read state). Cross-file *edits* are not — need a change in someone else's
@@ -91,9 +91,10 @@ gh pr create --fill                                               # Closes #N + 
 - Colyseus 0.18 differs from everything agents remember: force them to check
   `docs.colyseus.io` (append `.md` for raw markdown) or install the skill:
   `npx skills add colyseus/skill`.
-- Platform packages (`@sdm/core`, `@sdm/host`) are skeletons until the platform
-  team merges their build order (see `server/README.md`): teams can start on
-  `games/team-2/shared/` rules **as soon as step 3 (@sdm/core) merges**.
+- Platform packages (`@sdm/core`, `@sdm/host`) don't exist yet (#73): the
+  contract (#64) landed against a local shim in `shared/types.ts` — swap is a
+  one-file change when the platform merges. Never wait on the platform to
+  start `shared/` rules; mirror the shapes per `server/ARCHITECTURE.md`.
 
 ## 3. Schedule (2-day hackathon)
 
