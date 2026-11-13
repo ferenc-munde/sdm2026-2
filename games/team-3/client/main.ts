@@ -10,7 +10,7 @@
 import { WebGLRenderer } from "three";
 import { FUEL_MAX, HULL_MAX, LOW_FUEL_THRESHOLD, WIN_DISTANCE } from "../shared/constants.ts";
 import type { InputMessage } from "../shared/messages.ts";
-import type { Phase } from "../shared/types.ts";
+import type { GameState, Phase } from "../shared/types.ts";
 import { buildTrainScene, fitCameraToMap } from "./trainScene.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import { CAR_LENGTH, carCentreX } from "./trainMap.ts";
@@ -19,6 +19,7 @@ import { hudView } from "./hudModel.ts";
 import { createKeyboard, isIdle } from "./keyboard.ts";
 import { createEndScreen } from "./screens.ts";
 import { buildScenery } from "./scenery.ts";
+import { createMuteButton, createSoundPlayer, eventsBetween, type SoundName } from "./sound.ts";
 
 const container = document.getElementById("app");
 if (!container) throw new Error("#app is missing from index.html");
@@ -55,6 +56,10 @@ resize();
 window.addEventListener("resize", resize);
 
 const hud = createHudBars(document.body);
+
+// Sound effects (#31): the player and its mute button.
+const sound = createSoundPlayer();
+createMuteButton(document.body, sound);
 
 // Show what the keyboard sends (#11). The room forwards this message once the
 // platform host exists; movement itself is simulated by the server (#7).
@@ -119,9 +124,32 @@ addDemoButton("Show win screen", "won");
 addDemoButton("Show lose screen", "lost");
 document.body.append(demoBar);
 
+// One button per sound, so every cue can be checked by hand.
+const soundBar = document.createElement("div");
+soundBar.style.cssText =
+  "position:fixed;left:50%;bottom:52px;transform:translateX(-50%);display:flex;gap:8px;" +
+  "font:12px system-ui,sans-serif";
+const addSoundButton = (label: string, name: SoundName): void => {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = label;
+  button.style.cssText =
+    "padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.18);" +
+    "background:rgba(16,16,24,.8);color:#e6e6ee;cursor:pointer;font:inherit";
+  button.addEventListener("click", () => sound.play(name));
+  soundBar.append(button);
+};
+addSoundButton("Hazard", "hazard");
+addSoundButton("Repair", "repairDone");
+addSoundButton("Low fuel", "lowFuel");
+addSoundButton("Win", "win");
+addSoundButton("Lose", "lose");
+document.body.append(soundBar);
+
 // Walk the crew along their car and drain a demo journey so it is obvious that
 // the scene, the bars, the end screens and the scenery follow the state.
 let lastTime: number | null = null;
+let previousDemoState: GameState | null = null;
 const walk = (time: number): void => {
   // Clamp the frame time so a tab switch does not make the scenery jump.
   const delta = lastTime === null ? 0 : Math.min(0.1, (time - lastTime) / 1000);
@@ -139,17 +167,27 @@ const walk = (time: number): void => {
     // A ~3 minute run: fuel and hull fall, distance grows, then the win screen.
     // The train slows at low fuel and stops when the tank is empty (#25).
     const fuel = Math.max(0, FUEL_MAX - seconds * 0.6);
+    const hull = Math.max(0, HULL_MAX - seconds * 0.3);
     const speedFactor = fuel <= 0 ? 0 : fuel <= LOW_FUEL_THRESHOLD ? 0.5 : 1;
     const progress = Math.min(1, seconds / 180);
-    hud.update(
-      hudView({
-        fuel,
-        hull: Math.max(0, HULL_MAX - seconds * 0.3),
-        distance: progress * WIN_DISTANCE,
-        speedFactor,
-      }),
-    );
+    const journey = { fuel, hull, distance: progress * WIN_DISTANCE, speedFactor };
+    hud.update(hudView(journey));
     scenery.update(delta, speedFactor);
+
+    // Sound cues come from diffing the states, exactly as they will in the room.
+    const demoState: GameState = {
+      roomCode: "DEMO",
+      phase: "playing",
+      time: seconds,
+      players: {},
+      items: {},
+      hazards: {},
+      journey,
+    };
+    if (previousDemoState) {
+      for (const name of eventsBetween(previousDemoState, demoState)) sound.play(name);
+    }
+    previousDemoState = demoState;
 
     if (progress >= 1) {
       demoPhase = "won";

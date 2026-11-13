@@ -146,6 +146,25 @@
       .endscreen-action:hover {
         background: #4f74ee;
       }
+
+      /* Sound on/off (#31). */
+      .mute {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(16, 16, 24, 0.8);
+        color: #e6e6ee;
+        font: 12px system-ui, sans-serif;
+        cursor: pointer;
+      }
+
+      .mute[aria-pressed="true"] {
+        border-color: rgba(247, 107, 21, 0.6);
+        color: #f76b15;
+      }
     </style>
   </head>
   <body>
