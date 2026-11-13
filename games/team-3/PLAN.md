@@ -2,7 +2,7 @@
 
 A co-operative, non-violent, online multiplayer game for 2–4 players. The players are the maintenance crew of a moving train. They carry coal, repair leaks and put out fires so the train reaches its destination before the hull fails. Nobody fights anybody; the team wins or loses together.
 
-This plan covers 12–15 working hours for three developers. It is planned to 12 hours, with the rest as buffer.
+This plan covers 12–15 working hours for four developers. It is planned to 12 hours, with the rest as buffer.
 
 ## 1. Decisions
 
@@ -76,11 +76,12 @@ Each person owns one area, so two people rarely edit the same file.
 
 | Person | Area | Owns |
 |---|---|---|
-| **Developer 1 — game rules** (`Abmuminfav`) | `shared/` (except `hazards/`) | State and input types, movement, journey model, items, map data, balance |
-| **Developer 2 — server and hazards** (`favyabils234-hash`) | `shared/hazards/`, `room/`, `config/`, `server.ts` | Template setup, room wiring, hazard rules, hazard director, leaving and rejoining, release, contact with the platform team |
-| **Developer 3 — client** (`Main-66`) | `client/` | Drawing, input, lobby, heads-up display, end screens, look and sound |
+| **Developer 1 — core rules** (`Abmuminfav`) | `shared/` (contract, `map/`, `movement/`, `journey/`, `items/`) | State and input types, map data, movement, journey model, carrying and throwing items |
+| **Developer 2 — room and run flow** (`favyabils234-hash`) | `room/`, `config/`, `shared/run/` | Package setup, room wiring, run phases, hazard director, difficulty scaling, leaving and rejoining, release, contact with the platform team |
+| **Developer 3 — client** (`Main-66`) | `client/` | Drawing, input, lobby, heads-up display, end screens, scenery, sound |
+| **Developer 4 — stations and hazards** (`davidudo2005`) | `shared/stations/`, `shared/hazards/` | Coal dispenser and refuelling, breach, fire, spreading fire, course hazard, how-to-play, AI conductor |
 
-**Reviews rotate:** Developer 1 reviews Developer 3, Developer 2 reviews Developer 1, Developer 3 reviews Developer 2. Everybody reviews the shared contract (issue 3).
+**Reviews rotate:** Developer 2 reviews Developer 1, Developer 3 reviews Developer 2, Developer 4 reviews Developer 3, Developer 1 reviews Developer 4. Everybody reviews the shared contract (task 3).
 
 ## 6. Timeline
 
@@ -93,7 +94,7 @@ Each person owns one area, so two people rarely edit the same file.
 | 4. Stretch | 10.5–12 | "If time" items, one at a time | Each merged with tests, or not started |
 | 5. Freeze | last 90 min | Bug fixes only | Every issue closed or marked not done |
 
-**Checkpoints.** At the end of each phase the three of us play the current build together for five minutes. If a phase is more than one hour late, we drop the lowest stretch item rather than extend.
+**Checkpoints.** At the end of each phase the four of us play the current build together for five minutes. If a phase is more than one hour late, we drop the lowest stretch item rather than extend.
 
 **Day split.** Friday ends after phase 2: the game is playable online. Saturday is phases 3–5.
 
@@ -109,7 +110,7 @@ Each line is one GitHub issue titled `[team-3] <title>`, labelled `team-3`, assi
 |---|---|---|---|
 | 1 | Add project plan and README | Dev 2 | Plan and run instructions are in the team folder |
 | 2 | Project skeleton: `@team-3/game` package with the template layout and a test runner | Dev 2 | `shared/`, `room/`, `client/` and `config/` exist; the tests run with one command; one passing test; README says how to run them |
-| 3 | Shared contract: state types, messages, constants | Dev 1 | Types compile; constants match section 3; all three approved |
+| 3 | Shared contract: state types, messages, constants | Dev 1 | Types compile; constants match section 3; the whole team approved |
 
 ### Phase 1 — walking skeleton
 
@@ -129,9 +130,9 @@ Each line is one GitHub issue titled `[team-3] <title>`, labelled `team-3`, assi
 |---|---|---|---|
 | 11 | Journey model: fuel, speed, distance, hull, win and lose | Dev 1 | Tests cover every row of section 3 |
 | 12 | Carry items: pick up and drop, one per player | Dev 1 | Tests: two players grabbing one item, only one gets it |
-| 13 | Coal dispenser and engine refuelling | Dev 1 | Test: delivering coal adds 35 fuel and uses the coal |
-| 14 | Hull breach: repair by holding the wrench | Dev 2 | Tests: 3 s repair, progress resets if released, needs wrench |
-| 15 | Fire: put out with the extinguisher; engine fire stalls the train | Dev 2 | Tests: 2.5 s, needs extinguisher, speed 0 while engine burns |
+| 13 | Coal dispenser and engine refuelling | Dev 4 | Test: delivering coal adds 35 fuel and uses the coal |
+| 14 | Hull breach: repair by holding the wrench | Dev 4 | Tests: 3 s repair, progress resets if released, needs wrench |
+| 15 | Fire: put out with the extinguisher; engine fire stalls the train | Dev 4 | Tests: 2.5 s, needs extinguisher, speed 0 while engine burns |
 | 16 | Hazard director: timed random hazards | Dev 2 | Tests: 12 s interval, 7 s after 65%, never on a busy spot |
 | 17 | Draw items, stations, hazards and repair progress | Dev 3 | Every object in the state is visible |
 | 18 | Heads-up display: hull, fuel, distance | Dev 3 | Bars follow the server state; fuel bar changes colour when low |
@@ -143,20 +144,20 @@ Each line is one GitHub issue titled `[team-3] <title>`, labelled `team-3`, assi
 | # | Title | Owner | Done when |
 |---|---|---|---|
 | 21 | Handle players leaving and rejoining | Dev 2 | Tests for `leave`, `disconnect` and `reconnect`: a dropped player's item falls; a returning player gets their seat back |
-| 22 | Scale difficulty to the number of players | Dev 1 | Test: hazard interval changes with 2, 3, 4 players |
+| 22 | Scale difficulty to the number of players | Dev 2 | Test: hazard interval changes with 2, 3, 4 players |
 | 23 | Scrolling background that follows train speed | Dev 3 | Background slows at low fuel and stops when stalled |
-| 24 | How-to-play screen and control hints | Dev 3 | A new player can start without being told the keys |
+| 24 | How-to-play screen and control hints | Dev 4 | A new player can start without being told the keys |
 | 25 | Play-test fixes | all | Bugs found in the checkpoint play-test are closed |
 
 ### Phase 4 — stretch, in order
 
 | # | Title | Owner |
 |---|---|---|
-| 26 | Course hazard and steering console | Dev 1 rules, Dev 3 warning |
+| 26 | Course hazard and steering console | Dev 4 rules, Dev 3 warning |
 | 27 | Throw items between cars | Dev 1 |
-| 28 | Fire spreads after 15 seconds | Dev 2 |
+| 28 | Fire spreads after 15 seconds | Dev 4 |
 | 29 | Sound effects | Dev 3 |
-| 30 | AI conductor announcements | Dev 2 |
+| 30 | AI conductor announcements | Dev 4 |
 
 ## 8. Working rules
 
@@ -168,7 +169,7 @@ The repository rules in the root `CLAUDE.md` and `GETTING_STARTED.md` apply. In 
 - **Run the tests before pushing.** Once the platform has continuous integration, every check must be green.
 - **Tests with every rule change.** Client-only drawing changes say how they were checked by hand.
 - **Review within 15 minutes.** A waiting review comes before starting new work.
-- **Contract changes are announced.** Anything in the shared state or inputs is agreed by all three before it is merged.
+- **Contract changes are announced.** Anything in the shared state or inputs is agreed by the whole team before it is merged.
 - **Stay in `games/team-3/`.** Anything needed from the platform team is an issue with the `platform` label.
 
 ## 9. Open points and risks
@@ -180,5 +181,6 @@ The repository rules in the root `CLAUDE.md` and `GETTING_STARTED.md` apply. In 
 | Code written before the template lands uses a different folder layout | Move it into `shared/` and shape it as the game definition when the skeleton is merged | Dev 1 |
 | The platform needs Node.js 22 and pnpm 10.28.0 | Everyone installs them before the skeleton lands | all |
 | Merge conflicts in shared files | One owner per folder; contract merged first | Dev 1 |
+| Developer 4 joined late and cannot be assigned issues until they accept the repository invitation | Tasks 13, 14, 15, 24, 26, 28 and 30 are reserved for Developer 4 and assigned as soon as the account has access | Dev 2 |
 | Too many features | Stretch items start only when phases 0–3 are merged | all |
 | One person blocked | Raise it at once; the reviewer of that area pairs for 15 minutes | all |

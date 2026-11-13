@@ -12,9 +12,10 @@ This folder holds the game of Team 3 (package `@team-3/game`, label `team-3`).
 
 | Developer | GitHub | Area |
 |---|---|---|
-| 1 | `Abmuminfav` | Game rules |
-| 2 | `favyabils234-hash` | Room, hazards, release |
+| 1 | `Abmuminfav` | Core rules: contract, map, movement, journey, items |
+| 2 | `favyabils234-hash` | Room, run flow, hazard director, release |
 | 3 | `Main-66` | Client |
+| 4 | `davidudo2005` | Stations and hazards |
 
 ## Working here
 
