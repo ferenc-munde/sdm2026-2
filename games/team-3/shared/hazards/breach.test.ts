@@ -10,7 +10,8 @@ function setup(kind: HazardKind, tool: ItemKind) {
   return state;
 }
 
-import { stepBreaches } from "./breach.ts";
+import { stepBreaches, breachSystem } from "./breach.ts";
+import { journeySystem } from "../journey/journey.ts";
 
 describe.each([
   ["breach", "wrench", 3, 2.5],
@@ -24,7 +25,7 @@ describe.each([
     expect(state.hazards.h).toBeUndefined();
     expect(state.players.p1!.heldItem).toBe("tool");
     expect(state.items.tool!.heldBy).toBe("p1");
-    expect(state.journey.hull).toBeCloseTo(100 - seconds * rate);
+    expect(state.journey.hull).toBeCloseTo(100);
     expect(initial.hazards.h!.progress).toBe(0);
   });
   it("resets progress on release, distance or disconnect", () => {
@@ -39,7 +40,7 @@ describe.each([
     const wrong = setup(kind, "coal");
     const next = stepBreaches(wrong, { p1: true }, seconds);
     expect(next.hazards.h!.progress).toBe(0);
-    expect(next.journey.hull).toBeCloseTo(100 - seconds * rate);
+    expect(next.journey.hull).toBeCloseTo(100);
     wrong.players.p1!.heldItem = null;
     expect(stepBreaches(wrong, { p1: true }, seconds).hazards.h!.progress).toBe(0);
   });
@@ -49,12 +50,19 @@ describe.each([
     state.players.p2!.heldItem = "second";
     expect(stepBreaches(state, { p1: true, p2: true }, 1).hazards.h!.progress).toBeCloseTo(1 / seconds);
   });
-  it("ignores paused runs and invalid durations; clamps hull at zero", () => {
+  it("ignores paused runs and invalid durations; leaves damage to journey", () => {
     const state = setup(kind, tool);
     for (const dt of [0, -1, NaN, Infinity]) expect(stepBreaches(state, {}, dt)).toBe(state);
     state.phase = "won";
     expect(stepBreaches(state, {}, 1)).toBe(state);
     state.phase = "playing";
-    expect(stepBreaches(state, {}, 1000).journey.hull).toBe(0);
+    expect(stepBreaches(state, {}, 1000).journey.hull).toBe(100);
   });
+});
+
+it("charges breach damage once when composed with the journey", () => {
+  const state = setup("breach", "wrench");
+  const frame = { inputs: {}, random: { next: () => 0.5 } };
+  const next = breachSystem(journeySystem(state, 2, frame), 2, frame);
+  expect(next.journey.hull).toBe(95);
 });

@@ -1,10 +1,10 @@
-# Breach rules — #16
+# Breach repair — #16
 
-Call `stepBreaches(state, interactions, dt)` once per server tick during play.
-Interactions are server-maintained held-interact inputs keyed by player ID.
-The function returns a new state and does not mutate its input.
+`stepBreaches(state, interactions, dt)` handles wrench repair and removes completed
+breaches. Repair takes three seconds; releasing interact resets progress. The
+wrench is kept. Only connected players holding the wrench within 40 units qualify.
 
-This function owns breach hull damage; the journey must not subtract it again.
-Run it before journey movement; the run owner still handles win/loss.
-
-Room and journey wiring are absent in this snapshot and remain integration work.
+The journey system owns ALL continuous hull damage. Run `journeySystem` before
+`breachSystem` in the session systems list so active breaches damage once per tick.
+`breachSystem` adapts the session held-input shape automatically. This deliberately
+charges the final repair tick, at most 0.125 hull at 20 Hz.
