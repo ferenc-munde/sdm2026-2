@@ -3,8 +3,13 @@ import { MockSessionAdapter, SessionError, type LobbyPlayer, type SessionAdapter
 import { createPreviewSnapshot, MockGameStateAdapter } from "./game-state-adapter.mjs";
 import { mountGameplayView, type PreviewAction } from "./gameplay-view";
 
-const app = document.querySelector<HTMLDivElement>("#app");
-if (!app) throw new Error("Lobby root element #app was not found.");
+function getAppRoot(): HTMLDivElement {
+  const root = document.querySelector<HTMLDivElement>("#app");
+  if (!root) throw new Error("Lobby root element #app was not found.");
+  return root;
+}
+
+const app = getAppRoot();
 
 const adapter: SessionAdapter = new MockSessionAdapter();
 let crew: LobbyPlayer[] = [];
