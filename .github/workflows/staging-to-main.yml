@@ -1,0 +1,66 @@
+name: Staging to Main CI
+
+on:
+  push:
+    branches:
+      - staging
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-to-main-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typescript-game-checks:
+    if: github.event_name == 'push' || github.head_ref == 'staging'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        team:
+          - team-1
+          - team-2
+          - team-3
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check frontend manifests
+        working-directory: games/${{ matrix.team }}
+        run: |
+          if [[ ! -f package.json ]]; then
+            echo "::error::games/${{ matrix.team }} must contain package.json."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        working-directory: games/${{ matrix.team }}
+        run: pnpm install
+
+      - name: Test TypeScript game and server logic
+        working-directory: games/${{ matrix.team }}
+        run: pnpm test
+
+      - name: Type-check TypeScript
+        working-directory: games/${{ matrix.team }}
+        run: pnpm run --if-present typecheck
+
+      - name: Build frontend
+        working-directory: games/${{ matrix.team }}
+        run: pnpm run --if-present build

@@ -1,0 +1,56 @@
+name: Team 2 Feature CI
+
+on:
+  push:
+    branches:
+      - Team_2_Feature
+  pull_request:
+    branches:
+      - development
+
+permissions:
+  contents: read
+
+concurrency:
+  group: team-2-feature-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typescript-game-checks:
+    if: github.event_name == 'push' || github.head_ref == 'Team_2_Feature'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: games/team-2
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check frontend manifests
+        run: |
+          if [[ ! -f package.json ]]; then
+            echo "::error::games/team-2 must contain package.json."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Test TypeScript game and server logic
+        run: pnpm test
+
+      - name: Type-check TypeScript
+        run: pnpm run --if-present typecheck
+
+      - name: Build frontend
+        run: pnpm run --if-present build
