@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "node tests/session-adapter.test.mjs"
+    "test": "node tests/session-adapter.test.mjs && node tests/game-state-adapter.test.mjs"
   },
   "devDependencies": {
     "typescript": "^5.7.0",
