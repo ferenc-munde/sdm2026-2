@@ -13,6 +13,9 @@ Browser code for **The Last Train**. What is in this folder today:
 | `keyboard.ts` | Keys → `input` message: WASD/arrows, Space/E to interact | #11 |
 | `lobbyModel.ts` | Main menu logic: name/code validation, error copy, share links (pure, tested) | #12 |
 | `lobby.ts` | Main menu screen: name, create room, join with a code, error line, room code | #12 |
+| `platformScene.ts` | Three.js platform for the waiting room: floor, walls, objects and crew | #146 |
+| `waitingRoomModel.ts` | Waiting room logic: crew, host, crew-size options, departure (pure, tested) | #146 |
+| `waitingRoom.ts` | Waiting room screen: crew list, crew size, ticket with copy link, Depart | #146 |
 | `screens.ts` | Win and lose screens, shown from `state.phase`, with "play again" | #21 |
 | `scenery.ts` | Ground and sleepers that scroll past the train at `journey.speedFactor` | #25 |
 | `sound.ts` | Event → sound mapping (hazard, repair, low fuel, win, lose), Web Audio player and mute button | #31 |
@@ -30,7 +33,6 @@ npm run typecheck
 
 ## Not here yet
 
-- **Connected client** (#145/#80): the socket that turns these messages into a live room.
-- **Waiting platform** (#146): the lobby scene with the crew, settings and departure lever.
+- **Connected client** (#145/#80): the socket that turns these messages into a live room; until then the waiting room runs on a mock crew.
 
 The client draws the state it receives and sends inputs; it never changes the game state itself.
