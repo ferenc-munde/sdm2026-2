@@ -8,6 +8,7 @@
 // low fuel and stops when the train stalls.
 
 import { createHelp } from "./help.ts";
+import { createCourseWarning } from "./courseWarning.ts";
 import { WebGLRenderer } from "three";
 import { FUEL_MAX, HULL_MAX, LOW_FUEL_THRESHOLD, WIN_DISTANCE } from "../shared/constants.ts";
 import type { ClientMessage, InputMessage } from "../shared/messages.ts";
@@ -70,6 +71,7 @@ resize();
 window.addEventListener("resize", resize);
 
 const hud = createHudBars(document.body);
+const courseWarning = createCourseWarning(document.body);
 const help = createHelp(document.body);
 help.update("playing");
 
@@ -150,6 +152,7 @@ const addDemoButton = (label: string, phase: Phase): void => {
   button.addEventListener("click", () => {
     demoPhase = phase;
     endScreen.update(phase);
+    if (previousDemoState) courseWarning.update({ ...previousDemoState, phase });
     help.update(phase);
   });
   demoBar.append(button);
@@ -241,11 +244,13 @@ const walk = (time: number): void => {
     if (previousDemoState) {
       for (const name of eventsBetween(previousDemoState, demoState)) sound.play(name);
     }
+    courseWarning.update(demoState);
     previousDemoState = demoState;
 
     if (progress >= 1) {
       demoPhase = "won";
       endScreen.update("won");
+      courseWarning.update({ ...demoState, phase: "won" });
       help.update("won");
     }
   }
