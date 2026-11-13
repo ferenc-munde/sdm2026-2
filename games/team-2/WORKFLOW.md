@@ -23,8 +23,8 @@ Roster (from `course/teams.json`): **A = Zeyad** (`Zackaziko`), **B = Shahd**
 | | **A — Spine & Contract** | **B — Tasks & UI** | **C — Players & Items** | **D — Sim, Stations & Hazards** |
 |---|---|---|---|---|
 | **Feature** | Package skeleton, GameDefinition wiring, journey/win-lose, map & camera | Task system both ends + HUD | Player & item feature both ends | Power/Pressure, stations, hazards both ends |
-| **`shared/` (pure rules)** | `game.ts` (composition), `state.ts`, `input.ts` | `tasks.ts` + test | `items.ts` + test | `sim.ts`, `stations.ts`, `hazards.ts` + tests |
-| **`client/`** | `net.ts`, join/lobby UI, `render.ts` (map, camera, doors) | `hud.ts` (checklist, top strip, win/lose screens) | local input, player sprites/anims, item visuals | station visuals, hazard fx, darkness/audio |
+| **`shared/` (pure rules)** | `game.ts` (composition), `state.ts`, `input.ts` | `tasks.ts` + test | `items.ts` + test | `sim.ts` (incl. #77 speed model), `stations.ts`, `hazards.ts` + tests |
+| **`client/`** | `net.ts`, join/lobby UI, `render.ts` (Three.js map, camera, doors) | `hud.ts` (checklist, train-on-track strip, win/lose) + `minigames/` | local input, player avatars/anims, item visuals | station visuals, hazard fx, darkness/audio |
 | **Other** | `room/index.ts`, `server.ts`, `config/game.json`, `package.json` | — | — | — |
 | **Issues** | #35, #37 + contract/journey/lobby (to open) | tasks+HUD (to open) | #39, #44, #40, #45 + items/death (to open) | sim/hazards/juice (to open) |
 
@@ -98,21 +98,22 @@ gh pr create --fill                                               # Closes #N + 
 ## 3. Schedule (2-day hackathon)
 
 ### Phase 0 — Spine (Day 1, first hours) — *serial-ish, blocks the rest*
-- **A:** PR #1 = SPEC + WORKFLOW docs (mergeable *now*, no platform needed).
-  File `[platform]` issue #2 (needs list) immediately.
-  When platform step 3 lands → PR #4: `shared/` state schema + input contract +
-  GameDefinition wiring with stub feature modules. When step 5 lands → PR #3:
-  copy template → `@team-2/game`, `config/game.json`, `room/index.ts`.
+- **A:** docs PR = SPEC + WORKFLOW (mergeable *now*, no platform needed — that's
+  PR #75). File the `[platform]` needs issue (#73) immediately.
+  When platform step 3 lands → PR: `shared/` state schema + input contract +
+  GameDefinition wiring with stub feature modules (#64). When step 5 lands →
+  PR: copy template → `@team-2/game`, `config/game.json`, `room/index.ts` (#35).
 - **B/C/D (don't wait for code):** design refinement in issue comments:
-  B: task rules table check; C: input/anim list; D: power/pressure/hazard
-  tuning tables + station layout coordinates. Draft module APIs in their own
-  stub files (merge after A's #4).
+  B: task rules + minigame parameter tables (#65, #76); C: input/anim list
+  (#39, #40); D: power/pressure/hazard tuning tables + station layout
+  coordinates (#68, #69). Draft module APIs in their own stub files (merge
+  after #64).
 
 ### Phase 1 — Vertical slices (Day 1 afternoon → evening) — all parallel
-- **B:** `shared/tasks.ts` + vitest (#5), HUD checklist + top strip.
-- **C:** input → server movement + client interpolation (#7), `shared/items.ts` + visuals (#8).
-- **D:** `shared/sim.ts` power/pressure + `stations.ts` (#9), start `hazards.ts` (#10).
-- **A:** journey/phases/win-lose (#6), carriage map + doors + camera (#14), lobby (#11).
+- **B:** `shared/tasks.ts` + vitest (#65), HUD checklist + train-on-track strip (#78), minigames (#76).
+- **C:** input → server movement + client interpolation (#39/#45), `shared/items.ts` + visuals (#67), interaction system (#40).
+- **D:** `shared/sim.ts` power/pressure + speed model (#68, #77), `stations.ts`, start `hazards.ts` (#69).
+- **A:** contract (#64), journey/phases/win-lose (#66), carriage map + doors + camera (#37), lobby (#70).
 
 ### Checkpoint (Day 1, evening) — **Integrator: A**
 2 browser clients + dev server: join lobby → start → move → remote players
@@ -120,10 +121,10 @@ interpolate → boiler task spawns → completes → gauges move. Cross-module b
 → issues assigned to module owners; **nobody fixes files they don't own.**
 
 ### Phase 2 — Depth & polish (Day 2)
-- **D:** full HazardDirector + hazard visuals (#10), juice (#13).
-- **C:** death/elimination + spectator (#12), item edge cases.
-- **B:** endgame sequence + win/lose screens polish (#5 follow-ups).
-- **A:** fail states, door sync, server tests for all rules, lobby → run flow (#6, #11).
+- **D:** full HazardDirector + hazard visuals (#69), juice (#72).
+- **C:** death/elimination + spectator (#71), item edge cases.
+- **B:** endgame sequence + minigame variety (#76 follow-ups).
+- **A:** fail states, door sync, server tests for all rules, lobby → run flow (#66, #70).
 - All: rotating playtests; every bug = issue with `done when`.
 - Final hours: demo run recorded, `main` runs end-to-end, CI green.
 

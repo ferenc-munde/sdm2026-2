@@ -6,7 +6,7 @@ Work only inside this folder unless an issue says otherwise. Start from the temp
 
 ## Game
 
-5-carriage co-op survival train. One **Colyseus 0.18 authoritative server** per team package, one **Vite + TypeScript browser client**, deterministic simulation (replayable), rendered with Canvas2D + DOM HUD.
+5-carriage co-op survival train. One **Colyseus 0.18 authoritative server** per team package, one **Vite + TypeScript browser client**, deterministic simulation (replayable), rendered with **Three.js** + DOM HUD (Among-Us-style task minigames, timed journey with a train-on-a-track strip).
 
 - `SPEC.md` — game design, state schema, input contract, issue list (source of truth)
 - `WORKFLOW.md` — who owns what, runbook, schedules, agent role prompts

@@ -13,15 +13,18 @@
 
 ## 1. Game loop, win & lose conditions
 
-One run = one journey. The train travels a fixed distance while a difficulty
-director injects tasks and hazards. Speed depends on Power and Pressure.
-The sim advances in fixed ticks (`config/game.json`: `tickRate`); journey
-distance is a pure function of ticks and sim state — never wall-clock time.
+One run = one **race against a time limit** over a fixed distance. The train
+travels while a difficulty director injects minigame tasks and hazards; speed
+is affected by task/hazard state (§3). The sim advances in fixed ticks
+(`config/game.json`: `tickRate`, `timeLimitSeconds`); all timing is tick
+counts — never wall-clock.
 
-- **Win:** journey distance reaches 100% → docking sequence unlocks → final task
-  `Pull emergency brake to dock safely` completes → **Docked Safe** screen with
-  per-team stats (tasks completed, fires fought, deaths).
+- **Win:** arrive (distance = 100%) before the time limit **and** complete the
+  final task `Pull emergency brake to dock safely` → **Docked Safe** screen
+  with per-team stats (tasks completed, fires fought, deaths).
 - **Lose (any of):**
+  - **Missed deadline:** the time limit passes before arrival — the train
+    stalls short of the station or crashes at speed.
   - **Boiler overload:** Pressure ≥ 100% for 10 uninterrupted seconds → boiler
     explosion, run over.
   - **Cold stall:** Power at 0% with no emergency generator running for 30s →
@@ -29,8 +32,11 @@ distance is a pure function of ticks and sim state — never wall-clock time.
   - **Crew wipe:** all players eliminated.
 - Room `phase` (in state): `lobby → running → won | lost`.
 
-HUD top strip always shows: journey progress bar, Power %, Pressure %, and one
-alarm icon per car (pulsing red when that car has an active hazard or task).
+HUD top strip: a **train-on-a-track visual** instead of a plain bar — the
+mini-train's position is the journey distance, a **schedule ghost** marker
+shows the minimum pace to arrive in time (falling behind turns the strip
+red), plus the deadline countdown, Power %, Pressure %, and one alarm icon
+per car.
 
 ## 2. Vehicle architecture (5 carriages)
 
@@ -66,6 +72,16 @@ The room shell (fixed tick, codes, reconnection, replay recording) comes from
 - `pressure: 0..100` — rises with fires/unsealed leaks; ≥ 100% starts the 10s
   overload fail countdown (klaxon + red vignette, driven from state).
 - `journeyDistance: 0..1` — drives spawn pacing and the win check.
+- `speed` — `base · f(power, pressure) · (1 − drag)`; **drag comes from every
+  unfinished critical task and every active hazard** (tuning values in
+  `config/game.json`). Staying above the required average speed
+  (`distance / timeLimit`) means arriving in time; completing tasks restores
+  speed — repairs literally move the train.
+- **Difficulty & player-count scaling** (director inputs):
+  `difficulty = elapsedTicks / timeLimitTicks` grows over the run, so
+  `spawnInterval = lerp(25s → 8s, difficulty) / (1 + 0.3·(players−1))` and the
+  concurrent cap is `players + 2`. More players → proportionally more tasks;
+  later in the run → faster spawns, nastier hazards, longer minigames.
 - Determinism rules (repo-mandated): `SeededRandom` from `@sdm/core/shared`
   (never `Math.random`), fixed ticks only (no `Date.now()` in the sim), every
   input zod-validated, tuning values in `config/game.json`.
@@ -76,24 +92,27 @@ Server-side director in `shared/tasks.ts` (pure, headless-testable):
 
 - Registry of 12 definitions across 5 categories (Power, Pressure, Fire,
   Navigation, Cargo). Endgame tasks only when `journeyDistance >= 0.9`.
-- Spawn timer measured in ticks; interval = `lerp(25s, 8s, journeyDistance)`
-  at the configured `tickRate`; exclude currently active IDs; max **4
-  concurrent** actives; prefer tasks matching current sim state.
+- Director (formulas in §3): interval from difficulty + player count, exclude
+  currently active IDs, concurrent cap `players + 2`; prefer tasks matching
+  current sim state.
+- **Every task resolves through a minigame** (Among-Us style, #76): wires,
+  valve sequence, slider calibration, hold-to-fill, keypad, tap-count.
+  Completion sends `progress` inputs; minigame length scales with difficulty.
 
-| Category | Task | Resolution |
-| --- | --- | --- |
-| Power | `Restore main power grid (0/1)` | Flip tripped breaker (Car 3) → restart boiler (Car 2) |
-| Power | `Replace blown fuse in Cargo Hold (0/2)` | Carry fuses Car 4 → Car 3 junction box |
-| Pressure | `Seal high-pressure steam leak (0/1)` | Close red valve (Car 2), then wrench-hold the burst pipe |
-| Pressure | `Drain flooded bilge (0/1)` | Sump pump (Car 3) held on for 5s |
-| Fire | `Extinguish engine compartment fire (0/1)` | Extinguisher Car 3 → Car 2, spray flames |
-| Fire | `Clear blocked ventilation vent (0/1)` | Interact-tap debris in Car 4 vent |
-| Navigation | `Calibrate track alignment coordinates (0/1)` | One player reads Car 1 table papers, another enters the code at the console |
-| Navigation | `Engage manual track switcher lever (0/1)` | Car 5 rear platform during junction warning |
-| Cargo | `Secure loose cargo crates (0/2)` | Re-fasten crates in Car 4 after rough-terrain shock |
-| Cargo | `Load emergency backup battery (0/1)` | Heavy cell Car 5 → Car 1 aux console (carrier slowed 30%) |
-| Endgame | `Purge coolant lines before docking (0/1)` | Simultaneous 2-player interact on Car 2 + Car 3 valves |
-| Endgame | `Pull emergency brake to dock safely (0/1)` | All living crew in Car 1, hold interact on brake |
+| Category | Task | Minigame | Resolution |
+| --- | --- | --- | --- |
+| Power | `Restore main power grid (0/1)` | valves → hold | Flip tripped breaker (Car 3) → restart boiler (Car 2) |
+| Power | `Replace blown fuse in Cargo Hold (0/2)` | wires | Carry fuses Car 4 → Car 3 junction box, connect |
+| Pressure | `Seal high-pressure steam leak (0/1)` | hold | Close red valve (Car 2), wrench-hold the burst pipe |
+| Pressure | `Drain flooded bilge (0/1)` | hold | Sump pump (Car 3) held on for 5s |
+| Fire | `Extinguish engine compartment fire (0/1)` | hold | Extinguisher Car 3 → Car 2, spray gauge |
+| Fire | `Clear blocked ventilation vent (0/1)` | taps | Interact-tap debris in Car 4 vent |
+| Navigation | `Calibrate track alignment coordinates (0/1)` | keypad | One player reads Car 1 papers, other enters the code |
+| Navigation | `Engage manual track switcher lever (0/1)` | slider | Car 5 rear platform during junction warning |
+| Cargo | `Secure loose cargo crates (0/2)` | hold | Re-fasten crates in Car 4 after rough-terrain shock |
+| Cargo | `Load emergency backup battery (0/1)` | carry + hold | Heavy cell Car 5 → Car 1 aux console (−30% speed) |
+| Endgame | `Purge coolant lines before docking (0/1)` | valves ×2 | Simultaneous 2-player interact on Car 2 + Car 3 |
+| Endgame | `Pull emergency brake to dock safely (0/1)` | hold (crew) | All living crew in Car 1, hold interact on brake |
 
 ## 5. Player death & elimination
 
@@ -160,6 +179,9 @@ export class Task extends Schema {
 	@type("uint8") current: number = 0;
 	@type("uint8") target: number = 1;
 	@type("string") type: string = "POWER";
+	@type("string") minigame: string = "wires"; // wires | valves | slider | hold | keypad | taps
+	@type("uint8") stepCount: number = 1;
+	@type("uint8") stepIndex: number = 0;
 }
 
 export class Hazard extends Schema {
@@ -187,6 +209,8 @@ export class DoorState extends Schema {
 export class LastTrainState extends BaseState {
 	@type("string") phase: string = "lobby";
 	@type("float32") journeyDistance: number = 0;
+	@type("float32") speed: number = 0;
+	@type("uint16") timeLimitTicks: number = 0;
 	@type("float32") power: number = 100;
 	@type("float32") pressure: number = 0;
 	@type("boolean") endgameUnlocked: boolean = false;
@@ -248,10 +272,17 @@ intervals, drain rates) — validated by the config schema in `shared/`.
 
 - `net.ts` — `@colyseus/sdk` join (`/team-2` path via gateway or `:2567` local),
   state callbacks (`onAdd`/`onRemove`/`onChange`), reconnection.
-- `render.ts` — Canvas2D: floors → props → doors → items → players → fx,
-  camera follows local player; darkness = lighting overlay when `power < 15`.
-- `hud.ts` — DOM overlay: task checklist (reuse row elements, keyed by task id —
-  no rebuild race), top strip (journey bar, Power/Pressure, per-car alarms),
+- `render.ts` — **Three.js** scene (`three` as a game-specific dependency in
+  the team `package.json`, per platform rules): low-poly 5-carriage interior,
+  capsule player avatars, interactable station meshes with proximity
+  highlight, per-car lights tied to power (darkness = dim + flashlight cone),
+  doors animating from state. Camera follows the local player; remote players
+  interpolated from schema snapshots.
+- `minigames/` — Among-Us-style DOM panels, one module per type (§4). Opening
+  a panel pauses nothing — the world keeps running around you; that tension
+  is the point. Completion sends validated `progress` inputs.
+- `hud.ts` — DOM overlay: task checklist (keyed rows), the **train-on-a-track
+  journey strip with schedule ghost** (#78), Power/Pressure, per-car alarms,
   interact prompt, win/lose screens.
 - `input.ts` — keyboard → throttled input sends (~10 Hz move, events for
   interact/pickup/toss).
@@ -307,10 +338,10 @@ games/team-2/
   server.ts           startGameServer() from @sdm/host
   index.html
   vite.config.ts
-  client/             net.ts render.ts hud.ts input.ts
+  client/             net.ts render.ts hud.ts input.ts minigames/
   room/index.ts       { game: (deps) => createGameRoom(lastTrain, deps) }
   shared/             game.ts state.ts input.ts tasks.ts items.ts sim.ts stations.ts hazards.ts
-  config/game.json    tickRate patchRate maxPlayers reconnectSeconds + tuning
+  config/game.json    tickRate patchRate maxPlayers timeLimitSeconds reconnectSeconds + tuning
 ```
 
 `shared/` stays browser-safe: only `@colyseus/schema`, `zod`, `@sdm/core/shared`,
@@ -339,8 +370,9 @@ duplicates.
 Opened 2026-11-13: **#64** contract (A), **#65** tasks+HUD (B), **#66**
 journey/win-lose (A), **#67** items (C), **#68** power/pressure+stations (D),
 **#69** hazards (D), **#70** lobby (A), **#71** death/spectator (C), **#72**
-juice (D), **#73** `[platform]` needs (filed by A). The docs plan PR closes
-**#74**.
+juice (D), **#76** minigame library (B), **#77** speed model (D), **#78**
+train-on-track HUD (B), **#73** `[platform]` needs (filed by A). Scope
+comments on #65/#66. The docs plan PR closes **#74**.
 
 Every issue: `[team-2]` prefix, goal + `done when` checklist, label `team-2`,
 assignee = owner. Branch `team-2/<n>-<short-description>`.
