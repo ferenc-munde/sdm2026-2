@@ -1,0 +1,162 @@
+# Root .gitignore for the whole repository: every game in games/ and the platform in server/.
+# Rules without a leading slash match in every folder. A team may add its own .gitignore in its
+# folder for extra rules, but must not un-ignore anything listed here.
+# Already committed a file by mistake? Ignoring it is not enough: `git rm --cached <file>` first.
+
+# --- Dependencies -------------------------------------------------------------------------------
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+.yarn/
+.pnp.*
+
+# The workspace uses pnpm: the only lockfile is pnpm-lock.yaml at the repository root.
+package-lock.json
+npm-shrinkwrap.json
+yarn.lock
+bun.lock
+bun.lockb
+
+# --- Build output -------------------------------------------------------------------------------
+dist/
+dist-ssr/
+build/
+out/
+.output/
+*.tsbuildinfo
+
+# --- Caches -------------------------------------------------------------------------------------
+.cache/
+.vite/
+.turbo/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+.npm/
+.temp/
+.tmp/
+tmp/
+temp/
+# Vite and vitest write these next to the config when it is loaded.
+*.timestamp-*.mjs
+
+# --- Test and QA output -------------------------------------------------------------------------
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+__screenshots__/
+
+# --- Environment files and secrets --------------------------------------------------------------
+# Secrets live in Railway variables, never in the repository. Only the example file is committed.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+id_rsa*
+id_ed25519*
+*.secret
+secrets.json
+credentials.json
+.npmrc.local
+.railway/*.local.*
+
+# --- Instructors' private reports (per-person numbers, see course/README.md) -----------------------
+.private/
+
+# --- Logs and crash dumps -----------------------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+*.heapsnapshot
+*.cpuprofile
+*.pid
+*.seed
+
+# --- Replays and bug reports saved while testing ------------------------------------------------
+replay-*.json
+bug-report-*.json
+
+# --- Operating system files ---------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+desktop.ini
+$RECYCLE.BIN/
+*.lnk
+.directory
+.Trash-*
+.fuse_hidden*
+.nfs*
+
+# --- Editors and IDEs ---------------------------------------------------------------------------
+# Shared VS Code settings are committed; everything else in .vscode/ is personal.
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+*.code-workspace
+.history/
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+.fleet/
+.zed/
+*.swp
+*.swo
+*.swn
+*~
+\#*\#
+.\#*
+*.bak
+*.orig
+*.rej
+
+# --- AI coding agents: personal settings and local state ----------------------------------------
+# Shared agent files (CLAUDE.md, AGENTS.md, .claude/skills/, .claude/settings.json) are committed.
+.claude/settings.local.json
+.claude/worktrees/
+.claude/todos/
+CLAUDE.local.md
+.cursor/
+.cursorignore
+.aider*
+.codex/
+.continue/
+.windsurf/
+.copilot/
+
+# --- Archives and large binaries (never commit them; see CLAUDE.md) -----------------------------
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+*.exe
+*.dll
+*.dmg
+*.iso

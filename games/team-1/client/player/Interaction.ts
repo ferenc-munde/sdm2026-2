@@ -15,6 +15,7 @@ export interface InteractionTarget {
 export type InteractionCallback = (target: InteractionTarget, player: any) => void;
 
 export class InteractionSystem {
+  private readonly handleKeyDown = (event: KeyboardEvent) => this.onKeyDown(event);
   private targets: Map<string, InteractionTarget> = new Map();
   private callbacks: Map<string, InteractionCallback[]> = new Map();
   private interactionRange: number;
@@ -24,6 +25,7 @@ export class InteractionSystem {
 
     // Listen for E key
     window.addEventListener('keydown', this.onKeyDown.bind(this));
+    window.addEventListener('keydown', this.handleKeyDown);
   }
 
   private onKeyDown(event: KeyboardEvent): void {
@@ -143,6 +145,7 @@ export class InteractionSystem {
    */
   destroy(): void {
     window.removeEventListener('keydown', this.onKeyDown.bind(this));
+    window.removeEventListener('keydown', this.handleKeyDown);
     this.targets.clear();
     this.callbacks.clear();
   }

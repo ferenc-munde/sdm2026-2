@@ -4,6 +4,23 @@
 
 Every team builds its own real-time multiplayer browser game in `games/team-N/`. All games share one platform in `server/`: the same server host, contract, tooling and CI.
 
+## Current status
+
+What has been done so far:
+
+| Area | Status |
+|---|---|
+| Repository skeleton | Done: rules (`CLAUDE.md`), getting started guide, `server/` structure with a README per package, `games/team-1` to `team-3` folders, course info |
+| Team roster | Done: `course/teams.json` lists instructors, students and their team |
+| Branches | Done: `main` (production), `staging`, `development`, `Team_1_Feature`, `Team_2_Feature`, `Team_3_Feature`. Work flows `Team_N_Feature` → `development` → `staging` → `main` (see [Branch structure](#branch-structure)) |
+| CI workflows | In progress (platform team, build-order step 2): GitHub Actions on every PR |
+| Workspace (`package.json`, `pnpm-workspace.yaml`, TypeScript config) | Not started (build-order step 1) |
+| `@sdm/core`, `@sdm/host`, `@sdm/template` | Not built: only the README of each package exists |
+| `@sdm/gateway`, Railway environments | Not built, nothing is deployed |
+| Game teams | Planning: project plans, specs and package skeletons are in review (for example Team 2, PRs #75 and #85) |
+
+The game teams are blocked on `@sdm/core`, `@sdm/host` and `@sdm/template` before they can write their game rules. Team 2 asked for them in issue #73. The build order is in [README.md](README.md#build-order).
+
 ```
 repo root            pnpm workspace (package.json, pnpm-workspace.yaml, lint/format and test config)
 ├─ games/team-N/     one package per team: client/, room/, shared/, config/, server.ts
@@ -72,14 +89,54 @@ One address, one path per game. The gateway is the only public service of an env
 | `/<game>/rest` | Proxied to the game's private address, WebSocket upgrades included; the `/<game>` prefix is removed |
 | anything else | 404; a game that cannot be reached gives 502 |
 
+## Branch structure
+
+`main` is production. Below it is `staging`, below that `development`, and below that one feature branch per team:
+
+```
+main                      production (prod)
+└─ staging                release candidate
+   └─ development         integration of all teams
+      ├─ Team_1_Feature
+      ├─ Team_2_Feature
+      └─ Team_3_Feature   one integration branch per team
+         └─ team-3/<issue>-<description>   short-lived work branch, one per issue
+```
+
+Work moves **upwards only**, one reviewed pull request per step:
+
+```
+team-N/<issue>-<description>  →  Team_N_Feature  →  development  →  staging  →  main
+```
+
+| Branch | Purpose | Receives pull requests from |
+|---|---|---|
+| `main` | Production: the stable, released state | `staging` only |
+| `staging` | Release candidate, checked before it goes to production | `development` only |
+| `development` | Integration branch for all teams | `Team_N_Feature`, and `platform` and `team-instructor` work branches |
+| `Team_N_Feature` | Team N's integration branch | Team N's work branches (`team-N/<issue>-<description>`) |
+
+Rules:
+
+- **A feature branch goes into `development`.** `Team_N_Feature` is never merged into `staging` or `main` directly, and a team's work branch is never merged into anything but its own `Team_N_Feature`.
+- Nobody commits directly to `main`, `staging`, `development` or `Team_N_Feature`: they change only through merged pull requests.
+- `platform` and `team-instructor` have no feature branch. Their work branches start from `development` and their pull requests go into `development`.
+- A team keeps its `Team_N_Feature` up to date by merging `development` into it.
+
+The same rules, with the commit and pull request format, are in [../CLAUDE.md](../CLAUDE.md#branches).
+
 ## Environments (Railway)
+
+> **Not set up yet.** This is the target.
 
 Railway project `sdm2026-2`, separate from Team 10's `sdm2026-1` project (see the instructors' setup issues). The gateway plus one service per game, one replica each.
 
 | Environment | Deploys | `APP_ENV` |
 |---|---|---|
-| development | `main`, after CI passed on the commit | `development` |
-| production | `prod`, through a reviewed release PR from `main` | `production` |
+| development | `development`, after CI passed on the commit | `development` |
+| production | `main`, through a reviewed promotion PR from `staging` | `production` |
+
+`staging` has no environment of its own yet: it is the release candidate that CI checks before the promotion to `main`.
 
 - Infrastructure is code, defined in one reviewed file, and changed only through a platform PR. **Never apply it while linked to another Railway project.**
 - Only the gateway has a public domain. Games are reached through it at `<address>/team-N`.

@@ -1,0 +1,109 @@
+# Removes files that .gitignore says must not be in the repository (node_modules, build output, .env,
+# editor files, foreign lockfiles, ...) from a team's feature branch when it is promoted to development.
+#
+# Runs on every pull request from a Team_N_Feature branch into development. It takes the root .gitignore
+# of development (not the one on the feature branch, which may be older or missing), finds the tracked
+# files that match it, removes them from Git with one commit on the feature branch, and comments on the
+# pull request with the list. When a developer pulls that commit, Git deletes these files from their
+# working folder too: dependencies and build output come back with an install or a build, a local .env
+# has to be saved first.
+#
+# pull_request_target: the workflow always runs as it is on development, so it works for a feature
+# branch that does not have this file yet, and it gets a token that may push. It checks the feature
+# branch out but never runs anything from it: only git commands.
+#
+# The bot's commit is the one allowed direct push to a Team_N_Feature branch. Commits pushed with the
+# workflow token do not start other workflows, so this cannot loop.
+# Owner: platform team.
+name: Remove ignored files
+
+on:
+  pull_request_target:
+    branches:
+      - development
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: remove-ignored-files-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  remove-ignored-files:
+    name: Remove ignored files
+    # Only promotions from a team's feature branch, and never from a fork (the token cannot push there).
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.head_ref, 'Team_') &&
+      endsWith(github.head_ref, '_Feature')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Remove tracked files that .gitignore excludes
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # The rules come from the base branch, so a feature branch cannot weaken them.
+          git fetch --quiet --no-tags --depth=1 origin "$BASE_REF"
+          if ! git cat-file -e "FETCH_HEAD:.gitignore" 2>/dev/null; then
+            echo "::notice::$BASE_REF has no root .gitignore, nothing to check."
+            exit 0
+          fi
+          rules="$RUNNER_TEMP/base.gitignore"
+          list="$RUNNER_TEMP/ignored.z"
+          git show "FETCH_HEAD:.gitignore" > "$rules"
+
+          # Tracked files matched by the base rules or by a .gitignore inside the branch. NUL-separated,
+          # so file names with spaces or line breaks are handled.
+          git -c core.excludesFile="$rules" ls-files -z --cached --ignored --exclude-standard > "$list"
+          count=$(tr -cd '\0' < "$list" | wc -c)
+          if [ "$count" -eq 0 ]; then
+            echo "No tracked file matches .gitignore."
+            echo "No tracked file matches \`.gitignore\`." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "Removing $count file(s) from Git:"
+          tr '\0' '\n' < "$list" | head -n 200
+
+          xargs -0 git rm --cached --quiet -- < "$list"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --quiet \
+            -m "chore(platform): remove files matched by .gitignore" \
+            -m "Removed $count file(s) that .gitignore excludes, before the promotion to $BASE_REF." \
+            -m "Refs #$PR_NUMBER"
+          git push --quiet origin "HEAD:refs/heads/$HEAD_REF"
+
+          # Report: at most 50 names in the comment, the rest as a count.
+          {
+            echo "**Removed $count file(s) that \`.gitignore\` excludes** from \`$HEAD_REF\` (one commit by the workflow)."
+            echo
+            echo "Run \`git pull\` on \`$HEAD_REF\` before you continue. The pull deletes these files from your working folder too: reinstall dependencies and rebuild afterwards, and **copy a local \`.env\` somewhere safe before you pull**."
+            echo
+            echo '```'
+            tr '\0' '\n' < "$list" | head -n 50
+            echo '```'
+            if [ "$count" -gt 50 ]; then
+              echo
+              echo "…and $((count - 50)) more."
+            fi
+          } > "$RUNNER_TEMP/report.md"
+          cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/report.md"

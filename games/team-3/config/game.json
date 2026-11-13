@@ -1,0 +1,6 @@
+{
+  "tickRate": 20,
+  "patchRate": 20,
+  "maxPlayers": 4,
+  "reconnectSeconds": 30
+}

@@ -12,6 +12,8 @@ export interface InputState {
 }
 
 export class InputHandler {
+  private readonly handleKeyDown = (event: KeyboardEvent) => this.onKeyDown(event);
+  private readonly handleKeyUp = (event: KeyboardEvent) => this.onKeyUp(event);
   private input: InputState = {
     forward: false,
     backward: false,
@@ -22,6 +24,8 @@ export class InputHandler {
   constructor() {
     window.addEventListener('keydown', this.onKeyDown.bind(this));
     window.addEventListener('keyup', this.onKeyUp.bind(this));
+    window.addEventListener('keydown', this.handleKeyDown);
+    window.addEventListener('keyup', this.handleKeyUp);
   }
 
   private onKeyDown(event: KeyboardEvent): void {
@@ -133,5 +137,7 @@ export class InputHandler {
   destroy(): void {
     window.removeEventListener('keydown', this.onKeyDown.bind(this));
     window.removeEventListener('keyup', this.onKeyUp.bind(this));
+    window.removeEventListener('keydown', this.handleKeyDown);
+    window.removeEventListener('keyup', this.handleKeyUp);
   }
 }
