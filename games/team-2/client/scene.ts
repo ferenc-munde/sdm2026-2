@@ -11,7 +11,7 @@ export function createTrainScene(container: HTMLElement) {
   rect(0, 0, 1600, 1000, "#292e20");
   for (let i = 0; i < 1400; i++) rect(i * 139 % 1600, i * 227 % 1000, 7, 5, i % 2 ? "#343b26" : "#22291c");
   for (const x of [440, 800, 1160]) {
-    for (let y = 0; y < 1000; y += 28) {
+    for (let y = 0; y < 1000; y += 25) {
       rect(x - 68, y, 136, 12, "#151a17"); rect(x - 64, y, 128, 7, "#65503a");
     }
     for (const dx of [-48, 48]) {
@@ -29,6 +29,11 @@ export function createTrainScene(container: HTMLElement) {
       c.lineTo(x + 37 - layer * 5, y + 14 + layer * 13); c.fill();
     }
   }
+  // Separate scrolling scenery from the train and crew, which stay in place.
+  const landscape = document.createElement("canvas");
+  landscape.width = art.width; landscape.height = art.height;
+  landscape.getContext("2d")!.drawImage(art, 0, 0);
+  c.clearRect(0, 0, art.width, art.height);
   const names = ["COMMAND", "BOILER", "MECHANICAL", "CARGO", "GENERATOR"];
   const colors = ["#478ca4", "#a56838", "#b49842", "#926b42", "#53846c"];
   for (let i = 0; i < 5; i++) {
@@ -66,7 +71,16 @@ export function createTrainScene(container: HTMLElement) {
   const camera = new THREE.OrthographicCamera(-800, 800, 500, -500, 0.1, 10);
   camera.position.z = 2;
   const geometry = new THREE.PlaneGeometry(1600, 1000);
-  const material = new THREE.MeshBasicMaterial({ map: texture });
+  const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+  const landscapeTexture = new THREE.CanvasTexture(landscape);
+  landscapeTexture.wrapT = THREE.RepeatWrapping;
+  landscapeTexture.magFilter = THREE.NearestFilter;
+  landscapeTexture.minFilter = THREE.NearestFilter;
+  landscapeTexture.colorSpace = THREE.SRGBColorSpace;
+  const landscapeMaterial = new THREE.MeshBasicMaterial({ map: landscapeTexture });
+  const landscapeMesh = new THREE.Mesh(geometry, landscapeMaterial);
+  landscapeMesh.position.z = -0.1;
+  scene.add(landscapeMesh);
   scene.add(new THREE.Mesh(geometry, material));
   const renderer = new THREE.WebGLRenderer({ antialias: false });
   renderer.domElement.setAttribute("aria-label", "2D top-down train with five carriages and forest tracks");
@@ -79,8 +93,26 @@ export function createTrainScene(container: HTMLElement) {
     camera.updateProjectionMatrix(); renderer.setSize(w, h); renderer.render(scene, camera);
   }
   window.addEventListener("resize", resize); resize();
-  return { destroy() {
+  let speed = 1;
+  let paused = false;
+  let previousTime: number | undefined;
+  renderer.setAnimationLoop((time: number) => {
+    const dt = previousTime === undefined ? 0 : Math.min(0.05, Math.max(0, (time - previousTime) / 1000));
+    previousTime = time;
+    // Presentation only: 1x = 120 artwork pixels/second. Never updates game state.
+    if (!paused && !document.hidden) {
+      landscapeTexture.offset.y = (landscapeTexture.offset.y + dt * speed * 0.12) % 1;
+    }
+    renderer.render(scene, camera);
+  });
+  return {
+    /** Visual multiplier, not a gameplay speed formula. Zero stops the scenery. */
+    setSpeed(value: number) { speed = Number.isFinite(value) ? Math.max(0, value) : 0; },
+    setPaused(value: boolean) { paused = value; },
+    destroy() {
+    renderer.setAnimationLoop(null);
     window.removeEventListener("resize", resize); geometry.dispose(); material.dispose();
+    landscapeTexture.dispose(); landscapeMaterial.dispose();
     texture.dispose(); renderer.dispose(); renderer.domElement.remove();
   } };
 }

@@ -25,6 +25,10 @@ Open the address printed in the terminal (normally http://127.0.0.1:5173/).
 The scene uses flat 2D top-down artwork with a Three.js orthographic camera,
 five vertical carriages, forest tracks, and the HUD. Buttons change example data only; the crew artwork is a static
 placeholder. There is no player movement, repair minigame, or multiplayer yet.
+Scenery now scrolls past the train. Use the demo speed slider (0–2x) and
+Pause scenery to test the effect. Victory/defeat stop the scenery, and Reset
+demo restores 1x. These controls do not calculate gameplay speed or advance
+the game clock; real speed will come from the rules/network integration.
 `npm.cmd run build` checks TypeScript and builds the browser app into `dist/`.
 `npm.cmd run preview` serves that build locally.
 

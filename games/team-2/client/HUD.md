@@ -47,3 +47,21 @@ HUD overlays let pointer events pass through to the Three.js scene.
 - Resize the browser to check the stacked layout.
 
 The preview does not test multiplayer or the Three.js integration.
+
+## Moving scene handoff
+
+`createTrainScene(container)` returns `setSpeed(multiplier)`,
+`setPaused(boolean)`, and `destroy()`. The scenery scrolls beneath a stationary
+train and crew. Speed 1 means 120 artwork pixels per second, 0 stops motion.
+This is a visual scale, not the simulation's units: the rules owner should map
+authoritative train speed to a suitable multiplier at the client boundary.
+No shared state, gameplay formulas, or task rules are changed by this API.
+
+`client/main.ts` currently provides demo speed/pause controls. Replace their
+example inputs with network state when the platform connection is ready.
+Victory and defeat stop visual movement. The demo does not automatically
+advance journey distance or countdown; those remain explicit preview controls.
+
+Current coordination: Shahd owns the base and HUD; Rawan owns the lobby;
+Ahmed and Zeyad own game rules and tasks. This handoff does not change the
+shared interfaces or implement those teammates' features.

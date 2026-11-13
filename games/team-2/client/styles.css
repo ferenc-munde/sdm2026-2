@@ -7,6 +7,9 @@ html, body { margin: 0; height: 100%; background: #0b141e; color: #eef3f6; font-
 #demo-controls button { padding: 9px 12px; margin: 3px; background: #e4c18a; border: 0; border-radius: 5px; color: #15212b; cursor: pointer; font: inherit; }
 #demo-controls button:hover { background: #ffe0aa; }
 #demo-controls button:focus-visible { outline: 3px solid #72d4cc; outline-offset: 2px; }
+.motion-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.motion-controls input { accent-color: #e4c18a; width: 160px; }
+.motion-controls output { min-width: 4ch; color: #f5d190; }
 @media (max-width: 800px) { .train-hud { max-height: 25vh; font-size: 13px; padding: 12px; } #demo-controls { font-size: 12px; } }
 /* Layout inspired by the reference: tasks left, status right, world centered. */
 #scene canvas { image-rendering: pixelated; }
