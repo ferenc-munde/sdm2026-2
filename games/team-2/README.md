@@ -18,7 +18,20 @@ Work only inside this folder unless an issue says otherwise. The package was sel
 - GitHub CLI (`gh`) is **optional** — handy for issues/PRs from the terminal,
   but the web UI works fine; nothing in the run steps needs it
 
-## Run locally (once the platform template is copied here)
+## Run the local Three.js scene
+
+From `games/team-2/`, run `npm.cmd install`, then `npm.cmd run dev`.
+Open the address printed in the terminal (normally http://127.0.0.1:5173/).
+The scene uses flat 2D top-down artwork with a Three.js orthographic camera,
+five vertical carriages, forest tracks, and the HUD. Buttons change example data only; the crew artwork is a static
+placeholder. There is no player movement, repair minigame, or multiplayer yet.
+`npm.cmd run build` checks TypeScript and builds the browser app into `dist/`.
+`npm.cmd run preview` serves that build locally.
+
+The standalone task-panel preview remains available with
+`node client/preview-hud.mjs` on port 5174.
+
+## Multiplayer (once the platform template is copied here)
 
 ```bash
 pnpm install
@@ -26,9 +39,8 @@ pnpm --filter @team-2/game dev   # client on :5173, server on :2567
 pnpm --filter @team-2/game test  # headless rules tests (deterministic sim)
 ```
 
-> Until the platform template is copied into this folder (#35 / #73), there is
-> no dev server: only `npm test` and `npm run typecheck` work from
-> `games/team-2/`.
+> The local `dev` command currently starts the browser scene only. The
+> multiplayer server still depends on the platform host/template (#73).
 
 Two browser tabs at `localhost:5173` = two players.
 
