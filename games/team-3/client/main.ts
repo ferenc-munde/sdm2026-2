@@ -1,19 +1,22 @@
 // Browser entry point: draws the train and the crew in a Three.js canvas.
 //
-// This is a hand-check page for the renderer (#10) and the heads-up display
-// (#20). The real client gets the state from the room once the platform host
-// exists; until then it shows a small demo crew walking through the cars and a
-// demo journey counting down, so the bars and the low-fuel colour can be seen.
+// This is a hand-check page for the renderer (#10), the heads-up display (#20)
+// and the win and lose screens (#21). The real client gets the state from the
+// room once the platform host exists; until then it shows a small demo crew
+// walking through the cars, a demo journey counting down, and two buttons that
+// show either end screen immediately.
 
 import { WebGLRenderer } from "three";
 import { FUEL_MAX, HULL_MAX, WIN_DISTANCE } from "../shared/constants.ts";
 import type { InputMessage } from "../shared/messages.ts";
+import type { Phase } from "../shared/types.ts";
 import { buildTrainScene, fitCameraToMap } from "./trainScene.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import { CAR_LENGTH, carCentreX } from "./trainMap.ts";
 import { createHudBars } from "./hud.ts";
 import { hudView } from "./hudModel.ts";
 import { createKeyboard, isIdle } from "./keyboard.ts";
+import { createEndScreen } from "./screens.ts";
 
 const container = document.getElementById("app");
 if (!container) throw new Error("#app is missing from index.html");
@@ -66,27 +69,73 @@ const sendInput = (message: InputMessage): void => {
 const keyboard = createKeyboard({ onChange: sendInput });
 readout.textContent = describeInput(keyboard.current());
 
-// Walk the crew along their car and drain a demo journey so it is obvious that
-// the scene and the bars follow the state.
-const walk = (time: number): void => {
-  const seconds = time / 1000;
-  const moved = demoPlayers.map((player, seat) => {
-    const base = carCentreX(seat);
-    const offset = Math.sin(seconds * 0.8 + seat) * (CAR_LENGTH / 3);
-    return { ...player, position: { x: base + offset, y: player.position.y } };
-  });
-  train.updatePlayers(moved);
+// The demo run and its end screens (#21). The real client shows the screen from
+// `state.phase`; the two buttons below show either screen without waiting for
+// the ~3 minute demo run to finish.
+let demoPhase: Phase = "playing";
+let demoStart = 0;
 
-  // A ~3 minute run: fuel and hull fall, distance grows.
-  const progress = (seconds % 180) / 180;
-  hud.update(
-    hudView({
-      fuel: Math.max(0, FUEL_MAX - seconds * 0.6),
-      hull: Math.max(0, HULL_MAX - seconds * 0.3),
-      distance: progress * WIN_DISTANCE,
-      speedFactor: 1,
-    }),
-  );
+// The room's socket plugs in here (#12): send `{ type: "playAgain" }` instead.
+const sendPlayAgain = (): void => {};
+
+const endScreen = createEndScreen(document.body, {
+  onPlayAgain: () => {
+    sendPlayAgain();
+    demoStart = performance.now();
+    demoPhase = "playing";
+    endScreen.update("playing");
+  },
+});
+
+const demoBar = document.createElement("div");
+demoBar.style.cssText =
+  "position:fixed;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:8px;" +
+  "font:12px system-ui,sans-serif";
+const addDemoButton = (label: string, phase: Phase): void => {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = label;
+  button.style.cssText =
+    "padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.18);" +
+    "background:rgba(16,16,24,.8);color:#e6e6ee;cursor:pointer;font:inherit";
+  button.addEventListener("click", () => {
+    demoPhase = phase;
+    endScreen.update(phase);
+  });
+  demoBar.append(button);
+};
+addDemoButton("Show win screen", "won");
+addDemoButton("Show lose screen", "lost");
+document.body.append(demoBar);
+
+// Walk the crew along their car and drain a demo journey so it is obvious that
+// the scene, the bars and the end screens follow the state.
+const walk = (time: number): void => {
+  if (demoPhase === "playing") {
+    const seconds = (time - demoStart) / 1000;
+    const moved = demoPlayers.map((player, seat) => {
+      const base = carCentreX(seat);
+      const offset = Math.sin(seconds * 0.8 + seat) * (CAR_LENGTH / 3);
+      return { ...player, position: { x: base + offset, y: player.position.y } };
+    });
+    train.updatePlayers(moved);
+
+    // A ~3 minute run: fuel and hull fall, distance grows, then the win screen.
+    const progress = Math.min(1, seconds / 180);
+    hud.update(
+      hudView({
+        fuel: Math.max(0, FUEL_MAX - seconds * 0.6),
+        hull: Math.max(0, HULL_MAX - seconds * 0.3),
+        distance: progress * WIN_DISTANCE,
+        speedFactor: 1,
+      }),
+    );
+
+    if (progress >= 1) {
+      demoPhase = "won";
+      endScreen.update("won");
+    }
+  }
 
   renderer.render(train.scene, train.camera);
   requestAnimationFrame(walk);
