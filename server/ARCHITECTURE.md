@@ -1,96 +1,86 @@
 # Architecture
 
-Every team builds its own real-time multiplayer browser game in `games/team-N/`. All games share one platform in `server/`: the same server host, netcode contract, tooling and CI.
+> **Target architecture.** This describes how the system is built. The repository is a skeleton: the platform team and the game teams build these parts during the hackathon. Each folder's `README.md` says what goes in it.
+
+Every team builds its own real-time multiplayer browser game in `games/team-N/`. All games share one platform in `server/`: the same server host, contract, tooling and CI.
 
 ```
-repo root            pnpm workspace (package.json, pnpm-workspace.yaml, biome.json, vitest.config.ts)
+repo root            pnpm workspace (package.json, pnpm-workspace.yaml, lint/format and test config)
 ├─ games/team-N/     one package per team: client/, room/, shared/, config/, server.ts
+├─ course/           course information and the team roster (instructors)
 └─ server/           platform (owned by the platform team)
-   ├─ core/          @sdm/core   shared contract, sim contract, Simulation + replays, client core
-   ├─ host/          @sdm/host   Colyseus + Express host, createGameRoom, routes, logs
+   ├─ core/          @sdm/core      contract, sim contract, Simulation + replays, client core
+   ├─ host/          @sdm/host      Colyseus + Express host, createGameRoom, routes, logs
+   ├─ gateway/       @sdm/gateway   the one public address, a path per game
    ├─ template/      @sdm/template  reference game that teams copy
-   └─ tooling/       @sdm/tooling   shared TypeScript config
+   ├─ tooling/       @sdm/tooling   shared TypeScript config, scripts and checks
+   └─ docs/          platform documentation
 ```
 
 ## Runtime
 
-Each game deploys as **one service**: its `server.ts` calls `startGameServer()`, which runs Colyseus (game rooms over WebSocket) and Express (HTTP) on one port, and serves the game's built client from the same origin. The client therefore connects to `location.origin` in deployed environments, with no CORS or per-environment URLs. In local dev the client runs on Vite (:5173) and connects to the server on :2567.
+Each game deploys as **one service**: its `server.ts` calls `startGameServer()`, which runs Colyseus (game rooms over WebSocket) and Express (HTTP) on one port and serves the game's built client from the same origin. The client therefore connects to its own origin in deployed environments, with no CORS or per-environment URLs. In local development the client runs on Vite (:5173) and connects to the server on :2567.
 
-The server is authoritative: clients send inputs, never state. Rooms advance in fixed ticks, use a seeded random generator, and record every event so any room can be replayed exactly (format: `ReplaySchema` in `@sdm/core/shared`).
+The server is authoritative: clients send inputs, never state. Rooms advance in fixed ticks, use a seeded random generator, and record every event, so any room can be replayed exactly.
 
 ## Rooms: game definition → Simulation → room
-
-Design: [docs/design-docs/room-base.md](docs/design-docs/room-base.md). For client authors: [docs/CLIENT_GUIDE.md](docs/CLIENT_GUIDE.md).
 
 | Layer | Where | What it does |
 |---|---|---|
 | Game definition | `games/team-N/shared/` | Pure, browser-safe rules: `createState`, `init`, `join`, `leave`, `step`, optional `disconnect`/`reconnect` and debug `commands`. Implements `GameDefinition` from `@sdm/core/sim`. |
-| Simulation | `@sdm/core/server` | Applies and records every event (join, leave, drop, reconnect, input, debug). `runReplay()` drives the same class headless, so a replay re-runs to the same state hash. |
+| Simulation | `@sdm/core/server` | Applies and records every event (join, leave, drop, reconnect, input, debug). A replay runner drives the same class headless, so a replay re-runs to the same state hash. |
 | Room | `@sdm/host` `createGameRoom()` | Colyseus shell: fixed tick, room codes, reconnection, debug commands (rejected in production), stats, logs, error handling. |
 
 Every game state extends `BaseState` (`tick`, `code`, `paused`, `seats` with `connected` and `lastSeq`). Every game config extends `RoomSettingsSchema` (`tickRate`, `patchRate`, `maxPlayers`, `reconnectSeconds`) and lives in `games/team-N/config/game.json`.
 
-`createGameRoom` lives in `@sdm/host`, not `@sdm/core`, so every room shares the host's single copy of the Colyseus runtime. `pnpm-workspace.yaml` pins that with a `packageExtensions` entry; see the comment there.
+`createGameRoom` lives in `@sdm/host`, not `@sdm/core`, so every room shares the host's single copy of the Colyseus runtime.
 
 ## HTTP routes (`@sdm/host`)
 
 | Route | What it does |
 |---|---|
-| `GET /health` | Env, commit SHA, start time |
+| `GET /health` | `ok`, environment, commit SHA, start time |
 | `POST /api/rooms/join` | `{code}` → `{roomId}`; 404 unknown, 409 full |
-| `GET /api/replays/:roomId` | Replay download for a live or recently finished room (1 hour / 50 rooms, in memory) |
-| `POST /api/bug-reports`, `GET /api/bug-reports/:id` | F8 reports with a copy of the room's replay; 5 per minute per IP |
+| `GET /api/replays/:roomId` | Replay download for a live or recently finished room (kept in memory) |
+| `POST /api/bug-reports`, `GET /api/bug-reports/:id` | Bug reports with a copy of the room's replay, rate-limited per IP |
 | `GET /api/stats` | Process and per-room stats |
-| `/colyseus` | Colyseus monitor, outside production only |
 
-The same contract as JSON Schema, for tools and agents outside TypeScript: `docs/generated/api.schema.json`, generated by `pnpm gen:api` and checked by `pnpm test`.
-
-## Observability
-
-Logs are pino JSON (`message` key, level names) so Railway's log explorer can filter on any field: `@roomId:…`, `@code:QXTR`, `@level:error`. Every line has `env`, `sha` and `game`; room lines add `roomId`, `code`, `tick` and `playerId`. Each room logs `room.stats` every 10 seconds (tick time avg/p95/max, late ticks, inputs and rejections, patches, reconnects), and the process logs `process.stats` (rooms, players, event-loop lag, heap, stored replays and reports). An exception in game code is logged with the replay URL, players get a notice, and the room closes.
-
-## The contract (`server/core/src/shared`)
+## The contract (`@sdm/core/shared`)
 
 | Module | Defines |
 |---|---|
-| `env.ts` | `AppEnv` (`local`, `development`, `staging`, `production`), `HealthResponse`, `isDebugEnabled()` |
-| `messages.ts` | WebSocket message names, HTTP routes, input envelope, debug commands, bug reports |
-| `replay.ts` | Replay file format |
-| `random.ts` | `SeededRandom` |
+| `env` | `AppEnv` (`local`, `development`, `production`), `HealthResponse`, `isDebugEnabled()` |
+| `messages` | WebSocket message names, HTTP routes, input envelope, debug commands, bug reports |
+| `replay` | Replay file format |
+| `random` | `SeededRandom` |
 
-Each game adds its own contract in `games/team-N/shared/`: Colyseus state schema, input schema and config schema (see `server/template/shared/index.ts`).
+Each game adds its own contract in `games/team-N/shared/`: Colyseus state schema, input schema and config schema.
+
+## Observability
+
+Structured JSON logs (for example pino) that Railway's log explorer can filter: every line has `env`, `sha` and `game`; room lines add `roomId`, `code`, `tick` and `playerId`. Rooms log periodic stats (tick time, late ticks, inputs, patches, reconnects), the process logs its own (rooms, players, event-loop lag, memory). An exception in game code is logged with the replay URL, players get a notice, and the room closes.
 
 ## Gateway (`@sdm/gateway`)
 
-One address, one path per game. The gateway is the only public service of an environment; every game stays its own service on Railway's private network, so a crash in one game never takes the others down, and merging one team's game redeploys only that team's service.
+One address, one path per game. The gateway is the only public service of an environment; every game is its own service on Railway's private network, so a crash in one game never takes the others down, and merging one team's game redeploys only that team's service.
 
 | Request | What happens |
 |---|---|
 | `/` | An index of the games, with the ones not released yet marked |
-| `/health` | The gateway's own `{ ok, env, sha, startedAt, games }`; it does not ask any game |
-| `/<game>` | Redirect (308) to `/<game>/` |
-| `/<game>/rest` | Proxied to `http://<game>.railway.internal:8080/rest`, WebSocket upgrades included |
-| anything else | A 404 page; a game that cannot be reached gives a 502 page |
-
-- The first path segment picks the game and is **removed**, so a game never sees its prefix. The Colyseus client supports this: with the endpoint `https://<address>/team-2` both the matchmaking requests and the WebSocket go through the prefix (`gateway.integration.test.ts` plays a real game that way).
-- A game that accepts an HTTP request and then stays silent for 30 s gets the 502 page from the gateway (`UPSTREAM_TIMEOUT_MS`), instead of the platform edge's generic error. WebSockets have no timeout: a live game is silent for long stretches. When a game is down, a WebSocket upgrade is answered with `502 Bad Gateway` (and an unknown game with 404), so a client can tell that from a dropped network.
-- The gateway passes `X-Forwarded-For`, `-Proto` and `-Host` through exactly as Railway's edge set them and adds nothing. The game trusts one proxy, as it always did, so `req.ip` is the last entry: the player's address as the edge saw it. A game behaves the same behind the gateway as when it is reached directly, so a game that is public by mistake cannot be given a fake address either (the per-IP limits for bug reports and live replays use `req.ip`).
-- Settings (`.env.example`): `GAMES`, `PLANNED_GAMES`, `UPSTREAM_PORT`, plus `PORT` and `APP_ENV` as for a game. On Railway `.railway/railway.ts` sets them from its own list of games.
-- Run it locally next to a game: `UPSTREAMS="team-2=http://127.0.0.1:2567" PORT=2570 node --import tsx server/gateway/server.ts`, then open <http://localhost:2570/team-2/>.
-- Tests: `server/gateway/src/gateway.test.ts` (fake games, WebSockets) and `gateway.integration.test.ts` (a real game server and a real Colyseus client through `/team-x`).
+| `/health` | The gateway's own health |
+| `/<game>` | Redirect to `/<game>/` |
+| `/<game>/rest` | Proxied to the game's private address, WebSocket upgrades included; the `/<game>` prefix is removed |
+| anything else | 404; a game that cannot be reached gives 502 |
 
 ## Environments (Railway)
 
-Defined in [`.railway/railway.ts`](../.railway/railway.ts): one project `sdm2026-2`, the gateway and one service per game, one replica each in `europe-west4`.
+Railway project `sdm2026-2`, separate from Team 10's `sdm2026-1` project (see the instructors' setup issues). The gateway plus one service per game, one replica each.
 
 | Environment | Deploys | `APP_ENV` |
 |---|---|---|
-| development | `main`, after CI passed on the commit (Wait for CI) | `development` |
-| production | `prod`, after CI passed on the commit, via a release PR from `main` | `production` |
+| development | `main`, after CI passed on the commit | `development` |
+| production | `prod`, through a reviewed release PR from `main` | `production` |
 
-- Watch paths: a service redeploys only when its game folder or the platform it runs on changes; Markdown and test files never redeploy.
-- Build `pnpm --filter <game> build`, start `node --import tsx <game>/server.ts`, health check `/health`, 15 s draining after SIGTERM, never sleeps.
-- Change the file in a platform PR with the `railway config plan` output for both environments, then apply from an up-to-date `main`: `railway link`, then `railway config plan` and `railway config apply`. Anything missing from the file is deleted on apply.
-- Add a team's game to `GAMES` once its package is on `main`. The same list tells the gateway which games to serve (`GAMES`), and the teams not in it yet are shown as "not released yet" (`PLANNED_GAMES`).
-- Domains: **only the gateway is public**, per environment: `railway domain --service gateway --port 8080`. A game gets no domain; it answers the gateway at `http://<game>.railway.internal:8080`. `.railway/railway.ts` cannot declare Railway's generated domains, so this is checked by hand (`railway domain` per service, see `server/docs/RAILWAY_SETUP.md`). It is hygiene, not a safety net: a game reached directly behaves the same, because the gateway passes `X-Forwarded-For` through untouched. A team's game is then at `<address>/<service>`, for example `<address>/team-2`.
-- Every service in an environment follows that environment's branch, so production serves all teams from `prod` and no team branch is deployed. Updating one team's game redeploys only that game; adding a game to `GAMES` also redeploys the gateway, because its `GAMES` variable changed.
+- Infrastructure is code, defined in one reviewed file, and changed only through a platform PR. **Never apply it while linked to another Railway project.**
+- Only the gateway has a public domain. Games are reached through it at `<address>/team-N`.
+- Secrets live in Railway variables, never in the repository.
