@@ -135,13 +135,44 @@ in state (`eliminated`). No mid-run revival v1.
 | --- | --- | --- |
 | 🔧 Wrench | Car 3 lockers | Seals pipes, force-opens locked bulkheads |
 | 🧯 Extinguisher | Car 3 lockers | Finite foam, refill dock in Car 4 |
-| 🔋 Battery cell | Car 4/5 bins | Heavy: carrier speed −30%, tossable |
+| 🔋 Battery cell | Car 4/5 bins | Heavy: carrier speed −30% |
 | ⚡ Coal | Car 4 bin | Boiler fuel |
 | 🔩 Spare parts / fuses | Car 4 bin | Repairs & fuse task |
 | 🔦 Flashlight | Car 4 locker | Directional light cone while held |
 
 Server owns item state (`items` map: type, holderId, fuel). The client renders
-carrying/tossing; toss physics are simulated server-side in fixed ticks.
+items on the ground or carried by players — there is no toss action in v1
+(dropped items simply appear at the player's position).
+
+### 7.1 Item Interaction Rules
+
+#### Pickup and Drop
+
+- Coordinate units are Three.js world units.
+- The pickup radius is 1.5 units.
+- Each player can hold one item.
+- Items have only two states: on the ground or held by a player.
+- Pickup requires the item to exist, be on the ground, be unheld, and be within
+  pickup radius.
+- Drop requires the requested `itemId` to match the player's `holdingItemId`.
+- Dropped items appear at the player's current position.
+
+#### Invalid Actions
+
+- Failed pickup operations return `false`.
+- Invalid actions leave game state unchanged.
+- Invalid drop operations also leave state unchanged.
+
+#### Extinguisher
+
+- Fuel capacity is 100.
+- Fuel consumption is 20 per second.
+- The extinguisher cannot spray when empty.
+- Spraying means holding `interactDown` while holding the extinguisher.
+- Spray direction comes from the player's facing (`anim`).
+- Fuel drains server-side in fixed ticks.
+- The refill location is the extinguisher refill dock in Carriage 4.
+- Refilling restores fuel to 100 and takes 3 seconds.
 
 ## 8. Netcode & state contract
 
@@ -162,7 +193,7 @@ owned by the base; do not redeclare them.
 
 ```ts
 import { Schema, MapSchema, type } from "@colyseus/schema";
-import { BaseState } from "@sdm/core/sim"; // shimmed by shared/types.ts until @sdm/core lands (#73)
+import { BaseState } from "@sdm/core/sim";
 
 export class Player extends Schema {
 	@type("string") name: string = "";
@@ -229,20 +260,20 @@ All inputs zod-validated in `shared/input.ts`; movement is server-simulated
 
 | Input | Payload | Effect (processed in `step`) |
 | --- | --- | --- |
-| `move` | `{ seq, mx, my, run }` | velocity each tick (hold-to-move: repeated sends) |
+| `move` | `{ mx, my, run }` | held direction, applied every tick until the next `move` (zero vector stops). No `seq`: the platform envelope carries it |
 | `interactDown` / `interactUp` | `{ stationId }` | press/release pairs drive hold-channels (wrench 5s, crank, brake) and taps |
 | `progress` | `{ taskId, amount }` | task director clamps amount 1–4 |
 | `pickup` / `drop` | `{ itemId }` | items module, distance check vs player |
-| `toss` | `{ itemId, tx, ty }` | target point; sim integrates toss physics |
 | `startRun` | — | lobby → running (host only) |
 | debug `commands` | per `@sdm/core/sim` | recorded in replays, rejected in production |
 
 ### 8.4 Game definition skeleton (`shared/game.ts`, thin composition root)
 
 ```ts
-// Landed in #64 (see shared/game.ts). Until @sdm/core exists, GameDefinition,
-// BaseState and Rng come from the local shim shared/types.ts (#73).
-import type { GameDefinition, Rng } from "./types";
+// Sketch from #64. Since #241 the real signatures come from @sdm/core/sim:
+// init(state, ctx), join(state, playerId, ctx, options), step(state, inputs, ctx)
+// with ctx.random and ctx.config. See shared/game.ts and docs/PLATFORM.md.
+import type { GameDefinition } from "@sdm/core/sim";
 import { LastTrainState } from "./state";
 import { createTasks } from "./tasks";   // owner B
 import { createItems } from "./items";   // owner C
@@ -256,9 +287,11 @@ export const lastTrain: GameDefinition<LastTrainState> = {
 	},
 	join: (state, sessionId, opts) => { /* new Player, name from opts */ },
 	leave: (state, sessionId) => { /* drop held item, mark seat */ },
-	step: (state, inputs, dt, rng, config) => {
+	step: (state, events, dt, rng, config) => {
+		// events: InputEvent[] — the room shell stamps sessionId (never the client);
 		// per fixed tick: sim.tick(), tasks.tick(), items.tick(),
-		// apply validated inputs, journey distance += speed(power, pressure) * dt,
+		// apply validated inputs (pickup/drop -> items, progress -> tasks),
+		// journey distance += speed(power, pressure) * dt,
 		// win/lose checks, door lockdown countdowns
 	},
 	commands: { /* debug: spawn task, set power, skip phase */ },
@@ -289,7 +322,7 @@ intervals, drain rates) — validated by the config schema in `shared/`:
   journey strip with schedule ghost** (#78), Power/Pressure, per-car alarms,
   interact prompt, win/lose screens.
 - `input.ts` — keyboard → throttled input sends (~10 Hz move, events for
-  interact/pickup/toss).
+  interact/pickup/drop).
 
 ## 9. Reference snippets
 
@@ -338,19 +371,17 @@ export function renderTasks(container: HTMLElement, tasks: Map<string, Task>): v
 games/team-2/
   SPEC.md  WORKFLOW.md  README.md  DEVELOPMENT.md
   package.json        @team-2/game
-  server.ts           startGameServer() from @sdm/host   (with the platform host, #73)
-  index.html
-  vite.config.ts
+  server.ts           startGameServer() from @sdm/host
   client/             net.ts render.ts hud.ts input.ts minigames/
   room/index.ts       { game: (deps) => createGameRoom(lastTrain, deps) }
-  shared/             game.ts state.ts input.ts random.ts types.ts config.ts
+  shared/             game.ts state.ts input.ts config.ts map.ts movement.ts lobby.ts
                       tasks.ts items.ts sim.ts (+ stations.ts hazards.ts from D)
   config/game.json    tickRate patchRate maxPlayers timeLimitSeconds reconnectSeconds + tuning
 ```
 
-`shared/random.ts` (mulberry32 `SeededRandom`) and `shared/types.ts` (the
-`@sdm/core/sim` shim) are swapped for platform imports when `@sdm/core` lands
-(#73); nothing else changes.
+`SeededRandom` comes from `@sdm/core/shared` and `BaseState` / `GameDefinition`
+from `@sdm/core/sim` (the local copies were removed in #241). The current
+folder map is in `docs/README.md`.
 
 `shared/` stays browser-safe: only `@colyseus/schema`, `zod`, `@sdm/core/shared`,
 `@sdm/core/sim` imports. Server tests (vitest) run the rules headless through

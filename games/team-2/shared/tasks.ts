@@ -1,12 +1,12 @@
 import type { LastTrainState } from "./state.ts";
-import type { Rng } from "./types.ts";
+import type { SeededRandom } from "@sdm/core/shared";
 
 export interface TasksModule {
 	requestProgress(taskId: string, amount: number): void;
 	tick(): void;
 }
 
-export function createTasks(state: LastTrainState, rng: Rng, config: unknown): TasksModule {
+export function createTasks(state: LastTrainState, rng: SeededRandom, config: unknown): TasksModule {
 	return {
 		requestProgress(taskId, amount) {
 			const task = state.tasks.get(taskId);

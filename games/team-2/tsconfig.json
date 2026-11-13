@@ -19,6 +19,7 @@
     "useDefineForClassFields": false
   },
   "include": [
+    "server.ts",
     "shared",
     "room",
     "client",
