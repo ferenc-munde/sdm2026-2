@@ -13,7 +13,6 @@ These rules apply to every agent and every human working in this repository. If 
 | `games/team-1/` | Team 1      | `team-1`          |
 | `games/team-2/` | Team 2      | `team-2`          |
 | `games/team-3/` | Team 3      | `team-3`          |
-| `games/team-4/` | Team 4      | `team-4`          |
 | `server/`       | Platform    | `platform`        |
 | `course/`       | Instructors | `team-instructor` |
 
@@ -39,7 +38,7 @@ Every change goes through the same path: **issue → branch → commits → pull
 ### 1. Issue first
 
 - Open an issue before writing any code. No issue, no branch, no PR.
-- The issue carries exactly one team label: `team-1`, `team-2`, `team-3`, `team-4`, `platform` or `team-instructor`.
+- The issue carries exactly one team label: `team-1`, `team-2`, `team-3`, `platform` or `team-instructor`.
 - The title starts with the team label: `[team-2] Add login page`.
 - Describe what is changing and why, and what "done" looks like (a short checklist).
 

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Last Train — renderer check</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #101018;
+        color: #e6e6ee;
+        font-family: system-ui, sans-serif;
+      }
+
+      #app {
+        width: 100vw;
+        height: 100vh;
+      }
+
+      .title {
+        position: fixed;
+        bottom: 16px;
+        left: 16px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: rgba(16, 16, 24, 0.7);
+        pointer-events: none;
+      }
+
+      .title h1 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .title p {
+        margin: 4px 0 0;
+        font-size: 12px;
+        opacity: 0.7;
+      }
+
+      /* Heads-up display (#20): three bars across the top of the screen. */
+      .hud {
+        position: fixed;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 16px;
+        width: min(860px, calc(100vw - 32px));
+        padding: 10px 14px;
+        border-radius: 10px;
+        background: rgba(16, 16, 24, 0.78);
+        pointer-events: none;
+      }
+
+      .hud-bar {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+        font-size: 12px;
+      }
+
+      .hud-bar-label {
+        opacity: 0.75;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .hud-bar-value {
+        min-width: 6ch;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .hud-bar-track {
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.14);
+        overflow: hidden;
+      }
+
+      .hud-bar-fill {
+        height: 100%;
+        width: 0;
+        border-radius: inherit;
+        transition: width 120ms linear, background 120ms linear;
+      }
+
+      /* Win and lose screens (#21). */
+      .endscreen {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(8, 8, 12, 0.82);
+        z-index: 10;
+      }
+
+      .endscreen[hidden] {
+        display: none;
+      }
+
+      .endscreen-panel {
+        width: min(420px, calc(100vw - 32px));
+        padding: 24px 28px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: #17171f;
+        text-align: center;
+      }
+
+      .endscreen h2 {
+        margin: 0 0 8px;
+        font-size: 24px;
+      }
+
+      .endscreen[data-outcome="won"] h2 {
+        color: #30a46c;
+      }
+
+      .endscreen[data-outcome="lost"] h2 {
+        color: #e5484d;
+      }
+
+      .endscreen p {
+        margin: 0 0 18px;
+        opacity: 0.8;
+      }
+
+      .endscreen-action {
+        padding: 10px 16px;
+        border: 0;
+        border-radius: 8px;
+        background: #3e63dd;
+        color: #ffffff;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .endscreen-action:hover {
+        background: #4f74ee;
+      }
+
+      /* Sound on/off (#31). */
+      .mute {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(16, 16, 24, 0.8);
+        color: #e6e6ee;
+        font: 12px system-ui, sans-serif;
+        cursor: pointer;
+      }
+
+      .mute[aria-pressed="true"] {
+        border-color: rgba(247, 107, 21, 0.6);
+        color: #f76b15;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="title">
+      <h1>The Last Train</h1>
+      <p>Renderer and HUD check (#10, #20)</p>
+    </div>
+    <div id="app"></div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

@@ -6,6 +6,13 @@ import { mountGameplayView, type PreviewAction } from "./gameplay-view";
 const appElement = document.querySelector<HTMLDivElement>("#app");
 if (!appElement) throw new Error("Lobby root element #app was not found.");
 const app: HTMLDivElement = appElement;
+function getAppRoot(): HTMLDivElement {
+  const root = document.querySelector<HTMLDivElement>("#app");
+  if (!root) throw new Error("Lobby root element #app was not found.");
+  return root;
+}
+
+const app = getAppRoot();
 
 const adapter: SessionAdapter = new MockSessionAdapter();
 let crew: LobbyPlayer[] = [];
@@ -187,6 +194,7 @@ function applyPreviewAction(action: PreviewAction): void {
 
 function renderRoom(): void {
   room.hidden = !roomCode;
+  room.hidden = !roomCode || Boolean(gameplayAdapter);
   app.querySelector<HTMLElement>("#active-code")!.textContent = roomCode;
   app.querySelector<HTMLElement>("#room-capacity")!.textContent = `${crew.length} / 4 CREW ABOARD`;
   playerList.innerHTML = crew.slice(0, 4).map((player, index) => `
