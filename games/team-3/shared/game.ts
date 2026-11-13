@@ -58,6 +58,8 @@ interface Hidden {
   notices: Record<PlayerId, Notice>;
 }
 
+// One world for every room: the train map, the platform map and the rule systems built from them.
+// They are read-only (the rules return new states and never change a map), so sharing is safe.
 const world: RoomWorld = createRoomWorld();
 const hidden = new WeakMap<LastTrainState, Hidden>();
 
