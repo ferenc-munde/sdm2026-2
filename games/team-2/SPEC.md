@@ -266,7 +266,9 @@ export const lastTrain: GameDefinition<LastTrainState> = {
 `room/index.ts` registers the factory: `{ game: (deps) => createGameRoom(lastTrain, deps) }`.
 `server.ts` calls `startGameServer()`. `config/game.json` holds `tickRate`,
 `patchRate`, `maxPlayers: 4`, `reconnectSeconds` + tuning values (spawn
-intervals, drain rates) — validated by the config schema in `shared/`.
+intervals, drain rates) — validated by the config schema in `shared/`:
+`patchRate ≤ tickRate` and `tickRate × timeLimitSeconds ≤ 65535` (the uint16
+`timeLimitTicks` budget in the state schema).
 
 ### 8.5 Client architecture (`client/`)
 
@@ -347,6 +349,11 @@ games/team-2/
 `shared/` stays browser-safe: only `@colyseus/schema`, `zod`, `@sdm/core/shared`,
 `@sdm/core/sim` imports. Server tests (vitest) run the rules headless through
 `@sdm/core/server`'s Simulation — deterministic, replay-checked.
+
+The state schema has exactly **one home**: `shared/state.ts`, owned by A.
+Any slice needing a new state field files a contract change with A (issue +
+SPEC update) — never a direct edit; this keeps the ownership table in
+`WORKFLOW.md` §1 true.
 
 ## 11. Issue breakdown & owners (real GitHub issues)
 

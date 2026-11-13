@@ -14,8 +14,9 @@ Work only inside this folder unless an issue says otherwise. Start from the temp
 ## Prerequisites
 
 - Node.js 22 LTS, pnpm 10 (`corepack enable`)
-- GitHub CLI (`gh`) + `gh auth login` for issues/PRs
 - Your AI agent of choice (see `WORKFLOW.md` §2)
+- GitHub CLI (`gh`) is **optional** — handy for issues/PRs from the terminal,
+  but the web UI works fine; nothing in the run steps needs it
 
 ## Run locally (once the platform template is copied here)
 
@@ -24,6 +25,10 @@ pnpm install
 pnpm --filter @team-2/game dev   # client on :5173, server on :2567
 pnpm --filter @team-2/game test  # headless rules tests (deterministic sim)
 ```
+
+> Until the platform template is copied into this folder (#35 / #73), there is
+> no dev server: only `npm test` and `npm run typecheck` work from
+> `games/team-2/`.
 
 Two browser tabs at `localhost:5173` = two players.
 
