@@ -1,9 +1,5 @@
-// Client-facing view of a player. Structurally compatible with `Player` in the
-// shared contract (#5): once that PR is merged, import the shared type instead
-// of keeping this local alias. The renderer only needs these three fields.
-export interface RenderPlayer {
-  id: string;
-  name: string;
-  /** Floor position in world units; the renderer maps it to (x, 0, y). */
-  position: { x: number; y: number };
-}
+// The part of a player the renderer needs. The full `Player` comes from the
+// shared contract; the renderer only reads the id, the name and the position.
+import type { Player } from "../shared/types.ts";
+
+export type RenderPlayer = Pick<Player, "id" | "name" | "position">;
