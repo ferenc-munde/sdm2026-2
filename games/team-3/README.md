@@ -19,6 +19,8 @@ This folder holds the game of Team 3 (package `@team-3/game`, label `team-3`).
 
 ## Working here
 
+Pull requests from work branches go into `Team_3_Feature`, which is promoted to `development`, `staging` and then `main`. See [DEVELOPMENT.md](DEVELOPMENT.md#branches-and-ci).
+
 Work only inside this folder unless an issue says otherwise. Start from the template game once the platform team has built it: the layout of a game package is in [server/template/README.md](../../server/template/README.md), the rules in [server/CLAUDE.md](../../server/CLAUDE.md).
 
 Until the platform packages exist, the game rules are written in `shared/` as pure, deterministic functions with tests, so they can be wrapped in the platform's game definition later without being rewritten.

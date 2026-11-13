@@ -161,12 +161,18 @@ Each line is one GitHub issue titled `[team-3] <title>`, labelled `team-3`, assi
 
 ## 8. Working rules
 
-The repository rules in the root `CLAUDE.md` and `GETTING_STARTED.md` apply. In short:
+Team 3 follows the promotion flow that the repository's CI is built for:
 
-- **Issue first.** No branch without an issue. Branch name: `team-3/<issue number>-<short-name>`, created from an up-to-date `main`.
-- **One issue, one pull request, into `main`.** Aim for under 200 changed lines. The title uses the commit format, for example `feat(team-3): add fire hazard`. The description says what changed and how it was tested, and ends with `Closes #<number>`.
+```
+team-3/<issue>-<name>  →  Team_3_Feature  →  development  →  staging  →  main
+     (work branch)         (team branch)     (all teams)     (release candidate)
+```
+
+- **Issue first.** No branch without an issue. Branch name: `team-3/<issue number>-<short-name>`, created from an up-to-date `Team_3_Feature`.
+- **One issue, one pull request, into `Team_3_Feature`.** Never straight into `main`. Aim for under 200 changed lines. The title uses the commit format, for example `feat(team-3): add fire hazard`. The description says what changed and how it was tested, and ends with `Closes #<number>`.
+- **Promotion.** At the end of each phase, when the "Team 3 Feature CI" front-end job is green, `Team_3_Feature` goes into `development` by pull request; `development` into `staging` and `staging` into `main` follow the same way.
 - **Commits** use `type(team-3): subject` with `Refs #<number>` in the body.
-- **Run the tests before pushing.** Once the platform has continuous integration, every check must be green.
+- **Run the CI steps before pushing**, in `games/team-3/`: `npm install`, `npm test`, `npm run typecheck`, `npm run build`.
 - **Tests with every rule change.** Client-only drawing changes say how they were checked by hand.
 - **Review within 15 minutes.** A waiting review comes before starting new work.
 - **Contract changes are announced.** Anything in the shared state or inputs is agreed by the whole team before it is merged.

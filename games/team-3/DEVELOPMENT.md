@@ -32,3 +32,24 @@ Until the root pnpm workspace exists, `npm install`, `npm test` and `npm run typ
 - No clock (`Date.now()`, `performance.now()`): time advances only through the step's elapsed time.
 - No imports from `node:*`, `colyseus` or the DOM, because the client imports these files too.
 - Tests sit next to the code as `*.test.ts`.
+
+## Branches and CI
+
+Work goes `team-3/<issue>-<name>` → `Team_3_Feature` → `development` → `staging` → `main`. Pull requests from work branches target `Team_3_Feature`, never `main`.
+
+```bash
+git fetch origin
+git switch -c team-3/42-short-name origin/Team_3_Feature
+# ... work, commit ...
+git push -u origin team-3/42-short-name
+gh pr create --base Team_3_Feature --label team-3
+```
+
+"Team 3 Feature CI" runs on every push to `Team_3_Feature` and on pull requests into `development`. Its front-end job runs these in `games/team-3/`, so run them before pushing:
+
+```bash
+npm install
+npm test
+npm run typecheck
+npm run build
+```
