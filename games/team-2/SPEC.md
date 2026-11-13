@@ -141,7 +141,8 @@ in state (`eliminated`). No mid-run revival v1.
 | 🔦 Flashlight | Car 4 locker | Directional light cone while held |
 
 Server owns item state (`items` map: type, holderId, fuel). The client renders
-items on the ground or carried by players.
+items on the ground or carried by players — there is no toss action in v1
+(dropped items simply appear at the player's position).
 
 ### 7.1 Item Interaction Rules
 

@@ -7,9 +7,8 @@ describe("client input schema", () => {
 		expect(parsed.type).toBe("move");
 	});
 
-	it("accepts a valid toss input", () => {
-		const parsed = clientInputSchema.parse({ type: "toss", seq: 3, itemId: "i1", tx: 2.5, ty: -1 });
-		expect(parsed.type).toBe("toss");
+	it("rejects toss inputs (removed from the contract)", () => {
+		expect(() => clientInputSchema.parse({ type: "toss", seq: 3, itemId: "i1", tx: 2.5, ty: -1 })).toThrow();
 	});
 
 	it("rejects a missing seq", () => {
