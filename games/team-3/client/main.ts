@@ -27,6 +27,7 @@ import { createWaitingRoom } from "./waitingRoom.ts";
 import { waitingView } from "./waitingRoomModel.ts";
 import { platformSpawn } from "../shared/map/platform.ts";
 import { errorText } from "./lobbyModel.ts";
+import { createActionKeys } from "./actionKeys.ts";
 import { createRoom, joinRoomByCode, serverAddress, type RoomConnection } from "./roomConnection.ts";
 import { joinErrorText } from "./roomLinks.ts";
 import { createSharedLinkJoin } from "./sharedLinkJoin.ts";
@@ -161,12 +162,19 @@ const sendInput = (message: InputMessage): void => {
   sendToRoom(message);
 };
 
-// The action keys (#220): F picks up, drops, takes or delivers coal and pulls the lever;
-// G throws the held item. Space/E stay "hold to interact".
+// The action keys from the design (#220): tap E or left-click to pick up / drop, Shift or F to
+// throw; holding E (or Space) is "interact" in the keyboard bindings.
+const onAction = createActionKeys(sendToRoom);
 window.addEventListener("keydown", (event) => {
-  if (!connection || event.repeat || isEditableTarget(event.target)) return;
-  if (event.code === "KeyF") sendToRoom({ type: "pickUpOrDrop" });
-  else if (event.code === "KeyG") sendToRoom({ type: "throw" });
+  if (!connection || isEditableTarget(event.target)) return;
+  onAction({ kind: "keydown", code: event.code, repeat: event.repeat, time: performance.now() });
+});
+window.addEventListener("keyup", (event) => {
+  if (!connection || isEditableTarget(event.target)) return;
+  onAction({ kind: "keyup", code: event.code, time: performance.now() });
+});
+renderer.domElement.addEventListener("mousedown", (event) => {
+  if (connection) onAction({ kind: "click", button: event.button });
 });
 
 const keyboard = createKeyboard({ onChange: sendInput });

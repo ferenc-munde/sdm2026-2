@@ -41,8 +41,8 @@ Until the client connects to the room (#12, #146), `pnpm run dev` opens a **hand
 |---|---|
 | Move | **W A S D** or the **arrow keys** |
 | Interact (hold) | **Space** or **E**: repair a breach with the wrench, put out a fire with the extinguisher, hold the steering console |
-| Pick up / drop, take or deliver coal, pull the departure lever | **F** |
-| Throw the held item | **G** |
+| Pick up / drop, take or deliver coal, pull the departure lever | **Tap E** or **left-click** |
+| Throw the held item | **Shift** or **F** |
 
 ## How the game works
 
