@@ -135,13 +135,44 @@ in state (`eliminated`). No mid-run revival v1.
 | --- | --- | --- |
 | 🔧 Wrench | Car 3 lockers | Seals pipes, force-opens locked bulkheads |
 | 🧯 Extinguisher | Car 3 lockers | Finite foam, refill dock in Car 4 |
-| 🔋 Battery cell | Car 4/5 bins | Heavy: carrier speed −30%, tossable |
+| 🔋 Battery cell | Car 4/5 bins | Heavy: carrier speed −30% |
 | ⚡ Coal | Car 4 bin | Boiler fuel |
 | 🔩 Spare parts / fuses | Car 4 bin | Repairs & fuse task |
 | 🔦 Flashlight | Car 4 locker | Directional light cone while held |
 
 Server owns item state (`items` map: type, holderId, fuel). The client renders
-carrying/tossing; toss physics are simulated server-side in fixed ticks.
+items on the ground or carried by players — there is no toss action in v1
+(dropped items simply appear at the player's position).
+
+### 7.1 Item Interaction Rules
+
+#### Pickup and Drop
+
+- Coordinate units are Three.js world units.
+- The pickup radius is 1.5 units.
+- Each player can hold one item.
+- Items have only two states: on the ground or held by a player.
+- Pickup requires the item to exist, be on the ground, be unheld, and be within
+  pickup radius.
+- Drop requires the requested `itemId` to match the player's `holdingItemId`.
+- Dropped items appear at the player's current position.
+
+#### Invalid Actions
+
+- Failed pickup operations return `false`.
+- Invalid actions leave game state unchanged.
+- Invalid drop operations also leave state unchanged.
+
+#### Extinguisher
+
+- Fuel capacity is 100.
+- Fuel consumption is 20 per second.
+- The extinguisher cannot spray when empty.
+- Spraying means holding `interactDown` while holding the extinguisher.
+- Spray direction comes from the player's facing (`anim`).
+- Fuel drains server-side in fixed ticks.
+- The refill location is the extinguisher refill dock in Carriage 4.
+- Refilling restores fuel to 100 and takes 3 seconds.
 
 ## 8. Netcode & state contract
 
@@ -233,7 +264,6 @@ All inputs zod-validated in `shared/input.ts`; movement is server-simulated
 | `interactDown` / `interactUp` | `{ stationId }` | press/release pairs drive hold-channels (wrench 5s, crank, brake) and taps |
 | `progress` | `{ taskId, amount }` | task director clamps amount 1–4 |
 | `pickup` / `drop` | `{ itemId }` | items module, distance check vs player |
-| `toss` | `{ itemId, tx, ty }` | target point; sim integrates toss physics |
 | `startRun` | — | lobby → running (host only) |
 | debug `commands` | per `@sdm/core/sim` | recorded in replays, rejected in production |
 
@@ -289,7 +319,7 @@ intervals, drain rates) — validated by the config schema in `shared/`:
   journey strip with schedule ghost** (#78), Power/Pressure, per-car alarms,
   interact prompt, win/lose screens.
 - `input.ts` — keyboard → throttled input sends (~10 Hz move, events for
-  interact/pickup/toss).
+  interact/pickup/drop).
 
 ## 9. Reference snippets
 
