@@ -350,6 +350,11 @@ games/team-2/
 `@sdm/core/sim` imports. Server tests (vitest) run the rules headless through
 `@sdm/core/server`'s Simulation — deterministic, replay-checked.
 
+The state schema has exactly **one home**: `shared/state.ts`, owned by A.
+Any slice needing a new state field files a contract change with A (issue +
+SPEC update) — never a direct edit; this keeps the ownership table in
+`WORKFLOW.md` §1 true.
+
 ## 11. Issue breakdown & owners (real GitHub issues)
 
 Open issues already exist — **they were written for the older 3-carriage
