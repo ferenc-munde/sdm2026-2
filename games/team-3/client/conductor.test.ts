@@ -6,6 +6,7 @@ import { createConductor } from "./conductor.ts";
 const state = (fuel = 100): GameState => ({
   roomCode: "TEST", phase: "playing", time: 0, players: {}, items: {}, hazards: {},
   journey: { fuel, hull: 100, distance: 0, speedFactor: 1 },
+  lobby: { hostId: null, crewSize: 2 },
 });
 const fire = { id: "fire1", kind: "fire" as const, car: 0, spotId: "engine",
   position: { x: 0, y: 0 }, age: 0, progress: 0, countdown: null };
