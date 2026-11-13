@@ -46,6 +46,19 @@ function readyRoom(seed = 1): Room {
   return send(room, "host", { type: "configureRoom", crewSize: 2 });
 }
 
+describe("createRoom", () => {
+  it("uses a given random source, so the platform's seeded random drives the hazards", () => {
+    let calls = 0;
+    const random = { next: () => { calls += 1; return 0.5; } };
+    let room = createRoom("ROOM", random, world);
+    room = send(room, "host", { type: "createRoom", name: "Ada" });
+    room = send(room, "crew", { type: "joinRoom", name: "Bo", code: "ROOM" });
+    room = send(send(room, "host", { type: "configureRoom", crewSize: 2 }), "host", { type: "startGame" });
+    ticks(room, 400); // 20 seconds: the director starts at least one hazard
+    expect(calls).toBeGreaterThan(0);
+  });
+});
+
 describe("parseClientMessage", () => {
   it("accepts every well-formed message and drops extra fields", () => {
     expect(parseClientMessage({ type: "input", direction: { dx: 1, dy: -1 }, interacting: true, cheat: 1 }))

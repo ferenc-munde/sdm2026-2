@@ -98,9 +98,13 @@ export function createRoomWorld(): RoomWorld {
   return { train, platform, steeringConsole, systems: createRunSystems(train, steeringConsole) };
 }
 
-/** A new, empty room waiting on the platform. `seed` makes its hazards repeatable. */
-export function createRoom(code: string, seed: number, world: RoomWorld): Room {
-  return { lobby: createPlatformLobby(createSession(code), world.platform), random: createSeededRandom(seed) };
+/**
+ * A new, empty room waiting on the platform. Pass a number seed, or the room's own seeded random
+ * source (the platform's `SeededRandom` fits `RandomSource`); either makes its hazards repeatable.
+ */
+export function createRoom(code: string, seed: number | RandomSource, world: RoomWorld): Room {
+  const random = typeof seed === "number" ? createSeededRandom(seed) : seed;
+  return { lobby: createPlatformLobby(createSession(code), world.platform), random };
 }
 
 const withSession = (room: Room, session: GameSession): Room =>
