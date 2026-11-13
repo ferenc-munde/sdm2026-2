@@ -54,7 +54,6 @@ jobs:
           - team-1
           - team-2
           - team-3
-          - team-4
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

@@ -15,7 +15,7 @@ During the hackathon we use this Google Meet room:
 - **One shared repository:** every team works in this repository. No private forks or side repositories.
 - **Everything in English:** code, comments, commit messages, issues, pull requests and documentation.
 - **AI first:** use AI agents for as much of the work as possible.
-- **Your own folder:** each game team works only in its own folder under `games/` (`games/team-1/` … `games/team-4/`), and the platform team in `server/`.
+- **Your own folder:** each game team works only in its own folder under `games/` (`games/team-1/` … `games/team-3/`), and the platform team in `server/`.
 - **Test everything:** no change is merged without being tested.
 
 ## Teams
@@ -24,11 +24,11 @@ Every issue and pull request carries exactly one team label:
 
 | Label               | Who             | Folder          |
 |---------------------|-----------------|-----------------|
-| `team-1` … `team-4` | the game teams  | `games/team-N/` |
+| `team-1` … `team-3` | the game teams  | `games/team-N/` |
 | `platform`          | the platform team | `server/`     |
 | `team-instructor`   | the instructors | `course/`       |
 
-**Team roster.** [`teams.json`](teams.json) is the official list of who is in which team, with each student's GitHub login, name and nickname, and the instructors. Everyone can read it; only the instructors change it. The `team` field stays empty until the teams are formed at the hackathon; then it is set to `team-1` … `team-4` or `platform`.
+**Team roster.** [`teams.json`](teams.json) is the official list of who is in which team, with each student's GitHub login, name and nickname, and the instructors. Everyone can read it; only the instructors change it. The `team` field stays empty until the teams are formed at the hackathon; then it is set to `team-1` … `team-3` or `platform`.
 
 ## Tracking progress
 
