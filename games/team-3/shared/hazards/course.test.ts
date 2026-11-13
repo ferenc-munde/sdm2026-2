@@ -6,6 +6,15 @@ const spot = { id: "course-spot", car: 0, position: { x: 0, y: 0 } };
 const console: Station = { kind: "steeringConsole", car: 0, position: { x: 0, y: 0 } };
 const start = () => startCourse(makeState(), spot);
 describe("course warning", () => {
+  it("cannot steer with a fire beside the console", () => {
+    const state = start();
+    state.hazards.fire = {
+      id: "fire", kind: "fire", car: console.car, spotId: "console-fire",
+      position: { ...console.position }, age: 0, progress: 0, countdown: null,
+    };
+    expect(stepCourses(state, { p1: true }, 5, console).journey.hull).toBe(88);
+  });
+
   it("starts with a five-second countdown", () => {
     expect(Object.values(start().hazards)[0]?.countdown).toBe(5);
   });

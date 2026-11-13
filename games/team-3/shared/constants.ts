@@ -42,6 +42,8 @@ export const SPEED_FACTOR_STOPPED = 0; // plan §3 (empty, or engine on fire)
 export const HULL_LOSS_PER_BREACH_PER_SECOND = 2.5; // plan §3
 export const HULL_LOSS_PER_FIRE_PER_SECOND = 1.5; // plan §3
 export const BREACH_REPAIR_SECONDS = 3; // hold time with the wrench, plan §3
+/** Movement multiplier while standing in a breach puddle/vent. */
+export const BREACH_MOVEMENT_FACTOR = 0.6; // 40% slower, idea document §3
 export const FIRE_EXTINGUISH_SECONDS = 2.5; // hold time with the extinguisher, plan §3
 export const FIRE_SPREAD_SECONDS = 15; // plan §2, from #30
 

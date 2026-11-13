@@ -10,6 +10,7 @@
 
 import { PLAYER_RADIUS, PLAYER_SPEED } from "../constants.ts";
 import type { FloorBox, TrainMap } from "../map/map.ts";
+import { movementFactorAtBreaches } from "../hazards/breach.ts";
 
 /** Anything with walls to collide with: the train (#83) or the lobby platform (#148). */
 export type Walled = Pick<TrainMap, "walls">;
@@ -92,7 +93,7 @@ export function stepMovement(
   for (const [id, player] of Object.entries(state.players)) {
     const direction = inputs[id];
     if (!player.connected || !direction || isStill(direction)) continue;
-    const position = movePosition(map, player.position, direction, dt);
+    const position = movePosition(map, player.position, direction, dt * movementFactorAtBreaches(state, id));
     players ??= { ...state.players };
     players[id] = { ...player, position, facing: { dx: direction.dx, dy: direction.dy } };
   }
