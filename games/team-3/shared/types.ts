@@ -65,6 +65,8 @@ export interface Hazard {
   position: Vec2;
   /** Seconds the hazard has existed (fire spreads after FIRE_SPREAD_SECONDS). */
   age: number;
+  /** Fire spread schedule in lifetime seconds; absent means first spread at 15. */
+  nextSpreadAt?: number;
   /** Repair / extinguish progress from 0 to 1. */
   progress: number;
   /** Course hazard only: seconds left until it hits; null for other kinds. */
