@@ -1,4 +1,7 @@
 html, body { margin: 0; height: 100%; background: #0b141e; color: #eef3f6; font-family: system-ui, sans-serif; }
+/* Developer controls are never part of the normal player interface. */
+#demo-controls[hidden] { display: none; }
+body:not(.has-dev-tools) .train-hud { bottom: 20px; }
 #scene { position: fixed; inset: 0; }
 #app { position: fixed; inset: 0; }
 #app canvas { display: block; touch-action: none; image-rendering: pixelated; }
