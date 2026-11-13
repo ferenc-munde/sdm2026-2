@@ -22,6 +22,33 @@ const DEFAULT_REPO = "ferenc-munde/sdm2026-2";
 const DEFAULT_ROSTER = join(HERE, "..", "teams.json");
 const TEAM_LABELS = ["team-1", "team-2", "team-3", "team-4", "platform", "team-instructor"];
 
+/**
+ * The rules an issue or PR is judged by, with the moment each came into force. Everything is judged
+ * by the rules in force when it was created: a rule added later never costs anyone points.
+ * Add a line here whenever CLAUDE.md or course/README.md gets a new rule that the report checks.
+ */
+export const RULES = [
+  { id: "issue-label-title", since: "2026-11-13T10:49:09Z", source: "#33",
+    text: "An issue has exactly one team label and its title starts with [that label]." },
+  { id: "pr-links-issue", since: "2026-11-13T10:49:09Z", source: "#33",
+    text: "A pull request links its issue with a closing keyword (Closes #N)." },
+  { id: "pr-base-branch", since: "2026-11-13T14:09:54Z", source: "b5180ca",
+    text: "A game team's work PR targets its Team_N_Feature branch; platform and instructor work targets development." },
+];
+
+/** True when the rule was in force at `createdAt`. Items without a date are judged by the current rules. */
+export function ruleApplies(id, createdAt, rules = RULES) {
+  const rule = rules.find((r) => r.id === id);
+  if (!rule) return false;
+  return !createdAt || Date.parse(createdAt) >= Date.parse(rule.since);
+}
+
+/** The branch a work PR of `team` must target under the branch-flow rule. */
+export function expectedBase(team) {
+  const m = /^team-(\d+)$/.exec(team ?? "");
+  return m ? `Team_${m[1]}_Feature` : "development";
+}
+
 /** Branches that collect work from other branches. A PR from one of them is a promotion or a sync, not new work. */
 export function isIntegrationBranch(ref) {
   return /^(main|prod|staging|development|Team_\d+_Feature|feature\/team-\d+|main-[a-z0-9]+)$/.test(ref);
@@ -51,8 +78,9 @@ export function areaOf(path) {
 /**
  * Grade proposal from activity, 0-10 points (the rule the Team 10 evaluation used, adapted):
  *   Delivery 0-4:      merged work PRs 5+ -> 4, 2-4 -> 3, 1 -> 2; none merged but one open -> 1
- *   Process 0-3:       +1 most merged PRs link their issue (Closes #N); +1 issues opened follow the
- *                      label/title rules; +1 closed at least one assigned issue
+ *   Process 0-3:       +1 most merged PRs follow the PR rules; +1 issues opened follow the issue
+ *                      rules; +1 closed at least one assigned issue. Only the rules in force when the
+ *                      issue or PR was created count (RULES); with nothing to judge, the point is given.
  *   Collaboration 0-3: reviewed other people's PRs 5+ -> 2, 1-4 -> 1; +1 at least half of an equal
  *                      share of the team's merged work
  *   Points -> grade:   8-10 -> 5, 5-7 -> 4, 3-4 -> 3, 1-2 -> 2, 0 -> 1
@@ -60,8 +88,8 @@ export function areaOf(path) {
 export function scoreOf(p, teamSize) {
   const delivery = p.prsMerged >= 5 ? 4 : p.prsMerged >= 2 ? 3 : p.prsMerged === 1 ? 2 : p.prsOpened > 0 ? 1 : 0;
   let process = 0;
-  if (p.prsMerged > 0 && p.prsMergedWithIssue * 2 >= p.prsMerged) process++;
-  if (p.issuesOpened > 0 && p.issuesOpenedOk * 5 >= p.issuesOpened * 4) process++;
+  if (p.prsMerged > 0 && (p.prsJudged === 0 || p.prsOk * 2 >= p.prsJudged)) process++;
+  if (p.issuesOpened > 0 && (p.issuesJudged === 0 || p.issuesOk * 5 >= p.issuesJudged * 4)) process++;
   if (p.issuesAssignedClosed > 0) process++;
   let collaboration = p.reviewsGiven >= 5 ? 2 : p.reviewsGiven >= 1 ? 1 : 0;
   if (teamSize > 0 && p.share * teamSize * 2 >= 1) collaboration++;
@@ -102,8 +130,8 @@ function teamOrder(a, b) {
 
 const emptyPerson = (login, name, team) => ({
   login, name, team,
-  issuesAssigned: 0, issuesAssignedClosed: 0, issuesOpened: 0, issuesOpenedOk: 0,
-  prsOpened: 0, prsMerged: 0, prsMergedWithIssue: 0, reviewsGiven: 0,
+  issuesAssigned: 0, issuesAssignedClosed: 0, issuesOpened: 0, issuesJudged: 0, issuesOk: 0,
+  prsOpened: 0, prsMerged: 0, prsJudged: 0, prsOk: 0, reviewsGiven: 0, ruleProblems: [],
   linesAdded: 0, areaLines: {}, areas: [], share: 0,
 });
 
@@ -134,9 +162,13 @@ export function buildReport(data, roster) {
     const author = person(issue.user?.login);
     if (author) {
       author.issuesOpened++;
-      const labels = (issue.labels ?? []).map((l) => (typeof l === "string" ? l : l.name)).filter((l) => TEAM_LABELS.includes(l));
-      const prefix = /^\[([^\]]+)\]/.exec(issue.title ?? "")?.[1];
-      if (labels.length === 1 && prefix === labels[0]) author.issuesOpenedOk++;
+      if (ruleApplies("issue-label-title", issue.created_at)) {
+        author.issuesJudged++;
+        const labels = (issue.labels ?? []).map((l) => (typeof l === "string" ? l : l.name)).filter((l) => TEAM_LABELS.includes(l));
+        const prefix = /^\[([^\]]+)\]/.exec(issue.title ?? "")?.[1];
+        if (labels.length === 1 && prefix === labels[0]) author.issuesOk++;
+        else author.ruleProblems.push(`issue #${issue.number}: team label / [label] title`);
+      }
     }
     for (const a of issue.assignees ?? []) {
       const p = person(a.login);
@@ -153,7 +185,20 @@ export function buildReport(data, roster) {
       author.prsOpened++;
       if (pr.merged_at) {
         author.prsMerged++;
-        if (/\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+/i.test(pr.body ?? "")) author.prsMergedWithIssue++;
+        const checks = [];
+        if (ruleApplies("pr-links-issue", pr.created_at)) {
+          checks.push(/\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+/i.test(pr.body ?? "") || "no Closes #N");
+        }
+        if (ruleApplies("pr-base-branch", pr.created_at) && pr.base?.ref) {
+          const want = expectedBase(author.team);
+          checks.push(pr.base.ref === want || `targets ${pr.base.ref}, not ${want}`);
+        }
+        if (checks.length) {
+          author.prsJudged++;
+          const problems = checks.filter((c) => c !== true);
+          if (problems.length === 0) author.prsOk++;
+          else author.ruleProblems.push(`PR #${pr.number}: ${problems.join(", ")}`);
+        }
         for (const f of data.files?.[pr.number] ?? []) {
           if (isGeneratedFile(f.filename)) continue;
           author.linesAdded += f.additions ?? 0;
@@ -203,15 +248,16 @@ export function toMarkdown(report, repo) {
     "Issues assigned: closed / all issues the student is assigned to. PRs: work pull requests only",
     "(promotion and sync PRs between integration branches are left out). Reviews: other people's PRs reviewed.",
     "Share: part of the team's lines added in merged work PRs (generated files left out). Grade: proposal, 0-10 points -> 1-5.",
+    "Rule problems: issues and PRs judged by the rules in force when they were created (see RULES in the script).",
     "",
   );
   for (const { team, members } of report) {
     lines.push(`## ${team}`, "");
-    lines.push("| Student | GitHub | Issues assigned (closed / all) | Issues opened | PRs opened | PRs merged | Reviews given | Lines added | Share | Points | Grade |");
-    lines.push("|---|---|---|---|---|---|---|---|---|---|---|");
+    lines.push("| Student | GitHub | Issues assigned (closed / all) | Issues opened | PRs opened | PRs merged | Reviews given | Lines added | Share | Rule problems | Points | Grade |");
+    lines.push("|---|---|---|---|---|---|---|---|---|---|---|---|");
     for (const m of members) {
       lines.push(
-        `| ${m.name || "–"} | ${m.login} | ${m.issuesAssignedClosed} / ${m.issuesAssigned} | ${m.issuesOpened} | ${m.prsOpened} | ${m.prsMerged} | ${m.reviewsGiven} | ${m.linesAdded} | ${Math.round(m.share * 100)}% | ${m.score.points} | ${m.score.grade} |`,
+        `| ${m.name || "–"} | ${m.login} | ${m.issuesAssignedClosed} / ${m.issuesAssigned} | ${m.issuesOpened} | ${m.prsOpened} | ${m.prsMerged} | ${m.reviewsGiven} | ${m.linesAdded} | ${Math.round(m.share * 100)}% | ${m.ruleProblems.length} | ${m.score.points} | ${m.score.grade} |`,
       );
     }
     lines.push("");
@@ -273,7 +319,7 @@ function main(argv) {
   const out = argv.includes("--json")
     ? JSON.stringify(report, null, 2)
     : argv.includes("--html")
-      ? toHtml(report, { repo, generatedAt: new Date() })
+      ? toHtml(report, { repo, generatedAt: new Date(), rules: RULES })
       : toMarkdown(report, repo);
   process.stdout.write(`${out}\n`);
 }

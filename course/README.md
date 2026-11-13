@@ -64,6 +64,7 @@ node course/tooling/student-report.mjs --json > .private/student-report.json
 
 - **Contribution share:** the student's part of the lines added in the team's merged work pull requests. Generated files, dependencies, lockfiles and binary assets are left out. Lines measure size, not quality.
 - **Grade proposal** (0–10 points): Delivery 0–4 (merged PRs: 5+ → 4, 2–4 → 3, 1 → 2, only open → 1); Process 0–3 (+1 most merged PRs link their issue, +1 issues opened follow the label and title rules, +1 closed an assigned issue); Collaboration 0–3 (reviews: 5+ → 2, 1–4 → 1; +1 at least half of an equal share). Points → grade: 8–10 → 5, 5–7 → 4, 3–4 → 3, 1–2 → 2, 0 → 1. The instructor decides the final grade.
+- **Rules of their time:** every issue and pull request is judged by the rules in force when it was created, so a rule added later never costs anyone points. The rules the report checks, and the moment each came into force, are listed in `RULES` at the top of `course/tooling/student-report.mjs` and at the bottom of the HTML page. When `CLAUDE.md` gets a new rule that the report should check, add it there with its date.
 
 One table per team, one row per student (from [`teams.json`](teams.json)): issues assigned (closed / all), issues opened, work pull requests opened and merged, and reviews given on other people's pull requests. Promotion and sync pull requests between integration branches (`main`, `development`, `staging`, `Team_N_Feature`) are not counted. Accounts that are active but not in the roster are listed under *(not in roster)*.
 
