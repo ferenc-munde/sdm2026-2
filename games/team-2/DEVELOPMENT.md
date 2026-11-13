@@ -36,6 +36,15 @@ Until the root pnpm workspace exists, `pnpm` works the same way. Lockfiles in
 this folder are ignored on purpose: the workspace lockfile at the repository
 root will replace them.
 
+## Run the multiplayer lobby
+
+From `games/team-2/`, run `npm install` once and then `npm run dev`. The dev
+script starts Vite on port 5173 and the Colyseus lobby server on port 2567.
+Use two browser tabs, choose the same team size, and join with distinct player
+names. The server-owned countdown is 30 seconds; the host can skip it to start
+with the current crew once at least two players have joined. A solo lobby is
+cancelled when its timer expires.
+
 ## Rules for code in `shared/`
 
 - Pure functions only: the same state, input and elapsed time always give the

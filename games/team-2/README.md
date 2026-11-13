@@ -18,29 +18,35 @@ Work only inside this folder unless an issue says otherwise. The package was sel
 - GitHub CLI (`gh`) is **optional** — handy for issues/PRs from the terminal,
   but the web UI works fine; nothing in the run steps needs it
 
-## Run the local Three.js scene
+## Run the local game and multiplayer lobby
 
-From `games/team-2/`, run `npm.cmd install`, then `npm.cmd run dev`.
-Open the address printed in the terminal (normally http://127.0.0.1:5173/).
-The scene uses flat 2D top-down artwork with a Three.js orthographic camera,
-five vertical carriages, forest tracks, and the HUD. Buttons change example data only; the crew artwork is a static
-placeholder. There is no player movement, repair minigame, or multiplayer yet.
-`npm.cmd run build` checks TypeScript and builds the browser app into `dist/`.
-`npm.cmd run preview` serves that build locally.
+From `games/team-2/`, run `npm install` once, then `npm run dev`. This starts
+the Vite client on `http://127.0.0.1:5173/` and the Colyseus lobby server on
+`http://127.0.0.1:2567`. Open two browser tabs, enter different names, select
+the same crew size, and choose **Create / Join Game** in both tabs. A full crew
+starts immediately. The host can skip the 30-second countdown to start with
+the current crew once at least two players have joined; a solo lobby is
+cancelled when its timer expires.
+
+The train world and HUD remain the existing local gameplay demo after the
+lobby starts; gameplay simulation and movement are not networked yet.
+`npm run build` checks TypeScript and builds the browser app into `dist/`;
+`npm run preview` serves that build locally.
 
 The standalone task-panel preview remains available with
 `node client/preview-hud.mjs` on port 5174.
 
-## Multiplayer (once the platform template is copied here)
+## Multiplayer lobby
 
 ```bash
-pnpm install
-pnpm --filter @team-2/game dev   # client on :5173, server on :2567
-pnpm --filter @team-2/game test  # headless rules tests (deterministic sim)
+npm install
+npm run dev     # client on :5173, lobby server on :2567
+npm test        # headless rules tests
 ```
 
-> The local `dev` command currently starts the browser scene only. The
-> multiplayer server still depends on the platform host/template (#73).
+> The lobby server uses a Colyseus room in this package. The existing train
+> scene and HUD remain local demo visuals after the match starts; gameplay
+> movement and simulation are not networked yet.
 
 Two browser tabs at `localhost:5173` = two players.
 

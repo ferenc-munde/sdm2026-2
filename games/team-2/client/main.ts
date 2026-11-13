@@ -1,5 +1,6 @@
 import { createTrainScene } from "./scene";
 import { createHud, type HudTask, type HudJourney } from "./hud";
+import { mountLobby } from "./lobby";
 import "./hud.css";
 import "./styles.css";
 
@@ -33,3 +34,13 @@ button("dock", () => { journey.distance = 1; journey.phase = "won"; });
 button("fail", () => { journey.phase = "lost"; });
 button("restart", reset);
 reset();
+
+mountLobby(document.body, (match) => {
+  journey.phase = "running";
+  const status = document.querySelector<HTMLParagraphElement>("#demo-controls p");
+  if (status) {
+    const crew = match.players.map((player) => player.name).join(", ");
+    status.textContent = "Multiplayer crew · " + match.playerCount + "/" + match.teamSize + " · " + crew;
+  }
+  update();
+});
