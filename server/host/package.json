@@ -1,0 +1,29 @@
+{
+  "name": "@sdm/host",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@colyseus/core": "^0.18.10",
+    "@colyseus/schema": "^5.0.8",
+    "@colyseus/ws-transport": "^0.18.1",
+    "@sdm/core": "workspace:*",
+    "colyseus": "^0.18.1",
+    "express": "^5.1.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@colyseus/sdk": "^0.18.1",
+    "@colyseus/testing": "^0.18.1",
+    "@sdm/tooling": "workspace:*",
+    "@types/express": "^5.0.0"
+  }
+}
