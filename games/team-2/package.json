@@ -6,7 +6,7 @@
   "description": "Last Train: a 5-carriage co-operative survival train (Team 2)",
   "scripts": {
     "dev": "vite client",
-    "build": "vite build client",
+    "build": "tsc --noEmit && vite build client",
     "preview": "vite preview client",
     "test": "vitest run",
     "test:watch": "vitest",

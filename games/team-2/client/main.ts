@@ -1,64 +1,110 @@
-// Local dev harness entry. Placeholder scene only — the real carriage
-// renderer is #37. Proves: vite serves the client, the schema state ticks
-// locally, and Three.js renders.
-import {
-	BoxGeometry,
-	Mesh,
-	MeshBasicMaterial,
-	PerspectiveCamera,
-	Scene,
-	WebGLRenderer,
-} from "three";
+import { createTrainScene } from "./scene";
+import { createHud, type HudTask, type HudJourney } from "./hud";
 import { createLocalStateModel } from "./stateModel.ts";
+import { localStateToHud } from "./state-to-hud";
+import gameConfig from "../config/game.json";
+import { TRAIN_CARS } from "./train-map";
+import "./hud.css";
+import "./styles.css";
 
-const container = document.getElementById("app");
-if (!container) throw new Error("#app is missing from index.html");
-
-const renderer = new WebGLRenderer({ antialias: true });
-renderer.setSize(container.clientWidth, container.clientHeight);
-container.appendChild(renderer.domElement);
-
-const scene = new Scene();
-const camera = new PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 100);
-camera.position.set(0, 2, 6);
-camera.lookAt(0, 0, 0);
-scene.add(new Mesh(new BoxGeometry(2, 2, 2), new MeshBasicMaterial({ color: 0xe0a63c })));
-
-const status = document.getElementById("status");
-if (!status) throw new Error("#status is missing from index.html");
-
+const sceneRoot = document.querySelector<HTMLElement>("#scene, #app");
+if (!sceneRoot) throw new Error("Scene container is missing");
+let trainScene: ReturnType<typeof createTrainScene> | undefined;
+try { trainScene = createTrainScene(sceneRoot); }
+catch (error) {
+  sceneRoot.textContent = "The 2D scene could not start. Try a browser with WebGL enabled.";
+  console.error(error);
+}
+const hud = createHud(document.querySelector<HTMLElement>("#hud")!);
 const model = createLocalStateModel();
-model.onTick((s) => {
-	status.textContent =
-		`tick ${s.tick} · phase ${s.phase} · power ${s.power.toFixed(0)}% · ` +
-		`dist ${(s.journeyDistance * 100).toFixed(1)}% · ` +
-		`[WASD/arrows move · E pickup · Q drop]`;
-});
-model.start();
+const runStartTick = model.state.tick;
+const mode = document.querySelector<HTMLSelectElement>("#view-mode")!;
+const status = document.querySelector<HTMLOutputElement>("#status")!;
+const speedInput = document.querySelector<HTMLInputElement>("#speed")!;
+const speedLabel = document.querySelector<HTMLOutputElement>("#speed-value")!;
+const pauseButton = document.querySelector<HTMLButtonElement>("#pause-motion")!;
+const mapSelect = document.querySelector<HTMLSelectElement>("#map-car")!;
+let tasks: HudTask[] = [];
+let journey: HudJourney;
+let demoSpeed = 1;
+let demoPaused = false;
+const isPreview = () => mode.value === "preview";
 
-// Keyboard -> adapter.send — the interim room flow: the adapter stamps
-// sessionId + seq and routes each press into step() as an InputEvent.
-// Demo item ids until items spawn on the ground (#95).
-const DEMO_ITEM_ID = "wrench";
-window.addEventListener("keydown", (event) => {
-	if (event.repeat && (event.key === "e" || event.key === "q")) return;
-	const move = { w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
-		ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] } as Record<string, [number, number]>;
-	const axis = move[event.key];
-	if (axis) {
-		model.send({ type: "move", mx: axis[0], my: axis[1], run: event.shiftKey });
-		if (event.key.startsWith("Arrow")) event.preventDefault();
-	} else if (event.key === "e") {
-		model.send({ type: "pickup", itemId: DEMO_ITEM_ID });
-	} else if (event.key === "q") {
-		model.send({ type: "drop", itemId: DEMO_ITEM_ID });
-	}
+mapSelect.addEventListener("change", () => {
+  const car = mapSelect.value === "all" ? null : Number(mapSelect.value);
+  trainScene?.focusCar(car);
+  document.getElementById("map-description")!.textContent = car === null
+    ? "Four open bulkheads connect the five carriages. Gold squares mark relief hatches."
+    : TRAIN_CARS[car]!.stations.map(station => station.label).join(" · ");
 });
 
-window.addEventListener("resize", () => {
-	renderer.setSize(container.clientWidth, container.clientHeight);
-	camera.aspect = container.clientWidth / container.clientHeight;
-	camera.updateProjectionMatrix();
+function update() {
+  if (isPreview()) {
+    hud.updateTasks(tasks);
+    hud.updateGauges({ power: tasks[0]?.current ? 100 : 40, pressure: 35 });
+    hud.updateJourney(journey);
+    trainScene?.setSpeed(journey.phase === "running" ? demoSpeed : 0);
+  } else {
+    const view = localStateToHud(model.state, gameConfig.tickRate, runStartTick);
+    hud.updateTasks(view.tasks);
+    hud.updateGauges(view.gauges);
+    hud.updateJourney(view.journey);
+    trainScene?.setSpeed(view.speed);
+  }
+  trainScene?.setPaused(demoPaused);
+  speedLabel.value = `${demoSpeed.toFixed(1)}x`;
+  pauseButton.textContent = demoPaused ? "Resume scenery" : "Pause scenery";
+  pauseButton.setAttribute("aria-pressed", String(demoPaused));
+  status.value = `Local tick ${model.state.tick} · phase ${model.state.phase} · ${isPreview() ? "EXAMPLE DATA" : "LOCAL RULES · WASD/arrows, E pickup, Q drop"}`;
+}
+function reset() {
+  demoSpeed = 1; demoPaused = false; speedInput.value = "1";
+  tasks = [{ id: "example-repair", title: "Example: repair electrical panel", current: 0, target: 1 }];
+  journey = { distance: 0, remainingSeconds: 300, totalSeconds: 300, phase: "running" };
+  update();
+}
+function button(id: string, action: () => void) {
+  document.getElementById(id)!.addEventListener("click", () => {
+    if (!isPreview() && id !== "pause-motion") return;
+    action(); update();
+  });
+}
+button("travel", () => { journey.distance = Math.min(1, journey.distance + 0.1); });
+button("elapsed", () => { journey.remainingSeconds = Math.max(0, journey.remainingSeconds - 30); });
+button("repair", () => { if (tasks[0]) tasks[0].current = 1; });
+button("dock", () => { journey.distance = 1; journey.phase = "won"; });
+button("fail", () => { journey.phase = "lost"; });
+button("restart", reset);
+button("pause-motion", () => { demoPaused = !demoPaused; });
+speedInput.addEventListener("input", () => { demoSpeed = Number(speedInput.value); update(); });
+function syncMode() {
+  for (const id of ["travel", "elapsed", "repair", "dock", "fail", "restart", "speed"]) {
+    (document.getElementById(id) as HTMLButtonElement | HTMLInputElement).disabled = !isPreview();
+  }
+  update();
+}
+mode.addEventListener("change", syncMode);
+// Preserve the adapter's input envelope and demo item identifier.
+const moves: Record<string, [number, number]> = {
+  w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
+  ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+};
+function onKey(event: KeyboardEvent) {
+  if (isPreview() || (event.target instanceof HTMLElement &&
+    (event.target.closest("input, select, textarea, button") || event.target.isContentEditable))) return;
+  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+  if (event.repeat && (key === "e" || key === "q")) return;
+  const axis = moves[key];
+  if (axis) {
+    model.send({ type: "move", mx: axis[0], my: axis[1], run: event.shiftKey });
+    event.preventDefault();
+  } else if (key === "e") model.send({ type: "pickup", itemId: "wrench" });
+  else if (key === "q") model.send({ type: "drop", itemId: "wrench" });
+}
+window.addEventListener("keydown", onKey);
+model.onTick(update);
+reset(); syncMode(); model.start();
+window.addEventListener("pagehide", () => {
+  model.stop(); window.removeEventListener("keydown", onKey);
+  trainScene?.destroy(); hud.destroy();
 });
-
-renderer.setAnimationLoop(() => renderer.render(scene, camera));

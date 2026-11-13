@@ -1,0 +1,34 @@
+html, body { margin: 0; height: 100%; background: #0b141e; color: #eef3f6; font-family: system-ui, sans-serif; }
+#scene { position: fixed; inset: 0; }
+#app { position: fixed; inset: 0; }
+#app canvas { display: block; touch-action: none; image-rendering: pixelated; }
+#scene canvas { display: block; touch-action: none; }
+#demo-controls { position: fixed; bottom: 16px; left: 20px; right: 20px; padding: 14px 18px; border: 1px solid #566878; border-radius: 12px; background: #14222ef2; }
+#demo-controls strong { color: #f5d190; letter-spacing: 0.06em; }
+#demo-controls p { margin: 6px 0; font-size: 14px; }
+#demo-controls button { padding: 9px 12px; margin: 3px; background: #e4c18a; border: 0; border-radius: 5px; color: #15212b; cursor: pointer; font: inherit; }
+#demo-controls button:hover { background: #ffe0aa; }
+#demo-controls button:focus-visible { outline: 3px solid #72d4cc; outline-offset: 2px; }
+.motion-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.motion-controls input { accent-color: #e4c18a; width: 160px; }
+.motion-controls output { min-width: 4ch; color: #f5d190; }
+.map-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.map-controls select { padding: 7px; background: #24382e; color: #fff1ca; border: 1px solid #979b80; font: inherit; }
+#map-description { color: #cfdbc9; font-size: 12px; }
+#status { display: block; margin: 8px 0; color: #cfdbc9; font-size: 12px; }
+#view-mode { padding: 6px; background: #24382e; color: #fff1ca; }
+#demo-controls button:disabled, #demo-controls input:disabled { opacity: 0.45; cursor: default; }
+@media (max-width: 800px) { .train-hud { max-height: 25vh; font-size: 13px; padding: 12px; } #demo-controls { font-size: 12px; } }
+/* Layout inspired by the reference: tasks left, status right, world centered. */
+#scene canvas { image-rendering: pixelated; }
+.train-hud { top: auto; bottom: 165px; left: 20px; right: auto; width: 300px; font-family: monospace; background: #101815ed; border-color: #979b80; }
+.train-hud-gauges { position: fixed; top: 20px; right: 20px; width: 250px; margin: 0; padding: 14px 20px 20px; border: 1px solid #979b80; border-radius: 12px; background: #101815ed; }
+.train-journey { left: 20px; right: auto; width: 260px; box-sizing: border-box; font: 14px/1.4 monospace; background: #101815ed; }
+.train-result { left: 50%; right: auto; top: 40%; width: min(360px, 75vw); transform: translate(-50%, -50%); }
+#demo-controls { background: #101815ed; font-family: monospace; }
+@media (max-width: 800px) {
+  .train-journey { width: 180px; padding: 10px; font-size: 11px; }
+  .train-hud-gauges { width: 140px; right: 10px; top: 10px; padding: 10px; }
+  .train-hud { top: auto; bottom: 210px; width: 190px; max-height: 180px; left: 10px; }
+  #demo-controls { max-height: 150px; overflow: auto; }
+}
