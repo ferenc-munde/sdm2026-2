@@ -1,0 +1,57 @@
+.train-hud {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  box-sizing: border-box;
+  width: min(340px, calc(100vw - 40px));
+  padding: 22px;
+  border: 1px solid #566878;
+  border-top: 3px solid #efbd64;
+  border-radius: 12px;
+  background: #14222ef2;
+  color: #f2f5f7;
+  font: 16px/1.5 system-ui, sans-serif;
+  pointer-events: none;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.train-hud h2 { margin: 0 0 14px; font-size: 20px; }
+.train-hud ul { padding: 0; margin: 0; list-style: none; }
+.train-hud li { padding: 12px 0; border-top: 1px solid #364957; }
+.train-hud .is-complete { color: #91dfb3; }
+.train-hud p { color: #bdc9d2; margin-bottom: 0; }
+.train-hud-gauges { margin-top: 20px; padding-top: 8px; border-top: 1px solid #364957; }
+.train-hud-gauges label { display: block; margin-top: 12px; }
+.train-hud-gauges span { display: block; margin-bottom: 6px; }
+.train-hud-gauges progress { display: block; width: 100%; height: 14px; accent-color: #91dfb3; }
+.train-hud-gauges .is-danger { color: #ffb0a6; }
+.train-hud-gauges .is-danger progress { accent-color: #f37566; }
+.train-journey {
+  position: fixed; top: 20px; left: 20px; right: 380px;
+  padding: 18px 24px; border: 1px solid #566878; border-radius: 12px;
+  background: #14222ef2; color: #f2f5f7; font: 16px/1.5 system-ui;
+  pointer-events: none;
+}
+.train-track { position: relative; height: 34px; margin: 18px 16px 8px; border-bottom: 4px dashed #efbd64; }
+.train-marker, .train-ghost { position: absolute; bottom: -4px; transform: translateX(-50%); }
+.train-marker { font-size: 28px; }
+.train-ghost { color: #c3d2df; font-size: 36px; }
+.train-station { position: absolute; right: -16px; top: -8px; }
+.train-journey small { display: block; color: #bdc9d2; }
+.train-journey.is-behind { border-color: #f37566; }
+.train-journey.is-behind small { color: #ffb0a6; }
+.train-result {
+  position: fixed; top: 210px; left: 20px; right: 380px;
+  padding: 28px; border: 2px solid #f37566; border-radius: 12px;
+  background: #14222ef5; color: #f2f5f7; font: 18px/1.5 system-ui;
+  pointer-events: none;
+}
+.train-result[hidden] { display: none; }
+.train-result.is-won { border-color: #91dfb3; }
+.train-result h1 { margin: 0; }
+@media (max-width: 800px) {
+  .train-journey { right: 20px; }
+  .train-hud { top: 205px; max-height: calc(100dvh - 225px); }
+  .train-result { top: 220px; right: 20px; z-index: 2; }
+}

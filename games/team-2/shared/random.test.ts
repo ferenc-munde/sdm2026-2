@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { SeededRandom } from "./random.ts";
+import { SeededRandom } from "@sdm/core/shared";
 
-describe("SeededRandom", () => {
+// The local copy is gone; these pin the platform generator the rules now receive as ctx.random.
+describe("SeededRandom (@sdm/core/shared)", () => {
 	it("produces the same sequence for the same seed", () => {
 		const a = new SeededRandom(42);
 		const b = new SeededRandom(42);
@@ -17,10 +18,10 @@ describe("SeededRandom", () => {
 			.not.toEqual(Array.from({ length: 5 }, () => b.next()));
 	});
 
-	it("int() stays within [0, maxInclusive]", () => {
+	it("int() stays within [min, max]", () => {
 		const rng = new SeededRandom(7);
 		for (let i = 0; i < 1000; i++) {
-			const v = rng.int(5);
+			const v = rng.int(0, 5);
 			expect(v).toBeGreaterThanOrEqual(0);
 			expect(v).toBeLessThanOrEqual(5);
 		}

@@ -1,5 +1,5 @@
 import { Schema, MapSchema, type } from "@colyseus/schema";
-import { BaseState } from "./types.ts";
+import { BaseState } from "@sdm/core/sim";
 
 export type TaskType = "POWER" | "PRESSURE" | "FIRE" | "NAVIGATION" | "CARGO";
 
