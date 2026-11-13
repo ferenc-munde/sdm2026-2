@@ -17,7 +17,7 @@ export function mountGameplayView(root: HTMLElement, adapter: GameStateAdapter, 
       <div><div class="panel-index">DEPARTURE IN PROGRESS</div><h2>The Night Line</h2></div>
       <div class="game-heading-actions"><span class="status-chip"><span id="game-connection-dot" class="live-dot"></span><span id="game-connection">CONNECTED</span></span><button id="return-crew" class="leave-button" type="button">Back to crew <span aria-hidden="true">↗</span></button></div>
     </div>
-    <div class="game-room-code">CREW CODE <strong>${escapeHtml(options.roomCode)}</strong><span>LOCAL MOCK STATE</span></div>
+      <div class="game-room-code">CREW CODE <strong>${escapeHtml(options.roomCode)}</strong><span>LOCAL MOCK STATE</span><span class="movement-hint">MOVE: WASD / ARROWS</span></div>
     <div class="game-layout">
       <section class="scene-panel" aria-label="Train and player view">
         <canvas id="train-canvas" class="train-canvas" aria-label="Three-dimensional cutaway view of the train and crew"></canvas>

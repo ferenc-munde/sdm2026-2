@@ -6,6 +6,14 @@ const browser = new Window({ url: "http://localhost/" });
 browser.document.body.innerHTML = '<main id="app" class="shell"></main>';
 globalThis.window = browser;
 globalThis.document = browser.document;
+const animationFrames = new Map();
+let nextAnimationFrameId = 1;
+globalThis.requestAnimationFrame = (callback) => {
+  const id = nextAnimationFrameId++;
+  animationFrames.set(id, callback);
+  return id;
+};
+globalThis.cancelAnimationFrame = (id) => animationFrames.delete(id);
 
 const vite = await createTestViteServer();
 try {
