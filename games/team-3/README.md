@@ -4,6 +4,7 @@ This folder holds the game of Team 3 (package `@team-3/game`, label `team-3`).
 
 **The Last Train** is a co-operative, non-violent, online multiplayer game for 2–4 players. The players are the maintenance crew of a moving train: they carry coal, repair leaks and put out fires so the train reaches its destination before the hull fails.
 
+- **Start here (status, folder map, how to run, what is left):** [docs/README.md](docs/README.md)
 - **Plan, scope, roles and backlog:** [PLAN.md](PLAN.md)
 - **The game rules, module by module:** [shared/README.md](shared/README.md)
 - **Developing here (branches, CI, rules for `shared/`):** [DEVELOPMENT.md](DEVELOPMENT.md)
@@ -31,9 +32,9 @@ pnpm run build       # production build of the client
 |---|---|
 | **Game rules** (`shared/`) | ✅ Complete and tested: movement, journey, carrying items, coal, breach and fire repair, engine stall, course hazard, fire spread, hazard director scaled to the crew, run phases, leaving and rejoining, lobby host and crew size, the waiting platform and boarding |
 | **Client** (`client/`) | ✅ Three.js train, players with names, stations, items and hazards with repair progress, HUD bars, keyboard, how-to-play, win and lose screens, scenery, sound, conductor announcements, main menu and shared-link join |
-| **Online play** | 🔧 **Server side done (#80):** `pnpm run server` runs the game as a platform room; two players can create a room, join it by code, see each other and play (`room/room.test.ts`). **Next:** the client connects to it (#12, #146), then hosting (#22) |
+| **Online play** | ✅ `pnpm run server` runs the game as a platform room (#80) and the client plays it (#220): create a room, join by code or shared link, see each other and play. **Next:** hosting (#22). Details: [docs/PLATFORM.md](docs/PLATFORM.md) |
 
-Until the client connects to the room (#12, #146), `pnpm run dev` opens a **hand-check page**: the train with a demo crew and a demo journey, showing every client part working. The rules themselves are exercised by the tests, including runs of a real session on the real map.
+`pnpm run dev` opens the real game, which needs `pnpm run server` running. Add `?demo` to the address for the **hand-check page**: the train with a demo crew and a demo journey, showing every client part working without a server.
 
 ## Controls
 
