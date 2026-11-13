@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "three": "^0.170.0",
-    "zod": "^3.24.0"
+    "zod": "^3.24.0",
+    "@colyseus/schema": "^5.0.0"
   },
   "devDependencies": {
     "@types/three": "^0.170.0",

@@ -2,7 +2,7 @@
 
 > 5-carriage co-op survival train. Built on the course platform: **Colyseus 0.18
 > authoritative server + deterministic, replayable `GameDefinition` + Vite
-> TypeScript browser client (Canvas2D render, DOM HUD)**. Strictly TypeScript
+> TypeScript browser client (Three.js render, DOM HUD)**. Strictly TypeScript
 > in a pnpm workspace. This file is the single source of truth for the coding
 > agent and for issue scoping. Pair with `WORKFLOW.md` (who does what).
 >
@@ -162,7 +162,7 @@ owned by the base; do not redeclare them.
 
 ```ts
 import { Schema, MapSchema, type } from "@colyseus/schema";
-import { BaseState } from "@sdm/core/sim";
+import { BaseState } from "@sdm/core/sim"; // shimmed by shared/types.ts until @sdm/core lands (#73)
 
 export class Player extends Schema {
 	@type("string") name: string = "";
@@ -240,23 +240,25 @@ All inputs zod-validated in `shared/input.ts`; movement is server-simulated
 ### 8.4 Game definition skeleton (`shared/game.ts`, thin composition root)
 
 ```ts
-import type { GameDefinition } from "@sdm/core/sim";
+// Landed in #64 (see shared/game.ts). Until @sdm/core exists, GameDefinition,
+// BaseState and Rng come from the local shim shared/types.ts (#73).
+import type { GameDefinition, Rng } from "./types";
 import { LastTrainState } from "./state";
-import { createTasks, TaskDirector } from "./tasks";   // owner B
-import { createItems } from "./items";                 // owner C
-import { createSim } from "./sim";                     // owner D (power/pressure/stations/hazards)
-import { inputSchema } from "./input";
+import { createTasks } from "./tasks";   // owner B
+import { createItems } from "./items";   // owner C
+import { createSim } from "./sim";       // owner D (power/pressure/stations/hazards)
 
 export const lastTrain: GameDefinition<LastTrainState> = {
 	createState: () => new LastTrainState(),
-	init: (state, deps) => {
-		state.modules = { tasks: createTasks(deps), items: createItems(deps), sim: createSim(deps) };
+	init: (state, rng, config) => {
+		state.timeLimitTicks = config.tickRate * config.timeLimitSeconds;
+		// wire tasks/items/sim modules; zod-validates config here
 	},
 	join: (state, sessionId, opts) => { /* new Player, name from opts */ },
 	leave: (state, sessionId) => { /* drop held item, mark seat */ },
-	step: (state, input, deps) => {
+	step: (state, inputs, dt, rng, config) => {
 		// per fixed tick: sim.tick(), tasks.tick(), items.tick(),
-		// journey distance += speed(power, pressure) * dt,
+		// apply validated inputs, journey distance += speed(power, pressure) * dt,
 		// win/lose checks, door lockdown countdowns
 	},
 	commands: { /* debug: spawn task, set power, skip phase */ },
@@ -295,12 +297,11 @@ intervals, drain rates) — validated by the config schema in `shared/`:
 
 ```ts
 export class TaskDirector {
-	static readonly MAX_CONCURRENT = 4;
 	static readonly ENDGAME_UNLOCK = 0.9;
 
 	// tick(state, deps): every spawnIntervalTicks()
 	//   intervalTicks = lerp(25s, 8s, journeyDistance) * tickRate
-	//   if active >= MAX_CONCURRENT -> skip
+	//   if active >= players + 2 -> skip   (concurrent cap, §3)
 	//   pool = defs not currently active, endgame defs filtered by unlock
 	//   addTask(deps.rng.pick(pool))
 	// requestProgress(taskId, amount): clamp(amount, 1, 4); on completion,
@@ -335,16 +336,21 @@ export function renderTasks(container: HTMLElement, tasks: Map<string, Task>): v
 
 ```
 games/team-2/
-  SPEC.md  WORKFLOW.md  README.md
+  SPEC.md  WORKFLOW.md  README.md  DEVELOPMENT.md
   package.json        @team-2/game
-  server.ts           startGameServer() from @sdm/host
+  server.ts           startGameServer() from @sdm/host   (with the platform host, #73)
   index.html
   vite.config.ts
   client/             net.ts render.ts hud.ts input.ts minigames/
   room/index.ts       { game: (deps) => createGameRoom(lastTrain, deps) }
-  shared/             game.ts state.ts input.ts tasks.ts items.ts sim.ts stations.ts hazards.ts
+  shared/             game.ts state.ts input.ts random.ts types.ts config.ts
+                      tasks.ts items.ts sim.ts (+ stations.ts hazards.ts from D)
   config/game.json    tickRate patchRate maxPlayers timeLimitSeconds reconnectSeconds + tuning
 ```
+
+`shared/random.ts` (mulberry32 `SeededRandom`) and `shared/types.ts` (the
+`@sdm/core/sim` shim) are swapped for platform imports when `@sdm/core` lands
+(#73); nothing else changes.
 
 `shared/` stays browser-safe: only `@colyseus/schema`, `zod`, `@sdm/core/shared`,
 `@sdm/core/sim` imports. Server tests (vitest) run the rules headless through
@@ -374,7 +380,7 @@ duplicates.
 
 ### Issues still to open (next free numbers, ~#48+)
 
-Opened 2026-11-13: **#64** contract (A), **#65** tasks+HUD (B), **#66**
+Opened 2026-11-13: **#64** contract (A — landed as PR #91), **#65** tasks+HUD (B), **#66**
 journey/win-lose (A), **#67** items (C), **#68** power/pressure+stations (D),
 **#69** hazards (D), **#70** lobby (A), **#71** death/spectator (C), **#72**
 juice (D), **#76** minigame library (B), **#77** speed model (D), **#78**
