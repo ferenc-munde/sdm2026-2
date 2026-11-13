@@ -193,7 +193,7 @@ owned by the base; do not redeclare them.
 
 ```ts
 import { Schema, MapSchema, type } from "@colyseus/schema";
-import { BaseState } from "@sdm/core/sim"; // shimmed by shared/types.ts until @sdm/core lands (#73)
+import { BaseState } from "@sdm/core/sim";
 
 export class Player extends Schema {
 	@type("string") name: string = "";
@@ -260,7 +260,7 @@ All inputs zod-validated in `shared/input.ts`; movement is server-simulated
 
 | Input | Payload | Effect (processed in `step`) |
 | --- | --- | --- |
-| `move` | `{ seq, mx, my, run }` | velocity each tick (hold-to-move: repeated sends) |
+| `move` | `{ mx, my, run }` | held direction, applied every tick until the next `move` (zero vector stops). No `seq`: the platform envelope carries it |
 | `interactDown` / `interactUp` | `{ stationId }` | press/release pairs drive hold-channels (wrench 5s, crank, brake) and taps |
 | `progress` | `{ taskId, amount }` | task director clamps amount 1–4 |
 | `pickup` / `drop` | `{ itemId }` | items module, distance check vs player |
@@ -270,9 +270,10 @@ All inputs zod-validated in `shared/input.ts`; movement is server-simulated
 ### 8.4 Game definition skeleton (`shared/game.ts`, thin composition root)
 
 ```ts
-// Landed in #64 (see shared/game.ts). Until @sdm/core exists, GameDefinition,
-// BaseState and Rng come from the local shim shared/types.ts (#73).
-import type { GameDefinition, Rng } from "./types";
+// Sketch from #64. Since #241 the real signatures come from @sdm/core/sim:
+// init(state, ctx), join(state, playerId, ctx, options), step(state, inputs, ctx)
+// with ctx.random and ctx.config. See shared/game.ts and docs/PLATFORM.md.
+import type { GameDefinition } from "@sdm/core/sim";
 import { LastTrainState } from "./state";
 import { createTasks } from "./tasks";   // owner B
 import { createItems } from "./items";   // owner C
@@ -370,19 +371,17 @@ export function renderTasks(container: HTMLElement, tasks: Map<string, Task>): v
 games/team-2/
   SPEC.md  WORKFLOW.md  README.md  DEVELOPMENT.md
   package.json        @team-2/game
-  server.ts           startGameServer() from @sdm/host   (with the platform host, #73)
-  index.html
-  vite.config.ts
+  server.ts           startGameServer() from @sdm/host
   client/             net.ts render.ts hud.ts input.ts minigames/
   room/index.ts       { game: (deps) => createGameRoom(lastTrain, deps) }
-  shared/             game.ts state.ts input.ts random.ts types.ts config.ts
+  shared/             game.ts state.ts input.ts config.ts map.ts movement.ts lobby.ts
                       tasks.ts items.ts sim.ts (+ stations.ts hazards.ts from D)
   config/game.json    tickRate patchRate maxPlayers timeLimitSeconds reconnectSeconds + tuning
 ```
 
-`shared/random.ts` (mulberry32 `SeededRandom`) and `shared/types.ts` (the
-`@sdm/core/sim` shim) are swapped for platform imports when `@sdm/core` lands
-(#73); nothing else changes.
+`SeededRandom` comes from `@sdm/core/shared` and `BaseState` / `GameDefinition`
+from `@sdm/core/sim` (the local copies were removed in #241). The current
+folder map is in `docs/README.md`.
 
 `shared/` stays browser-safe: only `@colyseus/schema`, `zod`, `@sdm/core/shared`,
 `@sdm/core/sim` imports. Server tests (vitest) run the rules headless through

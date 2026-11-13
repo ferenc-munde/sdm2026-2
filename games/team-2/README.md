@@ -2,7 +2,9 @@
 
 This folder holds the game of Team 2 (package `@team-2/game`, label `team-2`).
 
-Work only inside this folder unless an issue says otherwise. The package was self-scaffolded (mirroring [server/template/README.md](../../server/template/README.md)) until the platform lands: the rules are in [server/CLAUDE.md](../../server/CLAUDE.md), build details in `DEVELOPMENT.md`.
+Work only inside this folder unless an issue says otherwise. The game runs on the shared platform (`@sdm/core`, `@sdm/host`): the rules are in [server/CLAUDE.md](../../server/CLAUDE.md), build details in `DEVELOPMENT.md`.
+
+**New here, or an AI agent picking the work up? Start with [`docs/README.md`](docs/README.md)**, then [`docs/PLATFORM.md`](docs/PLATFORM.md) and [`docs/NEXT_STEPS.md`](docs/NEXT_STEPS.md).
 
 ## Game
 
@@ -20,45 +22,46 @@ Work only inside this folder unless an issue says otherwise. The package was sel
 
 ## Run the game and multiplayer lobby
 
+Install once from the repository root (`pnpm install`: this is one pnpm workspace), then from `games/team-2/`:
+
 ```bash
-npm install
-npm run dev      # Vite client on :5173 and Colyseus lobby on :2567
-npm test         # headless rules tests (deterministic sim)
-npm run typecheck
-npm run build    # typecheck + client build to client/dist/ (Vite root is client/)
-npm run preview  # serve the client build
+pnpm dev             # game server on :2567 (lobby + game room) and Vite client on :5173
+pnpm test            # rules tests and the two-client room test
+pnpm run typecheck
+pnpm run build       # typecheck + client build to client/dist/ (Vite root is client/)
+pnpm run preview     # serve the client build
 ```
 
-Open two browser tabs, choose the same crew size, and join with distinct names.
+Open two browser tabs at `http://127.0.0.1:5173/`, choose the same crew size, and join with distinct names.
 The host can skip the 30-second lobby countdown and depart with the current
 crew, including one player. When the timer expires, the game starts with
 whoever joined.
 
-The lobby is networked. The existing local rules adapter and moving train scene
-remain intact after departure; gameplay simulation and player movement are not
-networked yet.
+After departure every player sits in the **same game room on the server**:
+the lobby host's browser creates it and the others join it by its code. Each
+player is a coloured disc; WASD or the arrow keys move it (Shift runs) and the
+server decides the position, so both tabs show both players moving. Phases,
+tasks, hazards, items and the journey are not simulated yet
+([docs/NEXT_STEPS.md](docs/NEXT_STEPS.md)).
 
-On Windows PowerShell, use `npm.cmd` if `npm.ps1` is blocked. Use Node 22 LTS.
+Add `?local` to the address for the offline demo: no server and no lobby, the
+same rules run in the browser with one player (`client/stateModel.ts`).
+`?room=CODE` joins a game room directly by its code.
+
 The map is flat 2D, displayed by Three.js with five vertical carriages, 20
 station locations, four passages, scrolling scenery and a carriage inspector.
-The landscape scrolls in the scene preview and follows speed in local rules.
-Crew artwork remains fixed in place; player movement is a separate unfinished
-feature.
+The landscape scrolls in the scene preview and follows `speed` from the game
+state otherwise (which stays 0 until the speed model exists).
 
-The **Local rules** mode displays actual state from the adapter and keeps
-WASD/arrows, E pickup and Q drop input wiring. Current rule modules are partly
-stubs, so speed, tasks and journey may not advance even while ticks increase.
-The countdown uses elapsed run ticks and the configured tick rate.
+The **Game state** data source shows the actual state. Current rule modules
+are partly stubs, so speed, tasks and journey do not advance even while ticks
+increase.
 
 Choose **Scene preview** to use the separate example controls: repair,
 journey/time, speed (0–2x), pause, victory, defeat and reset. These controls
-never modify the adapter state. Switch back to Local rules to see live state.
+never modify the game state. Switch back to Game state to see live state.
 The standalone HUD preview is also available with `node client/preview-hud.mjs`
-on port 5174. The lobby connects browser tabs for crew assembly; match
-gameplay state remains local to each browser for now.
-
-Two browser tabs at `localhost:5173` can join the same lobby; gameplay state
-after departure remains local to each browser for now.
+on port 5174.
 
 ## Workflow (repo rules — see root `CLAUDE.md`)
 
