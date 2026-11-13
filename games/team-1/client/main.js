@@ -1,3 +1,4 @@
+
 import { createScene } from "./three/Scene.js";
 import { createCamera, resizeCamera } from "./three/Camera.js";
 import { createRenderer } from "./three/Renderer.js";
@@ -6,6 +7,7 @@ import { createCarriage } from "./world/Carriage.js";
 import { createSeats } from "./world/Seats.js";
 import { createPlayer } from "./players/Player.js";
 import { createPlayerControls } from "./players/PlayerControls.js";
+import { createElectricalRepair } from "./tasks/ElectricalRepair.js";
 import * as THREE from "three";
 
 function startGame() {
@@ -25,24 +27,30 @@ function startGame() {
 
   addLighting(scene);
 
+  // Create train environment
   const carriage = createCarriage();
   scene.add(carriage);
 
   const seats = createSeats();
   scene.add(seats);
 
-  // Create four players in the central aisle
-const players = [
-  createPlayer(1, -1.1, -9),
-  createPlayer(2, 1.1, -9),
-  createPlayer(3, -1.1, 9),
-  createPlayer(4, 1.1, 9)
-];
+  // Create four local players
+  const players = [
+    createPlayer(1, -1.1, -9),
+    createPlayer(2, 1.1, -9),
+    createPlayer(3, -1.1, 9),
+    createPlayer(4, 1.1, 9)
+  ];
 
-players.forEach(player => scene.add(player));
+  players.forEach(player => scene.add(player));
 
-const controls = createPlayerControls(players);
-const clock = new THREE.Clock();
+  // Player movement controls
+  const controls = createPlayerControls(players);
+
+  // Electrical repair station
+  const electricalRepair = createElectricalRepair(scene, container);
+
+  const clock = new THREE.Clock();
 
   function handleResize() {
     const width = container.clientWidth;
@@ -56,12 +64,15 @@ const clock = new THREE.Clock();
 
   window.addEventListener("resize", handleResize);
 
- renderer.setAnimationLoop(() => {
-  const delta = Math.min(clock.getDelta(), 0.05);
+  // Main game loop
+  renderer.setAnimationLoop(() => {
+    const delta = Math.min(clock.getDelta(), 0.05);
 
-  controls.update(delta);
-  renderer.render(scene, camera);
-});
+    controls.update(delta);
+    electricalRepair.update(players);
+
+    renderer.render(scene, camera);
+  });
 
   console.log("The Last Train: Three.js initialized.");
 }
