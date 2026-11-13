@@ -28,7 +28,7 @@ Every issue and pull request carries exactly one team label:
 | `platform`          | the platform team | `server/`     |
 | `team-instructor`   | the instructors | `course/`       |
 
-**Team roster.** [`teams.json`](teams.json) is the official list of who is in which team, with each student's GitHub login, name and nickname, and the instructors. Everyone can read it; only the instructors change it. The students are added once their GitHub logins are collected and the teams are formed on the first day.
+**Team roster.** [`teams.json`](teams.json) is the official list of who is in which team, with each student's GitHub login, name and nickname, and the instructors. Everyone can read it; only the instructors change it. The `team` field stays empty until the teams are formed at the hackathon; then it is set to `team-1` … `team-4` or `platform`.
 
 ## Tracking progress
 

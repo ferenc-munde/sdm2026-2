@@ -1,4 +1,28 @@
 {
   "instructors": ["ferenc-munde", "matyas-munde", "samate-cclab", "nd2003", "muneeebnaveeed"],
-  "students": []
+  "students": [
+    { "login": "shahdtamerr", "name": "Abdelhamid Shahd Tamer Ouda", "team": "" },
+    { "login": "Abmuminfav", "name": "Adekunle Abdulmumin Favour", "team": "" },
+    { "login": "favyabils234-hash", "name": "Abilogun-Wole Favour Oluwasayo", "team": "" },
+    { "login": "ahmadaftabx", "name": "Aftab Butt Ahmad Mohammad", "team": "" },
+    { "login": "ahmedif12", "name": "Iftikhar Ahmed", "team": "" },
+    {
+      "login": "",
+      "name": "Khalil Zeyad Tarek Abdelmoniem Ahmed",
+      "team": "",
+      "note": "GitHub username not provided yet."
+    },
+    { "login": "hamdankhkh2005-wq", "name": "Khan Hamdan", "team": "" },
+    { "login": "Ahmed-Mahmoud124", "name": "Mahmoud Ahmed Walid Abdelsatar", "team": "" },
+    { "login": "Rawan-Ahmed-Mohamed", "name": "Mostafa Rawan Ahmed Mohamed Ahmed", "team": "" },
+    { "login": "davidudo2005", "name": "Okeregwu Udochukwu David Emmanuel", "team": "" },
+    {
+      "login": "",
+      "name": "Sajid Muhammad Huzaifa",
+      "team": "",
+      "note": "GitHub username not provided yet."
+    },
+    { "login": "Wasay-3435", "name": "Shah Syed Wasia Ali", "team": "" },
+    { "login": "Main-66", "name": "Sisoulath Phongpasith", "team": "" }
+  ]
 }
