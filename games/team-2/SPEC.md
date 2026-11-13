@@ -266,7 +266,9 @@ export const lastTrain: GameDefinition<LastTrainState> = {
 `room/index.ts` registers the factory: `{ game: (deps) => createGameRoom(lastTrain, deps) }`.
 `server.ts` calls `startGameServer()`. `config/game.json` holds `tickRate`,
 `patchRate`, `maxPlayers: 4`, `reconnectSeconds` + tuning values (spawn
-intervals, drain rates) — validated by the config schema in `shared/`.
+intervals, drain rates) — validated by the config schema in `shared/`:
+`patchRate ≤ tickRate` and `tickRate × timeLimitSeconds ≤ 65535` (the uint16
+`timeLimitTicks` budget in the state schema).
 
 ### 8.5 Client architecture (`client/`)
 

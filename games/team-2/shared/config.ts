@@ -12,6 +12,13 @@ export const gameConfigSchema = z
 	.refine(
 		(c) => c.patchRate <= c.tickRate,
 		{ message: "patchRate must not exceed tickRate" },
+	)
+	.refine(
+		(c) => c.tickRate * c.timeLimitSeconds <= 65535,
+		{
+			message:
+				"tickRate × timeLimitSeconds must fit the uint16 tick budget (65535) used by the state schema",
+		},
 	);
 
 export type GameConfig = z.infer<typeof gameConfigSchema>;

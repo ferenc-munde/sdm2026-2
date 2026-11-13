@@ -42,4 +42,11 @@ describe("game config", () => {
 	it("accepts a patchRate equal to the tickRate", () => {
 		expect(() => parseGameConfig({ ...valid, tickRate: 20, patchRate: 20 })).not.toThrow();
 	});
+
+	it("rejects a tick budget exceeding the uint16 limit", () => {
+		expect(() => parseGameConfig({ ...valid, tickRate: 60, timeLimitSeconds: 1200 })).toThrow();
+		expect(() => parseGameConfig({ ...valid, tickRate: 60, timeLimitSeconds: 1100 })).toThrow();
+		expect(() => parseGameConfig({ ...valid, tickRate: 60, timeLimitSeconds: 1092 })).not.toThrow();
+		expect(() => parseGameConfig({ ...valid, tickRate: 50, timeLimitSeconds: 1200 })).not.toThrow();
+	});
 });
