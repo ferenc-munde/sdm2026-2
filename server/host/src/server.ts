@@ -1,6 +1,7 @@
 import { defineRoom, defineServer, Room, type Server } from "colyseus";
 import express from "express";
 import {
+  GAME_ROOM_NAME,
   JoinRoomRequestSchema,
   ROUTES,
   parseAppEnv,
@@ -11,7 +12,7 @@ import { createLogger, type Logger } from "./logger";
 import { RoomRegistry } from "./registry";
 import type { HostDeps } from "./room";
 
-export const GAME_ROOM_NAME = "game";
+export { GAME_ROOM_NAME };
 
 type RoomFactory = (deps: HostDeps) => new () => Room<any>;
 
