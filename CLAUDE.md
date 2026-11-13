@@ -24,7 +24,7 @@ Work inside your own team's folder. Changes to another team's folder or to the s
 
 Everyone uses the same stack. Don't introduce alternatives without an issue that explains why.
 
-- **Language:** TypeScript everywhere, in one pnpm workspace.
+- **Language:** TypeScript everywhere, in one pnpm workspace. Team 1 may use plain JavaScript (#48).
 - **Frontend:** Vite + TypeScript, one app per team in `games/team-N/` (started from `server/template/` once the platform team has built it).
 - **Multiplayer:** Colyseus 0.18 on the server, `@colyseus/sdk` in the clients. Colyseus 0.18 changed many APIs: read [server/CLAUDE.md](server/CLAUDE.md) before writing Colyseus code.
 - **Hosting:** Railway, set up by the platform team (see [server/ARCHITECTURE.md](server/ARCHITECTURE.md)).
