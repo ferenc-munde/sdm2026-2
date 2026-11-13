@@ -1,4 +1,3 @@
-import "./styles.css";
 import { MockSessionAdapter, SessionError, type LobbyPlayer, type SessionAdapter, type SessionEvent } from "./session-adapter.mjs";
 import { createPreviewSnapshot, MockGameStateAdapter } from "./game-state-adapter.mjs";
 import { mountGameplayView, type PreviewAction } from "./gameplay-view";

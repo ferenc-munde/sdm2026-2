@@ -7,10 +7,18 @@ export type TrainScene = {
   dispose(): void;
 };
 
-export function mountTrainScene(canvas: HTMLCanvasElement, fallback: HTMLElement): TrainScene {
-  let renderer: THREE.WebGLRenderer;
+export type SceneRendererFactory = (
+  canvas: HTMLCanvasElement,
+) => Pick<THREE.WebGLRenderer, "setPixelRatio" | "setSize" | "render" | "dispose">;
+
+export function mountTrainScene(
+  canvas: HTMLCanvasElement,
+  fallback: HTMLElement,
+  createRenderer: SceneRendererFactory = (target) => new THREE.WebGLRenderer({ canvas: target, antialias: true, alpha: false }),
+): TrainScene {
+  let renderer: ReturnType<SceneRendererFactory>;
   try {
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer = createRenderer(canvas);
   } catch {
     fallback.hidden = false;
     canvas.hidden = true;
@@ -58,6 +66,7 @@ export function mountTrainScene(canvas: HTMLCanvasElement, fallback: HTMLElement
 
   const playerGeometry = new THREE.CylinderGeometry(0.28, 0.34, 0.9, 12);
   const headGeometry = new THREE.SphereGeometry(0.25, 14, 10);
+  const sharedPlayerGeometries = new Set([playerGeometry, headGeometry]);
   const playerMeshes = new Map<string, THREE.Group>();
 
   function createPlayer(color: string): THREE.Group {
@@ -75,6 +84,19 @@ export function mountTrainScene(canvas: HTMLCanvasElement, fallback: HTMLElement
     marker.position.y = 0.015;
     group.add(body, head, marker);
     return group;
+  }
+
+  function disposePlayerResources(group: THREE.Group): void {
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+    group.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      if (!sharedPlayerGeometries.has(object.geometry)) geometries.add(object.geometry);
+      const objectMaterials = Array.isArray(object.material) ? object.material : [object.material];
+      objectMaterials.forEach((material) => materials.add(material));
+    });
+    geometries.forEach((geometry) => geometry.dispose());
+    materials.forEach((material) => material.dispose());
   }
 
   const resize = () => {
@@ -105,8 +127,7 @@ export function mountTrainScene(canvas: HTMLCanvasElement, fallback: HTMLElement
       for (const [id, group] of playerMeshes) {
         if (!visible.has(id)) {
           scene.remove(group);
-          const body = group.children.find((object) => object instanceof THREE.Mesh) as THREE.Mesh | undefined;
-          if (body) (body.material as THREE.Material).dispose();
+          disposePlayerResources(group);
           playerMeshes.delete(id);
         }
       }
@@ -129,6 +150,12 @@ export function mountTrainScene(canvas: HTMLCanvasElement, fallback: HTMLElement
     dispose() {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      for (const group of playerMeshes.values()) {
+        scene.remove(group);
+        disposePlayerResources(group);
+      }
+      playerMeshes.clear();
+
       const geometries = new Set<THREE.BufferGeometry>();
       const materials = new Set<THREE.Material>();
       scene.traverse((object) => {
@@ -138,11 +165,10 @@ export function mountTrainScene(canvas: HTMLCanvasElement, fallback: HTMLElement
           objectMaterials.forEach((material) => materials.add(material));
         }
       });
+      sharedPlayerGeometries.forEach((geometry) => geometries.add(geometry));
       geometries.forEach((geometry) => geometry.dispose());
       materials.forEach((material) => material.dispose());
       renderer.dispose();
-      for (const group of playerMeshes.values()) scene.remove(group);
-      playerMeshes.clear();
     },
   };
 }
