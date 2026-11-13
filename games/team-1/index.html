@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Last Train - Team 1</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: #1a1a1a;
+        font-family: Arial, sans-serif;
+      }
+
+      #game-canvas {
+        display: block;
+      }
+
+      #hud {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        color: #fff;
+        font-size: 14px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 10px;
+        border-radius: 5px;
+      }
+
+      .hud-item {
+        margin: 5px 0;
+      }
+
+      #inventory {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        color: #fff;
+        font-size: 12px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 10px;
+        border-radius: 5px;
+        max-width: 200px;
+      }
+
+      .inventory-item {
+        margin: 3px 0;
+        padding: 3px;
+        background: rgba(100, 100, 100, 0.5);
+        border-radius: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game-canvas"></canvas>
+
+    <div id="hud">
+      <div class="hud-item">Position: <span id="pos-x">0.0</span>, <span id="pos-y">0.0</span></div>
+      <div class="hud-item">Direction: <span id="direction">down</span></div>
+      <div class="hud-item">Moving: <span id="moving">false</span></div>
+      <div class="hud-item">Train Condition: <span id="condition">100</span>%</div>
+      <div class="hud-item">Time: <span id="time">20:00</span></div>
+    </div>
+
+    <div id="inventory">
+      <div style="font-weight: bold; margin-bottom: 5px">Inventory</div>
+      <div id="inventory-list"></div>
+    </div>
+
+    <script type="module" src="/client/main.ts"></script>
+  </body>
+</html>
