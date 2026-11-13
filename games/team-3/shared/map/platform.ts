@@ -7,7 +7,7 @@
 // Same coordinates as the train map: floor positions (x along, y across), drawn by the
 // client at (x, 0, y), with boxes given by centre and size.
 
-import { MAX_PLAYERS, PLAYER_RADIUS } from "../constants.ts";
+import { INTERACT_RANGE, MAX_PLAYERS, PLAYER_RADIUS } from "../constants.ts";
 import type { PlatformObjectLayout } from "../stations/platform.ts";
 import type { Vec2 } from "../types.ts";
 import { WALL_THICKNESS, insideBox, type FloorBox } from "./map.ts";
@@ -16,8 +16,11 @@ import { WALL_THICKNESS, insideBox, type FloorBox } from "./map.ts";
 export const PLATFORM_LENGTH = 900;
 /** Depth of the platform from the train (back, -y) to the platform edge (front, +y). */
 export const PLATFORM_DEPTH = 260;
-/** Objects keep at least this far apart, so standing at one never reaches another. */
-export const OBJECT_SPACING = 2 * PLAYER_RADIUS + 16;
+/**
+ * Objects keep more than this far apart. A player reaches an object within INTERACT_RANGE, so
+ * with twice that between any two objects no spot on the platform reaches both (#199).
+ */
+export const OBJECT_SPACING = 2 * INTERACT_RANGE;
 
 export interface PlatformMap {
   /** The walkable floor. */
@@ -99,7 +102,8 @@ export function validatePlatform(map: PlatformMap): string[] {
   objects.forEach((object, i) => {
     if (!standable(object.position)) problems.push(`${object.name} is not on the platform`);
     objects.slice(i + 1).forEach((other) => {
-      if (apart(object.position, other.position) < OBJECT_SPACING) problems.push(`${object.name} and ${other.name} are too close`);
+      // Reach includes INTERACT_RANGE itself, so exactly OBJECT_SPACING apart is still too close.
+      if (apart(object.position, other.position) <= OBJECT_SPACING) problems.push(`${object.name} and ${other.name} are too close`);
     });
     map.playerSpawns.forEach((spawn, seat) => {
       if (apart(object.position, spawn) < OBJECT_SPACING) problems.push(`${object.name} is too close to player start ${seat}`);
