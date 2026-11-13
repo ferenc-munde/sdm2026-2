@@ -181,6 +181,5 @@ The repository rules in the root `CLAUDE.md` and `GETTING_STARTED.md` apply. In 
 | Code written before the template lands uses a different folder layout | Move it into `shared/` and shape it as the game definition when the skeleton is merged | Dev 1 |
 | The platform needs Node.js 22 and pnpm 10.28.0 | Everyone installs them before the skeleton lands | all |
 | Merge conflicts in shared files | One owner per folder; contract merged first | Dev 1 |
-| Developer 4 joined late and cannot be assigned issues until they accept the repository invitation | Tasks 13, 14, 15, 24, 26, 28 and 30 are reserved for Developer 4 and assigned as soon as the account has access | Dev 2 |
 | Too many features | Stretch items start only when phases 0–3 are merged | all |
 | One person blocked | Raise it at once; the reviewer of that area pairs for 15 minutes | all |
