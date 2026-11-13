@@ -91,10 +91,9 @@ gh pr create --fill                                               # Closes #N + 
 - Colyseus 0.18 differs from everything agents remember: force them to check
   `docs.colyseus.io` (append `.md` for raw markdown) or install the skill:
   `npx skills add colyseus/skill`.
-- Platform packages (`@sdm/core`, `@sdm/host`) don't exist yet (#73): the
-  contract (#64) landed against a local shim in `shared/types.ts` — swap is a
-  one-file change when the platform merges. Never wait on the platform to
-  start `shared/` rules; mirror the shapes per `server/ARCHITECTURE.md`.
+- The game runs on the platform packages (`@sdm/core`, `@sdm/host`) since
+  #241; the local shim `shared/types.ts` is gone. Read `docs/PLATFORM.md`
+  before touching `shared/game.ts`, `room/` or `client/net.ts`.
 
 ## 3. Schedule (2-day hackathon)
 

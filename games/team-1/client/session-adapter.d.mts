@@ -21,7 +21,8 @@ export interface SessionAdapter {
   subscribe(listener: (event: SessionEvent) => void): () => void;
 }
 
-export type SessionErrorCode = "INVALID_NAME" | "NOT_FOUND" | "SESSION_FULL" | "ALREADY_IN_SESSION";
+/** `CONNECTION_FAILED` is only raised by the room-backed adapter (client/room-adapters.ts). */
+export type SessionErrorCode = "INVALID_NAME" | "NOT_FOUND" | "SESSION_FULL" | "ALREADY_IN_SESSION" | "CONNECTION_FAILED";
 
 export declare class SessionError extends Error {
   constructor(message: string, code: SessionErrorCode);
