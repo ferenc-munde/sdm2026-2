@@ -8,6 +8,8 @@ export type GameplayViewOptions = {
   roomCode: string;
   onExit: () => void;
   onPreviewAction: (action: PreviewAction) => void;
+  /** True when the snapshots come from a platform room: hides the mock controls and labels. */
+  live?: boolean;
   createScene?: (canvas: HTMLCanvasElement, fallback: HTMLElement) => TrainScene;
 };
 
@@ -17,7 +19,7 @@ export function mountGameplayView(root: HTMLElement, adapter: GameStateAdapter, 
       <div><div class="panel-index">DEPARTURE IN PROGRESS</div><h2>The Night Line</h2></div>
       <div class="game-heading-actions"><span class="status-chip"><span id="game-connection-dot" class="live-dot"></span><span id="game-connection">CONNECTED</span></span><button id="return-crew" class="leave-button" type="button">Back to crew <span aria-hidden="true">↗</span></button></div>
     </div>
-      <div class="game-room-code">CREW CODE <strong>${escapeHtml(options.roomCode)}</strong><span>LOCAL MOCK STATE</span><span class="movement-hint">MOVE: WASD / ARROWS</span></div>
+      <div class="game-room-code">CREW CODE <strong>${escapeHtml(options.roomCode)}</strong><span>${options.live ? "LIVE ROOM STATE" : "LOCAL MOCK STATE"}</span><span class="movement-hint">MOVE: WASD / ARROWS${options.live ? " · REPAIR: E" : ""}</span></div>
     <div class="game-layout">
       <section class="scene-panel" aria-label="Train and player view">
         <canvas id="train-canvas" class="train-canvas" aria-label="Three-dimensional cutaway view of the train and crew"></canvas>
@@ -31,7 +33,7 @@ export function mountGameplayView(root: HTMLElement, adapter: GameStateAdapter, 
         <section class="hud-block crew-block"><div class="hud-label">CREW ON BOARD <strong id="crew-count">0 / 4</strong></div><ul id="game-players" class="game-player-list" aria-label="Crew connection status"></ul></section>
       </aside>
     </div>
-    <details class="mock-controls" open><summary><span class="mock-dot"></span> LOCAL MOCK SNAPSHOT CONTROLS <span class="mock-warning">PREVIEW ONLY</span></summary><div class="mock-actions"><button type="button" data-action="advance-time">Advance 15 sec</button><button type="button" data-action="damage-train">Damage train</button><button type="button" data-action="progress-repair">Progress repair</button><button type="button" data-action="win">Preview victory</button><button type="button" data-action="fail">Preview failure</button><button type="button" data-action="reset">Reset preview</button></div></details>
+    ${options.live ? "" : `<details class="mock-controls" open><summary><span class="mock-dot"></span> LOCAL MOCK SNAPSHOT CONTROLS <span class="mock-warning">PREVIEW ONLY</span></summary><div class="mock-actions"><button type="button" data-action="advance-time">Advance 15 sec</button><button type="button" data-action="damage-train">Damage train</button><button type="button" data-action="progress-repair">Progress repair</button><button type="button" data-action="win">Preview victory</button><button type="button" data-action="fail">Preview failure</button><button type="button" data-action="reset">Reset preview</button></div></details>`}
     <section id="outcome-overlay" class="outcome-overlay" role="dialog" aria-modal="true" aria-labelledby="outcome-title" hidden><div class="outcome-card"><div id="outcome-kicker" class="panel-index">JOURNEY COMPLETE</div><h2 id="outcome-title"></h2><p id="outcome-message"></p><button id="outcome-return" class="button button-primary" type="button"><span>Return to crew</span><span aria-hidden="true">↗</span></button></div></section>
   `;
 
