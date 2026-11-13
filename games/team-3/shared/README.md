@@ -13,7 +13,7 @@ Everything that decides what happens in The Last Train lives here, as **pure, de
               departAndBoard (host, crew complete)  ──────►      pickUpOrDrop / coal stations on demand
 ```
 
-The room (temporary server #145, later `@sdm/host` #80) holds one `GameSession` per room and calls these functions. Players only send inputs; the state is never trusted from a client.
+The platform room (`@sdm/host`, connected in #80) will hold one `GameSession` per room and calls these functions. Players only send inputs; the state is never trusted from a client.
 
 ## Modules
 
@@ -55,14 +55,14 @@ The room (temporary server #145, later `@sdm/host` #80) holds one `GameSession` 
 |---|---|---|
 | [hazards/breach.ts](hazards/breach.ts) | Hold a wrench at a breach for 3 s to repair it | `davidudo2005` (#111), notes in [BREACH.md](hazards/BREACH.md) |
 | [hazards/fire.ts](hazards/fire.ts) | Hold an extinguisher at a fire for 2.5 s; an engine fire stalls the train | `davidudo2005` (#122), [FIRE.md](hazards/FIRE.md) |
-| [hazards/course.ts](hazards/course.ts) | Course warning: hold the steering console in the last 2 s or lose 12 hull | `davidudo2005`, [COURSE.md](hazards/COURSE.md) |
+| [hazards/course.ts](hazards/course.ts) | Course warning: hold the steering console in the last 2 s or lose 12 hull | `davidudo2005` (#127), [COURSE.md](hazards/COURSE.md) |
 | [hazards/spread.ts](hazards/spread.ts) | A fire left for 15 s spreads to the nearest free spot | `davidudo2005` (#129), [SPREAD.md](hazards/SPREAD.md) |
 | [stations/coal.ts](stations/coal.ts) | Take coal at the dispenser; deliver it at the engine for +35 fuel | `davidudo2005` (#108), [README.md](stations/README.md) |
 | [stations/platform.ts](stations/platform.ts) | Departure lever, practice coal and boiler, practice breach, how-to-play boards | `davidudo2005` (#169), [PLATFORM.md](stations/PLATFORM.md) |
 
 ## Order of the rule systems in a run
 
-The session runs its systems in this order on every step, then the hazard director, then the win/lose check:
+`stepSession` runs the systems it is given in order, then the hazard director, then the win/lose check. Nothing builds this list yet; when the room is connected (#80) it must pass them in this order:
 
 1. **movement**: `stepMovement(state, inputDirections(frame.inputs), dt, trainMap)`
 2. **journey**: `journeySystem` (fuel, speed, distance, all hull damage)

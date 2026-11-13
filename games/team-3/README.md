@@ -30,7 +30,7 @@ npm run build       # production build of the client
 |---|---|
 | **Game rules** (`shared/`) | ✅ Complete and tested: movement, journey, carrying items, coal, breach and fire repair, engine stall, course hazard, fire spread, hazard director scaled to the crew, run phases, leaving and rejoining, lobby host and crew size, the waiting platform and boarding |
 | **Client** (`client/`) | ✅ Three.js train, players with names, stations, items and hazards with repair progress, HUD bars, keyboard, how-to-play, win and lose screens, scenery, sound, conductor announcements, main menu and shared-link join |
-| **Online play** | ⏳ **Blocked on a server.** The platform host (`@sdm/host`) doesn't exist yet, so the rules can't run for several browsers. The temporary team server (#145) is the way around it |
+| **Online play** | ⏳ **Blocked on a server.** The platform host (`@sdm/host`) doesn't exist yet, so the rules can't run for several browsers. Following the repo rules, the team doesn't build its own server: online play waits for `@sdm/host` (#133, #172), and #80 connects the game to it |
 
 Until the server exists, `npm run dev` opens a **hand-check page**: the train with a demo crew and a demo journey, showing every client part working. The rules themselves are exercised by the tests, including runs of a real session on the real map.
 
@@ -65,4 +65,4 @@ The crew wins when the train reaches **1800** distance and loses when the **hull
 
 Pull requests from work branches go into `Team_3_Feature`, which is promoted to `development`, `staging` and then `main`. See [DEVELOPMENT.md](DEVELOPMENT.md#branches-and-ci).
 
-Work only inside this folder unless an issue says otherwise. The game package follows the layout of the platform template ([server/template/README.md](../../server/template/README.md)). The template and the platform host haven't been built yet, so the team wrote the rules in `shared/` as pure, deterministic functions with tests. They can be wrapped in the platform's game definition (#80) without being rewritten, and the temporary server (#145) runs them in the meantime.
+Work only inside this folder unless an issue says otherwise. The game package follows the layout of the platform template ([server/template/README.md](../../server/template/README.md)). The template and the platform host haven't been built yet, so the team wrote the rules in `shared/` as pure, deterministic functions with tests. They can be wrapped in the platform's game definition (#80) without being rewritten, once `@sdm/host` is merged.
