@@ -1,7 +1,7 @@
 // Messages between client and server, sent as JSON over the WebSocket.
 // Every message has a `type` field so it can be switched on.
 
-import type { Direction, GameState, PlayerId } from "./types";
+import type { Direction, GameState, PlayerId } from "./types.ts";
 
 // --- Client to server ---
 

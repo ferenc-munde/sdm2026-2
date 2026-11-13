@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import * as C from "./constants";
-import type { ClientMessage, ServerMessage } from "./messages";
+import * as C from "./constants.ts";
+import type { ClientMessage, ServerMessage } from "./messages.ts";
 
 describe("constants", () => {
   it("use the numbers fixed in the issues", () => {
