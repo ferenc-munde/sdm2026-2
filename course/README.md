@@ -51,3 +51,20 @@ The grading rules are presented at the opening on the first day. The results are
 - **Collaboration:** contributions spread across the team members, reviews of other people's PRs.
 
 Only work that is visible in this repository counts, so keep your issues and PRs up to date.
+
+### Student activity report (instructors)
+
+```bash
+node course/tooling/student-report.mjs --html > .private/student-report.html
+node course/tooling/student-report.mjs > .private/student-report.md
+node course/tooling/student-report.mjs --json > .private/student-report.json
+```
+
+`--html` writes one page with a section per team: a bar with each student's contribution share, and per student the numbers, a short summary built from them, and a grade proposal. Open the file in a browser.
+
+- **Contribution share:** the student's part of the lines added in the team's merged work pull requests. Generated files, dependencies, lockfiles and binary assets are left out. Lines measure size, not quality.
+- **Grade proposal** (0–10 points): Delivery 0–4 (merged PRs: 5+ → 4, 2–4 → 3, 1 → 2, only open → 1); Process 0–3 (+1 most merged PRs link their issue, +1 issues opened follow the label and title rules, +1 closed an assigned issue); Collaboration 0–3 (reviews: 5+ → 2, 1–4 → 1; +1 at least half of an equal share). Points → grade: 8–10 → 5, 5–7 → 4, 3–4 → 3, 1–2 → 2, 0 → 1. The instructor decides the final grade.
+
+One table per team, one row per student (from [`teams.json`](teams.json)): issues assigned (closed / all), issues opened, work pull requests opened and merged, and reviews given on other people's pull requests. Promotion and sync pull requests between integration branches (`main`, `development`, `staging`, `Team_N_Feature`) are not counted. Accounts that are active but not in the roster are listed under *(not in roster)*.
+
+It needs Node and the [GitHub CLI](https://cli.github.com/), logged in with `gh auth login`, and works the same on Windows, macOS and Linux. **The output has per-person numbers: never commit it.**
