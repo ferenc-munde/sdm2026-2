@@ -61,20 +61,13 @@ export function errorText(code: ErrorCode): string {
       return "That run has already started.";
     case "invalidName":
       return "That name was not accepted. Use 1–16 characters.";
+    case "notEnoughPlayers":
+      return "The crew isn't complete yet. Wait for everyone to join.";
+    case "notHost":
+      return "Only the host can do that.";
     case "invalidMessage":
       return "The room did not accept that. Try again.";
     default:
       return "Something went wrong. Try again.";
   }
-}
-
-/** The share link for a room code; the gateway uses `/team-3` once deployed (#22). */
-export function shareLink(code: string, origin: string): string {
-  return `${origin.replace(/\/$/, "")}/#${normaliseCode(code)}`;
-}
-
-/** Reads the room code out of a shared link (`#K7QF`), or null when there is none. */
-export function codeFromHash(hash: string): string | null {
-  const code = normaliseCode(hash.replace(/^#/, ""));
-  return code.length === JOIN_CODE_LENGTH ? code : null;
 }

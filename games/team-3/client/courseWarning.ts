@@ -1,4 +1,4 @@
-import { COURSE_HOLD_WINDOW_SECONDS } from "../shared/constants.ts";
+import { COURSE_HOLD_WINDOW_SECONDS, COURSE_HULL_DAMAGE } from "../shared/constants.ts";
 import type { GameState } from "../shared/types.ts";
 
 export function courseWarningView(state: GameState): { seconds: number; progress: number; holdNow: boolean } | null {
@@ -37,7 +37,7 @@ export function createCourseWarning(container: HTMLElement) {
       if (!view) return;
       const text = view.holdNow ? "HOLD Space / E at the steering console now!" : "Course hazard ahead — get to the steering console!";
       if (instruction.textContent !== text) instruction.textContent = text;
-      countdown.textContent = `${view.seconds} seconds remaining · hold through the final 2 seconds to avoid 12 hull damage`;
+      countdown.textContent = `${view.seconds} seconds remaining · hold through the final ${COURSE_HOLD_WINDOW_SECONDS} seconds to avoid ${COURSE_HULL_DAMAGE} hull damage`;
       progress.value = view.progress;
     },
     dispose(): void { panel.remove(); },
