@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { canCreate, canJoin, codeProblem, errorText, nameProblem, normaliseCode, normaliseName } from "./lobbyModel.ts";
+import {
+  canCreate,
+  canJoin,
+  codeProblem,
+  errorText,
+  nameProblem,
+  normaliseCode,
+  normaliseName,
+} from "./lobbyModel.ts";
 
 describe("name and code", () => {
   it("trims the name", () => {
@@ -39,13 +47,17 @@ describe("name and code", () => {
 
 describe("error copy", () => {
   it("has a plain sentence for every error code", () => {
-    const codes = ["roomNotFound", "roomFull", "gameInProgress", "invalidName", "invalidMessage", "notHost"] as const;
+    const codes = ["roomNotFound", "roomFull", "gameInProgress", "invalidName", "invalidMessage", "notEnoughPlayers", "notHost"] as const;
     for (const code of codes) {
       const text = errorText(code);
       expect(text.length).toBeGreaterThan(10);
       expect(text).not.toContain(code);
     }
   });
+  it("explains lobby refusals instead of the generic fallback", () => {
+    const generic = "Something went wrong. Try again.";
+    expect(errorText("notEnoughPlayers")).not.toBe(generic);
+    expect(errorText("notHost")).not.toBe(generic);
+    expect(errorText("notHost")).toContain("host");
+  });
 });
-
-

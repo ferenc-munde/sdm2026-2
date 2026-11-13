@@ -61,6 +61,10 @@ export function errorText(code: ErrorCode): string {
       return "That run has already started.";
     case "invalidName":
       return "That name was not accepted. Use 1–16 characters.";
+    case "notEnoughPlayers":
+      return "The crew isn't complete yet. Wait for everyone to join.";
+    case "notHost":
+      return "Only the host can do that.";
     case "invalidMessage":
       return "The room did not accept that. Try again.";
     case "notHost":

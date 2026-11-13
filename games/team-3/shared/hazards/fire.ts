@@ -2,15 +2,11 @@ import { FIRE_EXTINGUISH_SECONDS } from "../constants.ts";
 import type { StepSystem } from "../run/session.ts";
 import type { GameState } from "../types.ts";
 import { canRepair, type Interactions } from "./interactions.ts";
+import { isEngineOnFire, speedFactorFor } from "../journey/journey.ts";
 
-import { LOW_FUEL_THRESHOLD, SPEED_FACTOR_FULL, SPEED_FACTOR_LOW, SPEED_FACTOR_STOPPED } from "../constants.ts";
-
-/** Journey rules can use this too; a fire only stalls the engine spot. */
+/** The train's speed for this state: the journey's rule (fuel level, engine fire), so both always agree. */
 export function speedFactorForHazards(state: GameState): number {
-  if (state.journey.fuel <= 0 || Object.values(state.hazards).some(h => h.kind === "fire" && h.spotId === "engine")) {
-    return SPEED_FACTOR_STOPPED;
-  }
-  return state.journey.fuel <= LOW_FUEL_THRESHOLD ? SPEED_FACTOR_LOW : SPEED_FACTOR_FULL;
+  return speedFactorFor(state.journey.fuel, isEngineOnFire(state.hazards));
 }
 
 /** Extinguishing only; journeySystem owns continuous fire damage. */

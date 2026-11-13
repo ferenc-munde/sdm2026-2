@@ -36,6 +36,8 @@ The existing #26 How to play button should stay mounted too.
 
 Tests cover host-only/crew-complete/range departure, practice coal and journey
 isolation, wrench requirements/reset, five-second respawn, disconnection and board
-proximity. Actual #148 map/start functions and #145/#146 lobby are not yet on the
-feature branch, so integration must be connected and checked there before closing
-#153 or #26. These adapters avoid duplicating another developer's lobby rules.
+proximity. `createPlatformLobby`, `stepPlatformLobby`, `usePlatformAction` and
+`platformLobbyView` in `run/boarding.ts` now connect these rules to #148's map,
+movement and boarding functions. The room owns that combined object, calls its tick
+and action functions, and syncs the returned view. #146 can render it without
+recreating platform rules.

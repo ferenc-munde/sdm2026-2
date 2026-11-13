@@ -87,13 +87,15 @@ help.update("lobby");
 
 // The main menu (#12). The room socket plugs in at `sendToRoom` (#145/#80).
 const sendToRoom = (_message: ClientMessage): void => {};
+/** Shown after "Create room" until #80 connects the platform room; not a real room. */
+const PLACEHOLDER_ROOM_CODE = "K7QF";
 
 const lobby = createLobby(document.body, {
   onCreate: (name) => {
     sendToRoom({ type: "createRoom", name });
     // Until the temporary server (#145) answers, open a mock room so the waiting
     // room can be checked by hand; the `joined` reply will drive this instead.
-    enterWaiting("K7QF");
+    enterWaiting(PLACEHOLDER_ROOM_CODE);
   },
   onJoin: (name, code) => {
     sendToRoom({ type: "joinRoom", name, code });
