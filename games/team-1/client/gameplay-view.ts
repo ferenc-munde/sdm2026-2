@@ -1,6 +1,7 @@
 import type { GameClientSnapshot, GameStateAdapter } from "./game-state-adapter.mjs";
 import { conditionBand, formatCountdown, toOutcomeViewModel, toTaskViewModels, toPlayerViewModels } from "./presentation-model.mjs";
 import { mountTrainScene } from "./player-scene";
+import { mountTrainScene, type TrainScene } from "./player-scene";
 
 export type PreviewAction = "advance-time" | "damage-train" | "progress-repair" | "win" | "fail" | "reset";
 
@@ -8,6 +9,7 @@ export type GameplayViewOptions = {
   roomCode: string;
   onExit: () => void;
   onPreviewAction: (action: PreviewAction) => void;
+  createScene?: (canvas: HTMLCanvasElement, fallback: HTMLElement) => TrainScene;
 };
 
 export function mountGameplayView(root: HTMLElement, adapter: GameStateAdapter, options: GameplayViewOptions): () => void {
@@ -37,6 +39,7 @@ export function mountGameplayView(root: HTMLElement, adapter: GameStateAdapter, 
   const canvas = root.querySelector<HTMLCanvasElement>("#train-canvas")!;
   const fallback = root.querySelector<HTMLElement>("#scene-fallback")!;
   const scene = mountTrainScene(canvas, fallback);
+  const scene = (options.createScene ?? mountTrainScene)(canvas, fallback);
   const unsubscribe = adapter.subscribe((snapshot) => renderSnapshot(snapshot));
   root.querySelector<HTMLButtonElement>("#return-crew")!.addEventListener("click", options.onExit);
   root.querySelector<HTMLButtonElement>("#outcome-return")!.addEventListener("click", options.onExit);
