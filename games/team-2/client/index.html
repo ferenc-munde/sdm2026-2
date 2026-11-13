@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Last Train — local dev harness</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #101018;
+        color: #e6e6ee;
+        font-family: system-ui, sans-serif;
+      }
+
+      #app {
+        width: 100vw;
+        height: 100vh;
+      }
+
+      .status {
+        position: fixed;
+        bottom: 16px;
+        left: 16px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: rgba(16, 16, 24, 0.7);
+        font-size: 12px;
+        pointer-events: none;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="status" id="status">starting…</div>
+    <div id="app"></div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

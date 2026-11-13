@@ -18,19 +18,22 @@ Work only inside this folder unless an issue says otherwise. The package was sel
 - GitHub CLI (`gh`) is **optional** — handy for issues/PRs from the terminal,
   but the web UI works fine; nothing in the run steps needs it
 
-## Run locally (once the platform template is copied here)
+## Run locally
 
 ```bash
-pnpm install
-pnpm --filter @team-2/game dev   # client on :5173, server on :2567
-pnpm --filter @team-2/game test  # headless rules tests (deterministic sim)
+npm install
+npm run dev      # local harness: client on :5173 (placeholder scene + ticking state)
+npm test         # headless rules tests (deterministic sim)
+npm run build    # client build to dist/ (what CI runs)
 ```
 
-> Until the platform template is copied into this folder (#35 / #73), there is
-> no dev server: only `npm test` and `npm run typecheck` work from
-> `games/team-2/`.
+> There is no server yet — the platform host is stalled (#73). The client
+> plays against a **local state adapter** (`client/stateModel.ts`) that drives
+> the real GameDefinition headless; when the platform lands, that one file is
+> swapped for `net.ts` + the Colyseus join (team-3 precedent).
 
-Two browser tabs at `localhost:5173` = two players.
+Two browser tabs at `localhost:5173` = two players, once real networking
+lands (#70).
 
 ## Workflow (repo rules — see root `CLAUDE.md`)
 
