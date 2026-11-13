@@ -79,13 +79,15 @@ help.update("playing");
 
 // The main menu (#12). The room socket plugs in at `sendToRoom` (#145/#80).
 const sendToRoom = (_message: ClientMessage): void => {};
+/** Shown after "Create room" until #80 connects the platform room; not a real room. */
+const PLACEHOLDER_ROOM_CODE = "K7QF";
 
 const lobby = createLobby(document.body, {
   onCreate: (name) => {
     sendToRoom({ type: "createRoom", name });
-    // Until the temporary server (#145) answers, show a code so the screen can
-    // be checked by hand; the reply will drive this instead.
-    lobby.showRoom("K7QF");
+    // TODO(#80): PLACEHOLDER. There is no room server yet, so this code is fake and
+    // nobody can join it. Replace it with the code from the platform room's reply.
+    lobby.showRoom(PLACEHOLDER_ROOM_CODE);
   },
   onJoin: (name, code) => {
     sendToRoom({ type: "joinRoom", name, code });
