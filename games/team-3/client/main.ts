@@ -7,6 +7,7 @@
 // down, two buttons that show either end screen, and a background that slows at
 // low fuel and stops when the train stalls.
 
+import { createConductor } from "./conductor.ts";
 import { createHelp } from "./help.ts";
 import { createCourseWarning } from "./courseWarning.ts";
 import { WebGLRenderer } from "three";
@@ -72,6 +73,7 @@ window.addEventListener("resize", resize);
 
 const hud = createHudBars(document.body);
 const courseWarning = createCourseWarning(document.body);
+const conductor = createConductor(document.body);
 const help = createHelp(document.body);
 help.update("playing");
 
@@ -153,6 +155,7 @@ const addDemoButton = (label: string, phase: Phase): void => {
     demoPhase = phase;
     endScreen.update(phase);
     if (previousDemoState) courseWarning.update({ ...previousDemoState, phase });
+    if (previousDemoState) conductor.update({ ...previousDemoState, phase });
     help.update(phase);
   });
   demoBar.append(button);
@@ -221,6 +224,7 @@ const walk = (time: number): void => {
     const demoState: GameState = {
       roomCode: "DEMO",
       phase: "playing",
+      lobby: { hostId: null, crewSize: 4 },
       time: seconds,
       players: {},
       items: {},
@@ -245,12 +249,14 @@ const walk = (time: number): void => {
       for (const name of eventsBetween(previousDemoState, demoState)) sound.play(name);
     }
     courseWarning.update(demoState);
+    conductor.update(demoState);
     previousDemoState = demoState;
 
     if (progress >= 1) {
       demoPhase = "won";
       endScreen.update("won");
       courseWarning.update({ ...demoState, phase: "won" });
+      conductor.update({ ...demoState, phase: "won" });
       help.update("won");
     }
   }
