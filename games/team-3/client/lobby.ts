@@ -30,6 +30,8 @@ export interface Lobby {
   reset(): void;
   /** Hides the menu, for example once the room is joined. */
   hide(): void;
+  /** Shows the menu again (used by "back to menu"). */
+  show(): void;
   dispose(): void;
 }
 
@@ -206,6 +208,9 @@ export function createLobby(container: HTMLElement, handlers: LobbyHandlers): Lo
     },
     hide(): void {
       root.hidden = true;
+    },
+    show(): void {
+      root.hidden = false;
     },
     dispose(): void {
       root.remove();

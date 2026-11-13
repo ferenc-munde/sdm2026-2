@@ -54,7 +54,6 @@ describe("error copy", () => {
       expect(text).not.toContain(code);
     }
   });
-
   it("explains lobby refusals instead of the generic fallback", () => {
     const generic = "Something went wrong. Try again.";
     expect(errorText("notEnoughPlayers")).not.toBe(generic);
