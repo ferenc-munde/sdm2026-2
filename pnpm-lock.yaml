@@ -17,9 +17,24 @@ importers:
 
   games/team-1:
     dependencies:
+      '@colyseus/schema':
+        specifier: ^5.0.8
+        version: 5.0.48(typescript@5.9.3)
+      '@colyseus/sdk':
+        specifier: ^0.18.1
+        version: 0.18.10(@colyseus/core@0.18.28)(typescript@5.9.3)(zod@4.6.7)
+      '@sdm/core':
+        specifier: workspace:*
+        version: link:../../server/core
+      '@sdm/host':
+        specifier: workspace:*
+        version: link:../../server/host
       three:
         specifier: ^0.180.0
         version: 0.180.0
+      zod:
+        specifier: ^4.1.12
+        version: 4.6.7
     devDependencies:
       '@types/three':
         specifier: ^0.180.0
@@ -33,6 +48,12 @@ importers:
       vite:
         specifier: ^6.4.1
         version: 6.4.6(@types/node@26.6.6)
+      vite-node:
+        specifier: ^3.2.0
+        version: 3.2.4(@types/node@26.6.6)
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@26.6.6)(happy-dom@21.0.4)
 
   games/team-2:
     dependencies:
@@ -76,9 +97,24 @@ importers:
 
   games/team-3:
     dependencies:
+      '@colyseus/schema':
+        specifier: ^5.0.8
+        version: 5.0.48(typescript@5.9.3)
+      '@colyseus/sdk':
+        specifier: ^0.18.1
+        version: 0.18.10(@colyseus/core@0.18.28)(typescript@5.9.3)(zod@4.6.7)
+      '@sdm/core':
+        specifier: workspace:*
+        version: link:../../server/core
+      '@sdm/host':
+        specifier: workspace:*
+        version: link:../../server/host
       three:
         specifier: ^0.170.0
         version: 0.170.0
+      zod:
+        specifier: ^4.1.12
+        version: 4.6.7
     devDependencies:
       '@types/three':
         specifier: ^0.170.0
@@ -89,6 +125,9 @@ importers:
       vite:
         specifier: ^6.0.0
         version: 6.4.6(@types/node@26.6.6)
+      vite-node:
+        specifier: ^3.2.0
+        version: 3.2.4(@types/node@26.6.6)
       vitest:
         specifier: ^3.0.0
         version: 3.2.7(@types/node@26.6.6)(happy-dom@21.0.4)

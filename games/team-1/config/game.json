@@ -1,0 +1,12 @@
+{
+  "tickRate": 20,
+  "patchRate": 20,
+  "maxPlayers": 4,
+  "reconnectSeconds": 20,
+  "roundSeconds": 180,
+  "playerSpeed": 5,
+  "taskCount": 3,
+  "repairStep": 10,
+  "conditionDecayPerSecond": 0.4,
+  "repairConditionBonus": 10
+}

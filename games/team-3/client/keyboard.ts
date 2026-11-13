@@ -92,6 +92,8 @@ export interface Keyboard {
   current(): InputMessage;
   /** The keys held right now, as `event.code` values. */
   readonly pressed: ReadonlySet<string>;
+  /** Release held input when a modal takes over the controls. */
+  reset(): void;
   /** Stops listening. */
   dispose(): void;
 }
@@ -160,6 +162,7 @@ export function createKeyboard(options: KeyboardOptions): Keyboard {
 
   return {
     current: () => current,
+    reset: onBlur,
     pressed,
     dispose: () => {
       target.removeEventListener("keydown", onKeyDown);

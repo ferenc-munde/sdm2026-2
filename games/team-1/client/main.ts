@@ -1,6 +1,10 @@
 import { MockSessionAdapter, SessionError, type LobbyPlayer, type SessionAdapter, type SessionEvent } from "./session-adapter.mjs";
-import { createPreviewSnapshot, MockGameStateAdapter } from "./game-state-adapter.mjs";
+import { createPreviewSnapshot, MockGameStateAdapter, type GameClientSnapshot, type GameStateAdapter } from "./game-state-adapter.mjs";
 import { mountGameplayView, type PreviewAction } from "./gameplay-view";
+import { PlayerPreviewController } from "./player-preview-controller";
+import { serverAddress } from "@sdm/core/client";
+import { createRoomAdapters } from "./room-adapters";
+import { RoomInputController } from "./room-input-controller";
 
 function getAppRoot(): HTMLDivElement {
   const root = document.querySelector<HTMLDivElement>("#app");
@@ -10,7 +14,14 @@ function getAppRoot(): HTMLDivElement {
 
 const app = getAppRoot();
 
-const adapter: SessionAdapter = new MockSessionAdapter();
+// The game runs on the platform room by default. `?mock` in the URL keeps the old in-memory
+// preview (no server needed); the DOM tests use it too.
+const useMock = new URLSearchParams(window.location.search).has("mock");
+// The server is next to the page on port 2567 unless VITE_SERVER_URL names another address.
+const live = useMock ? undefined : createRoomAdapters(serverAddress(window.location, import.meta.env.VITE_SERVER_URL));
+const adapter: SessionAdapter = live?.session ?? new MockSessionAdapter();
+/** The lobby parts that are hidden while the game view is open. The mock note exists only in mock mode. */
+const lobbySections = [".hero", ...(useMock ? [".preview-note"] : []), ".lobby-grid", "#feedback", "#crew-room"];
 let crew: LobbyPlayer[] = [];
 let ownId = "";
 let roomCode = "";
@@ -72,21 +83,35 @@ const playerList = app.querySelector<HTMLUListElement>("#player-list")!;
 const createButton = app.querySelector<HTMLButtonElement>("#create-session")!;
 const joinButton = app.querySelector<HTMLButtonElement>("#join-session")!;
 const gameScreen = app.querySelector<HTMLElement>("#game-screen")!;
-let gameplayAdapter: MockGameStateAdapter | undefined;
+/** The state source of the open game view; undefined while the lobby is shown. */
+let gameplayAdapter: GameStateAdapter | undefined;
+/** Mock mode only: the local snapshot store behind the game view. */
+let mockGameplay: MockGameStateAdapter | undefined;
 let disposeGameplay: (() => void) | undefined;
+let localPlayer: { update(deltaTime: number): void; dispose(): void } | undefined;
+let localPlayerFrame = 0;
+/** Live mode only: the last room phase seen, to open the game view when a run starts. */
+let lastPhase: GameClientSnapshot["phase"] = "lobby";
+
+if (live) {
+  app.querySelector<HTMLElement>(".preview-note")!.hidden = true;
+  app.querySelector<HTMLElement>(".field-hint")!.hidden = true;
+}
 
 createButton.addEventListener("click", () => void connect("create"));
 joinButton.addEventListener("click", () => void connect("join"));
 app.querySelector<HTMLButtonElement>("#leave-session")!.addEventListener("click", () => void disconnect());
-app.querySelector<HTMLButtonElement>("#board-train")!.addEventListener("click", startGameplayPreview);
+app.querySelector<HTMLButtonElement>("#board-train")!.addEventListener("click", boardTrain);
 app.querySelector<HTMLInputElement>("#room-code")!.addEventListener("input", (event) => {
   const input = event.currentTarget as HTMLInputElement;
   input.value = input.value.replace(/[^a-z0-9]/gi, "").toUpperCase();
 });
 
 const unsubscribe = adapter.subscribe((event) => handleSessionEvent(event));
+const unsubscribeRoom = live?.game.subscribe((snapshot) => handleRoomSnapshot(snapshot));
 window.addEventListener("pagehide", () => {
   unsubscribe();
+  unsubscribeRoom?.();
   void adapter.leaveSession();
 }, { once: true });
 
@@ -104,6 +129,7 @@ async function connect(mode: "create" | "join"): Promise<void> {
     roomCode = session.code;
     crew = session.players;
     ownId = session.playerId;
+    lastPhase = "lobby";
     renderRoom();
     showFeedback(mode === "create" ? "Your crew is ready. Share the code to invite your friends." : "You’re aboard. Your crew can see you.", "success");
   } catch (error) {
@@ -113,6 +139,8 @@ async function connect(mode: "create" | "join"): Promise<void> {
     pending = false;
     setPending(false);
   }
+  // A player who joins a run that is already under way goes straight to the train.
+  if (live && roomCode) handleRoomSnapshot(live.game.getSnapshot());
 }
 
 async function disconnect(): Promise<void> {
@@ -134,37 +162,86 @@ function handleSessionEvent(event: SessionEvent): void {
     showFeedback(`${event.player.name} left the crew.`, "neutral");
   }
   renderRoom();
-  if (gameplayAdapter) {
-    gameplayAdapter.publish({ ...gameplayAdapter.getSnapshot(), players: createPreviewSnapshot(crew).players });
+  if (mockGameplay) {
+    mockGameplay.publish({ ...mockGameplay.getSnapshot(), players: createPreviewSnapshot(crew).players });
   }
 }
 
-function startGameplayPreview(): void {
+/** Live mode: follows the room. Keeps the crew list current and opens the game view when a run starts. */
+function handleRoomSnapshot(snapshot: GameClientSnapshot): void {
+  if (!roomCode) return;
+  if (snapshot.connectionState === "disconnected") {
+    if (gameplayAdapter) returnToCrew();
+    crew = [];
+    roomCode = "";
+    ownId = "";
+    room.hidden = true;
+    showFeedback("The connection to the train was lost. Create or join a crew again.", "error");
+    return;
+  }
+  crew = snapshot.players.map(({ id, name, connected }) => ({ id, name, connected }));
+  renderRoom();
+  if (snapshot.phase === "playing" && lastPhase !== "playing" && live) openGameplay(live.game);
+  lastPhase = snapshot.phase;
+}
+
+/** "Board the train": in live mode the room starts the run for everyone; in mock mode it opens the local preview. */
+function boardTrain(): void {
   if (!roomCode || gameplayAdapter) return;
-  gameplayAdapter = new MockGameStateAdapter(createPreviewSnapshot(crew));
-  for (const selector of [".hero", ".preview-note", ".lobby-grid", "#feedback", "#crew-room"]) {
+  if (!live) {
+    mockGameplay = new MockGameStateAdapter(createPreviewSnapshot(crew));
+    openGameplay(mockGameplay);
+  } else if (live.game.getSnapshot().phase === "playing") {
+    // The run is already under way (this player went back to the crew screen): just look at it again.
+    openGameplay(live.game);
+  } else {
+    live.game.sendInput({ type: "start" });
+  }
+}
+
+function openGameplay(state: GameStateAdapter): void {
+  if (!roomCode || gameplayAdapter) return;
+  gameplayAdapter = state;
+  for (const selector of lobbySections) {
     app.querySelector<HTMLElement>(selector)!.hidden = true;
   }
   gameScreen.hidden = false;
-  disposeGameplay = mountGameplayView(gameScreen, gameplayAdapter, {
+  disposeGameplay = mountGameplayView(gameScreen, state, {
     roomCode,
     onExit: returnToCrew,
     onPreviewAction: applyPreviewAction,
+    live: Boolean(live),
   });
+  if (!crew.some((player) => player.id === ownId)) return;
+  // Live: the keyboard sends inputs to the room. Mock: the keyboard moves the player in the local snapshot.
+  localPlayer = live ? new RoomInputController(live.game) : new PlayerPreviewController(ownId, mockGameplay!);
+  let previousFrame = performance.now();
+  const updateLocalPlayer = (now: number) => {
+    if (!localPlayer) return;
+    localPlayer.update(now - previousFrame);
+    previousFrame = now;
+    localPlayerFrame = requestAnimationFrame(updateLocalPlayer);
+  };
+  localPlayerFrame = requestAnimationFrame(updateLocalPlayer);
 }
 
 function returnToCrew(): void {
+  cancelAnimationFrame(localPlayerFrame);
+  localPlayer?.dispose();
+  localPlayer = undefined;
   disposeGameplay?.();
   disposeGameplay = undefined;
   gameplayAdapter = undefined;
+  mockGameplay = undefined;
   gameScreen.hidden = true;
-  for (const selector of [".hero", ".preview-note", ".lobby-grid", "#feedback", "#crew-room"]) {
+  for (const selector of lobbySections) {
     app.querySelector<HTMLElement>(selector)!.hidden = false;
   }
 }
 
 function applyPreviewAction(action: PreviewAction): void {
-  if (!gameplayAdapter) return;
+  if (!mockGameplay) return;
+  const gameplayAdapter = mockGameplay;
   const state = gameplayAdapter.getSnapshot();
   if (action === "reset") {
     gameplayAdapter.publish(createPreviewSnapshot(crew));
