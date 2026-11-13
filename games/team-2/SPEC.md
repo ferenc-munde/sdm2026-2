@@ -286,9 +286,11 @@ export const lastTrain: GameDefinition<LastTrainState> = {
 	},
 	join: (state, sessionId, opts) => { /* new Player, name from opts */ },
 	leave: (state, sessionId) => { /* drop held item, mark seat */ },
-	step: (state, inputs, dt, rng, config) => {
+	step: (state, events, dt, rng, config) => {
+		// events: InputEvent[] — the room shell stamps sessionId (never the client);
 		// per fixed tick: sim.tick(), tasks.tick(), items.tick(),
-		// apply validated inputs, journey distance += speed(power, pressure) * dt,
+		// apply validated inputs (pickup/drop -> items, progress -> tasks),
+		// journey distance += speed(power, pressure) * dt,
 		// win/lose checks, door lockdown countdowns
 	},
 	commands: { /* debug: spawn task, set power, skip phase */ },
