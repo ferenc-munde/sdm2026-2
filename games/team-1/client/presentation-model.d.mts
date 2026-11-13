@@ -1,3 +1,4 @@
+import type { GamePlayer, GameClientSnapshot } from "./game-state-adapter.mjs";
 import type { GamePlayer, GameClientSnapshot, GameOutcome, GameTask } from "./game-state-adapter.mjs";
 
 export type PlayerViewModel = Omit<GamePlayer, "position"> & { x: number; z: number };

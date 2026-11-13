@@ -1,12 +1,18 @@
 import * as THREE from "three";
 import type { GameClientSnapshot } from "./game-state-adapter.mjs";
 import { toPlayerViewModels } from "./presentation-model.mjs";
+import { TRAIN_LAYOUT } from "./environment/TrainEnvironment";
+import { createScene } from "./scene";
 
 export type TrainScene = {
   update(snapshot: GameClientSnapshot): void;
   dispose(): void;
 };
 
+export function mountTrainScene(canvas: HTMLCanvasElement, fallback: HTMLElement): TrainScene {
+  let renderer: THREE.WebGLRenderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
 export type SceneRendererFactory = (
   canvas: HTMLCanvasElement,
 ) => Pick<THREE.WebGLRenderer, "setPixelRatio" | "setSize" | "render" | "dispose">;
@@ -25,6 +31,17 @@ export function mountTrainScene(
     return { update: () => undefined, dispose: () => undefined };
   }
 
+  const scene = createScene();
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
+  camera.position.set(0, 24, 0);
+  camera.up.set(0, 0, -1);
+  camera.lookAt(0, 0, 0);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  const playerGeometry = new THREE.CylinderGeometry(0.28, 0.34, 0.9, 12);
+  const headGeometry = new THREE.SphereGeometry(0.25, 14, 10);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#182124");
   scene.fog = new THREE.Fog("#182124", 18, 42);
@@ -81,6 +98,7 @@ export function mountTrainScene(
       new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.25, side: THREE.DoubleSide }),
     );
     marker.rotation.x = -Math.PI / 2;
+    marker.position.y = 0.04;
     marker.position.y = 0.015;
     group.add(body, head, marker);
     return group;
@@ -103,6 +121,18 @@ export function mountTrainScene(
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
     if (width === 0 || height === 0) return;
+    const aspect = width / height;
+    const layoutPadding = 1.5;
+    const viewHeight = Math.max(
+      TRAIN_LAYOUT.width + layoutPadding * 2,
+      (TRAIN_LAYOUT.length + layoutPadding * 2) / aspect,
+    );
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(width, height, false);
+    camera.left = (-viewHeight * aspect) / 2;
+    camera.right = (viewHeight * aspect) / 2;
+    camera.top = viewHeight / 2;
+    camera.bottom = -viewHeight / 2;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
@@ -127,6 +157,8 @@ export function mountTrainScene(
       for (const [id, group] of playerMeshes) {
         if (!visible.has(id)) {
           scene.remove(group);
+          const body = group.children.find((object) => object instanceof THREE.Mesh) as THREE.Mesh | undefined;
+          if (body) (body.material as THREE.Material).dispose();
           disposePlayerResources(group);
           playerMeshes.delete(id);
         }
@@ -138,6 +170,16 @@ export function mountTrainScene(
           playerMeshes.set(player.id, group);
           scene.add(group);
         }
+        const horizontalInset = 1.5;
+        const depthInset = 1.25;
+        group.position.set(
+          -TRAIN_LAYOUT.length / 2 + horizontalInset + player.x * (TRAIN_LAYOUT.length - horizontalInset * 2),
+          0,
+          -TRAIN_LAYOUT.width / 2 + depthInset + player.z * (TRAIN_LAYOUT.width - depthInset * 2),
+        );
+        group.visible = true;
+        const material = (group.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial;
+        material.color.set(player.color);
         group.position.set(-5.8 + player.x * 11.6, 0, -2.8 + player.z * 5.6);
         group.visible = true;
         const material = (group.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial;
@@ -167,6 +209,11 @@ export function mountTrainScene(
           objectMaterials.forEach((material) => materials.add(material));
         }
       });
+      geometries.forEach((geometry) => geometry.dispose());
+      materials.forEach((material) => material.dispose());
+      renderer.dispose();
+      for (const group of playerMeshes.values()) scene.remove(group);
+      playerMeshes.clear();
       sharedPlayerGeometries.forEach((geometry) => geometries.add(geometry));
       geometries.forEach((geometry) => geometry.dispose());
       materials.forEach((material) => material.dispose());
