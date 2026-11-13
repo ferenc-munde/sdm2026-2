@@ -16,34 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  python-server:
-    if: github.event_name == 'push' || github.head_ref == 'Team_2_Feature'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip pytest
-          if [[ -f server/requirements.txt ]]; then
-            python -m pip install -r server/requirements.txt
-          fi
-
-      - name: Test Python server
-        run: |
-          if ! find server -type f \( -name 'test_*.py' -o -name '*_test.py' \) -print -quit | grep -q .; then
-            echo "::error::No Python tests found under server/."
-            exit 1
-          fi
-          python -m pytest server
-
-  threejs-frontend:
+  typescript-game-checks:
     if: github.event_name == 'push' || github.head_ref == 'Team_2_Feature'
     runs-on: ubuntu-latest
     defaults:
@@ -52,6 +25,11 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -66,18 +44,13 @@ jobs:
           fi
 
       - name: Install dependencies
-        run: |
-          if [[ -f package-lock.json ]]; then
-            npm ci
-          else
-            npm install
-          fi
+        run: pnpm install
 
-      - name: Test frontend
-        run: npm test
+      - name: Test TypeScript game and server logic
+        run: pnpm test
 
-      - name: Type-check frontend
-        run: npm run typecheck --if-present
+      - name: Type-check TypeScript
+        run: pnpm run --if-present typecheck
 
       - name: Build frontend
-        run: npm run build --if-present
+        run: pnpm run --if-present build
