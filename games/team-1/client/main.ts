@@ -90,6 +90,9 @@ app.querySelector<HTMLInputElement>("#room-code")!.addEventListener("input", (ev
 const unsubscribe = adapter.subscribe((event) => handleSessionEvent(event));
 window.addEventListener("pagehide", () => {
   unsubscribe();
+  cancelAnimationFrame(playerPreviewFrame);
+  playerPreview?.dispose();
+  disposeGameplay?.();
   void adapter.leaveSession();
 }, { once: true });
 
