@@ -57,11 +57,13 @@ const describeInput = (message: InputMessage): string => {
   return `input  dx ${message.direction.dx}  dy ${message.direction.dy}${interact}${idle}`;
 };
 
-const keyboard = createKeyboard({
-  onChange: (message) => {
-    readout.textContent = describeInput(message);
-  },
-});
+// The room's socket plugs in here (#12): `sendInput` becomes `socket.send`,
+// and the readout is only the stand-in until the platform host exists.
+const sendInput = (message: InputMessage): void => {
+  readout.textContent = describeInput(message);
+};
+
+const keyboard = createKeyboard({ onChange: sendInput });
 readout.textContent = describeInput(keyboard.current());
 
 // Walk the crew along their car and drain a demo journey so it is obvious that

@@ -4,10 +4,30 @@ import {
   createKeyboard,
   directionFromKeys,
   inputFromKeys,
+  isEditableTarget,
   isIdle,
   sameInput,
   type Keyboard,
 } from "./keyboard.ts";
+
+/** An EventTarget that lets a test fire an event with any shape it likes. */
+class FakeTarget {
+  private readonly listeners = new Map<string, Array<(event: unknown) => void>>();
+
+  addEventListener(type: string, listener: (event: unknown) => void): void {
+    const list = this.listeners.get(type) ?? [];
+    list.push(listener);
+    this.listeners.set(type, list);
+  }
+
+  removeEventListener(type: string, listener: (event: unknown) => void): void {
+    this.listeners.set(type, (this.listeners.get(type) ?? []).filter((item) => item !== listener));
+  }
+
+  fire(type: string, event: unknown): void {
+    for (const listener of this.listeners.get(type) ?? []) listener(event);
+  }
+}
 
 const keys = (...codes: string[]): Set<string> => new Set(codes);
 
@@ -137,6 +157,49 @@ describe("keyboard listener", () => {
     const other = keyEvent("keydown", "KeyQ");
     target.dispatchEvent(other);
     expect(other.defaultPrevented).toBe(false);
+  });
+
+  it("leaves typing in a text field alone", () => {
+    const fake = new FakeTarget();
+    const seen: string[] = [];
+    createKeyboard({
+      target: fake as unknown as EventTarget,
+      onChange: (message) => seen.push(`${message.direction.dx},${message.direction.dy}`),
+    });
+
+    let prevented = false;
+    fake.fire("keydown", {
+      code: "KeyS",
+      target: { tagName: "INPUT" },
+      preventDefault: () => {
+        prevented = true;
+      },
+    });
+    expect(prevented).toBe(false);
+    expect(seen).toEqual([]);
+
+    prevented = false;
+    fake.fire("keydown", {
+      code: "KeyS",
+      target: { tagName: "DIV" },
+      preventDefault: () => {
+        prevented = true;
+      },
+    });
+    expect(prevented).toBe(true);
+    expect(seen).toEqual(["0,1"]);
+  });
+
+  it("recognises the editable elements it must not touch", () => {
+    const asTarget = (value: object): EventTarget => value as unknown as EventTarget;
+    expect(isEditableTarget(null)).toBe(false);
+    expect(isEditableTarget(asTarget({ tagName: "INPUT" }))).toBe(true);
+    expect(isEditableTarget(asTarget({ tagName: "input" }))).toBe(true);
+    expect(isEditableTarget(asTarget({ tagName: "TEXTAREA" }))).toBe(true);
+    expect(isEditableTarget(asTarget({ tagName: "SELECT" }))).toBe(true);
+    expect(isEditableTarget(asTarget({ isContentEditable: true }))).toBe(true);
+    expect(isEditableTarget(asTarget({ tagName: "DIV" }))).toBe(false);
+    expect(isEditableTarget(asTarget({}))).toBe(false);
   });
 
   it("releases every key when the window loses focus", () => {

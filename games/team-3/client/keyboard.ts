@@ -96,6 +96,18 @@ export interface Keyboard {
   dispose(): void;
 }
 
+/**
+ * True when the event comes from somewhere the player is typing, such as the
+ * lobby name field (#12). Those keys must not move the player or block typing.
+ */
+export function isEditableTarget(target: EventTarget | null): boolean {
+  if (!target) return false;
+  const element = target as { tagName?: unknown; isContentEditable?: unknown };
+  if (element.isContentEditable === true) return true;
+  const tag = typeof element.tagName === "string" ? element.tagName.toLowerCase() : "";
+  return tag === "input" || tag === "textarea" || tag === "select";
+}
+
 function isBound(code: string, bindings: KeyBindings): boolean {
   return [bindings.up, bindings.down, bindings.left, bindings.right, bindings.interact].some((codes) =>
     codes.includes(code),
@@ -121,6 +133,7 @@ export function createKeyboard(options: KeyboardOptions): Keyboard {
   };
 
   const onKeyDown = (event: Event): void => {
+    if (isEditableTarget(event.target)) return;
     const code = (event as KeyboardEvent).code;
     if (!isBound(code, bindings)) return;
     // Keep the page from scrolling with the arrow keys and Space.
