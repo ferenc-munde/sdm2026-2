@@ -1,7 +1,19 @@
-import { BREACH_REPAIR_SECONDS } from "../constants.ts";
+import { BREACH_MOVEMENT_FACTOR, BREACH_REPAIR_SECONDS, INTERACT_RANGE } from "../constants.ts";
 import type { StepSystem } from "../run/session.ts";
 import type { GameState } from "../types.ts";
 import { canRepair, type Interactions } from "./interactions.ts";
+
+/** Breach puddles/vents slow players within interaction range by 40%. */
+export function movementFactorAtBreaches(state: GameState, playerId: string): number {
+  const player = state.players[playerId];
+  if (state.phase !== "playing" || !player?.connected) return 1;
+  return Object.values(state.hazards).some((hazard) =>
+    hazard.kind === "breach" && Math.hypot(
+      player.position.x - hazard.position.x,
+      player.position.y - hazard.position.y,
+    ) <= INTERACT_RANGE
+  ) ? BREACH_MOVEMENT_FACTOR : 1;
+}
 
 /** Repair progress only. The journey system owns all continuous hull damage. */
 export function stepBreaches(state: GameState, inputs: Interactions, dt: number): GameState {

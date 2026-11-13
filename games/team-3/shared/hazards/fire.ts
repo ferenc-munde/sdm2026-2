@@ -1,8 +1,18 @@
-import { FIRE_EXTINGUISH_SECONDS } from "../constants.ts";
+import { FIRE_EXTINGUISH_SECONDS, INTERACT_RANGE } from "../constants.ts";
 import type { StepSystem } from "../run/session.ts";
-import type { GameState } from "../types.ts";
+import type { GameState, Station } from "../types.ts";
 import { canRepair, type Interactions } from "./interactions.ts";
 import { isEngineOnFire, speedFactorFor } from "../journey/journey.ts";
+
+/** A fire at an adjacent hazard spot disables the station until extinguished. */
+export function isStationDisabledByFire(state: GameState, station: Station): boolean {
+  return state.phase === "playing" && Object.values(state.hazards).some((hazard) =>
+    hazard.kind === "fire" && hazard.car === station.car && Math.hypot(
+      hazard.position.x - station.position.x,
+      hazard.position.y - station.position.y,
+    ) <= INTERACT_RANGE
+  );
+}
 
 /** The train's speed for this state: the journey's rule (fuel level, engine fire), so both always agree. */
 export function speedFactorForHazards(state: GameState): number {
