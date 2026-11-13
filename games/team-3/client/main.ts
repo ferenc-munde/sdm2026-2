@@ -7,6 +7,7 @@
 // down, two buttons that show either end screen, and a background that slows at
 // low fuel and stops when the train stalls.
 
+import { createConductor } from "./conductor.ts";
 import { WebGLRenderer } from "three";
 import { FUEL_MAX, HULL_MAX, LOW_FUEL_THRESHOLD, WIN_DISTANCE } from "../shared/constants.ts";
 import type { InputMessage } from "../shared/messages.ts";
@@ -56,6 +57,7 @@ resize();
 window.addEventListener("resize", resize);
 
 const hud = createHudBars(document.body);
+const conductor = createConductor(document.body);
 
 // Sound effects (#31): the player and its mute button.
 const sound = createSoundPlayer();
@@ -117,6 +119,7 @@ const addDemoButton = (label: string, phase: Phase): void => {
   button.addEventListener("click", () => {
     demoPhase = phase;
     endScreen.update(phase);
+    if (previousDemoState) conductor.update({ ...previousDemoState, phase });
   });
   demoBar.append(button);
 };
@@ -187,11 +190,13 @@ const walk = (time: number): void => {
     if (previousDemoState) {
       for (const name of eventsBetween(previousDemoState, demoState)) sound.play(name);
     }
+    conductor.update(demoState);
     previousDemoState = demoState;
 
     if (progress >= 1) {
       demoPhase = "won";
       endScreen.update("won");
+      conductor.update({ ...demoState, phase: "won" });
     }
   }
 
