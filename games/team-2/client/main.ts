@@ -1,12 +1,23 @@
 import { createTrainScene } from "./scene";
 import { createHud, type HudTask, type HudJourney } from "./hud";
-import { createLocalStateModel } from "./stateModel.ts";
+import { createLocalStateModel, type GameSession } from "./stateModel.ts";
+import { hostGame, joinGame, serverAddress, type NetSession } from "./net.ts";
 import { localStateToHud } from "./state-to-hud";
 import gameConfig from "../config/game.json";
 import { TRAIN_CARS } from "./train-map";
 import { mountLobby } from "./lobby";
 import "./hud.css";
 import "./styles.css";
+
+// How the page gets its game state:
+//   (default)    lobby → networked game room on the server (net.ts)
+//   ?room=CODE   skip the lobby and join that game room directly
+//   ?local       offline demo: the rules run in this browser (stateModel.ts), no server needed
+// `?lobby=http://host:port` (or VITE_SERVER_URL at build time) points at another server.
+const params = new URLSearchParams(window.location.search);
+const offline = params.has("local");
+const server = serverAddress(window.location, params.get("lobby") ?? import.meta.env.VITE_SERVER_URL);
+const GAME_CODE_TIMEOUT_MS = 15000;
 
 const sceneRoot = document.querySelector<HTMLElement>("#scene, #app");
 if (!sceneRoot) throw new Error("Scene container is missing");
@@ -17,8 +28,12 @@ catch (error) {
   console.error(error);
 }
 const hud = createHud(document.querySelector<HTMLElement>("#hud")!);
-const model = createLocalStateModel();
-const runStartTick = model.state.tick;
+// The offline model also runs behind the lobby until the game room is joined.
+const local = createLocalStateModel();
+let session: GameSession = local;
+let online = false;
+let netStatus = offline ? "" : "Not in a game room yet · join through the lobby";
+let runStartTick = session.state.tick;
 const mode = document.querySelector<HTMLSelectElement>("#view-mode")!;
 const status = document.querySelector<HTMLOutputElement>("#status")!;
 const speedInput = document.querySelector<HTMLInputElement>("#speed")!;
@@ -39,24 +54,37 @@ mapSelect.addEventListener("change", () => {
     : TRAIN_CARS[car]!.stations.map(station => station.label).join(" · ");
 });
 
+function describeSession(): string {
+  const state = session.state;
+  if (online) return `Room ${session.code} · ${state.players.size} crew aboard · tick ${state.tick} · WASD/arrows move, Shift runs, E pickup, Q drop`;
+  const source = offline ? "LOCAL RULES (offline)" : netStatus;
+  return `Local tick ${state.tick} · phase ${state.phase} · ${source} · WASD/arrows move, Shift runs, E pickup, Q drop`;
+}
+
 function update() {
+  const state = session.state;
   if (isPreview()) {
     hud.updateTasks(tasks);
     hud.updateGauges({ power: tasks[0]?.current ? 100 : 40, pressure: 35 });
     hud.updateJourney(journey);
     trainScene?.setSpeed(journey.phase === "running" ? demoSpeed : 0);
   } else {
-    const view = localStateToHud(model.state, gameConfig.tickRate, runStartTick);
+    const view = localStateToHud(state, gameConfig.tickRate, runStartTick);
     hud.updateTasks(view.tasks);
     hud.updateGauges(view.gauges);
     hud.updateJourney(view.journey);
     trainScene?.setSpeed(view.speed);
   }
+  // The crew is always drawn from the game state, one marker per entry of `players`.
+  trainScene?.setPlayers(
+    Array.from(state.players, ([id, player]) => ({ id, x: player.x, y: player.y, eliminated: player.eliminated })),
+    session.playerId,
+  );
   trainScene?.setPaused(demoPaused);
   speedLabel.value = `${demoSpeed.toFixed(1)}x`;
   pauseButton.textContent = demoPaused ? "Resume scenery" : "Pause scenery";
   pauseButton.setAttribute("aria-pressed", String(demoPaused));
-  status.value = `Local tick ${model.state.tick} · phase ${model.state.phase} · ${isPreview() ? "EXAMPLE DATA" : "LOCAL RULES · WASD/arrows, E pickup, Q drop"}`;
+  status.value = isPreview() ? `EXAMPLE DATA · ${online ? `room ${session.code}` : "no game room"}` : describeSession();
 }
 function reset() {
   demoSpeed = 1; demoPaused = false; speedInput.value = "1";
@@ -85,33 +113,107 @@ function syncMode() {
   update();
 }
 mode.addEventListener("change", syncMode);
-// Preserve the adapter's input envelope and demo item identifier.
+
+// Keyboard → inputs. Movement is hold-to-move: one `move` input whenever the held direction
+// (or Shift) changes, and a zero vector on release. The server moves the player every tick.
 const moves: Record<string, [number, number]> = {
   w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
   ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
 };
-function onKey(event: KeyboardEvent) {
+const STOPPED = "0,0,false";
+const held = new Set<string>();
+let running = false;
+let lastMove = STOPPED;
+function sendMove() {
+  let mx = 0, my = 0;
+  for (const key of held) { mx += moves[key]![0]; my += moves[key]![1]; }
+  mx = Math.sign(mx); my = Math.sign(my);
+  const run = running && (mx !== 0 || my !== 0);
+  const next = `${mx},${my},${run}`;
+  if (next === lastMove) return;
+  lastMove = next;
+  session.send({ type: "move", mx, my, run });
+}
+function releaseKeys() { held.clear(); running = false; sendMove(); }
+const keyOf = (event: KeyboardEvent) => event.key.length === 1 ? event.key.toLowerCase() : event.key;
+function onKeyDown(event: KeyboardEvent) {
   if (isPreview() || (event.target instanceof HTMLElement &&
     (event.target.closest("input, select, textarea, button") || event.target.isContentEditable))) return;
-  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-  if (event.repeat && (key === "e" || key === "q")) return;
-  const axis = moves[key];
-  if (axis) {
-    model.send({ type: "move", mx: axis[0], my: axis[1], run: event.shiftKey });
+  const key = keyOf(event);
+  running = event.shiftKey;
+  if (moves[key]) {
+    held.add(key); sendMove();
     event.preventDefault();
-  } else if (key === "e") model.send({ type: "pickup", itemId: "wrench" });
-  else if (key === "q") model.send({ type: "drop", itemId: "wrench" });
+  } else if (key === "Shift") sendMove();
+  else if (event.repeat) return;
+  else if (key === "e") session.send({ type: "pickup", itemId: "wrench" });
+  else if (key === "q") session.send({ type: "drop", itemId: "wrench" });
 }
-window.addEventListener("keydown", onKey);
-model.onTick(update);
-reset(); syncMode(); model.start();
-const lobby = mountLobby(document.body, (match) => {
-  // The lobby is networked; gameplay still uses the existing local rules adapter.
-  if (isPreview()) journey.phase = "running";
+function onKeyUp(event: KeyboardEvent) {
+  running = event.shiftKey;
+  held.delete(keyOf(event));
+  sendMove();
+}
+window.addEventListener("keydown", onKeyDown);
+window.addEventListener("keyup", onKeyUp);
+window.addEventListener("blur", releaseKeys);
+
+/** Swap the offline model for a seat in the game room. */
+async function enterGameRoom(connect: () => Promise<NetSession>) {
+  netStatus = "Connecting to the game room…";
   update();
-  status.value = `Crew aboard · ${match.playerCount}/${match.teamSize} · ${match.players.map((player) => player.name).join(", ")}`;
-});
+  try {
+    const next = await connect();
+    local.stop();
+    session = next; online = true; runStartTick = next.state.tick;
+    lastMove = STOPPED; sendMove();
+    next.onTick(update);
+    next.onClosed(() => {
+      online = false;
+      netStatus = "The connection to the game room ended · reload the page to play again";
+      update();
+    });
+  } catch (error) {
+    netStatus = `Could not join the game room (${error instanceof Error ? error.message : String(error)}) · reload to try again`;
+    console.error(error);
+  }
+  update();
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then((value) => { clearTimeout(timer); resolve(value); }, reject);
+  });
+}
+
+local.onTick(() => { if (session === local) update(); });
+reset(); syncMode(); local.start();
+
+let lobby: ReturnType<typeof mountLobby> | undefined;
+const directCode = params.get("room");
+if (offline) {
+  // Offline demo: no lobby, no server.
+} else if (directCode) {
+  void enterGameRoom(() => joinGame(server, directCode));
+} else {
+  // Lobby → game room: the lobby host creates the game room and reports its code to the lobby,
+  // which passes it on; everybody else joins the game room by that code.
+  lobby = mountLobby(document.body, (match) => {
+    void enterGameRoom(async () => {
+      if (match.isHost) {
+        const hosted = await hostGame(server, match.name);
+        match.shareGameCode(hosted.code);
+        return hosted;
+      }
+      const code = await withTimeout(match.gameCode, GAME_CODE_TIMEOUT_MS, "the host did not open a game room");
+      return joinGame(server, code, match.name);
+    }).finally(() => match.leaveLobby());
+  }, server.http);
+}
 window.addEventListener("pagehide", () => {
-  model.stop(); window.removeEventListener("keydown", onKey);
-  lobby.destroy(); trainScene?.destroy(); hud.destroy();
+  session.stop(); local.stop();
+  window.removeEventListener("keydown", onKeyDown); window.removeEventListener("keyup", onKeyUp);
+  window.removeEventListener("blur", releaseKeys);
+  lobby?.destroy(); trainScene?.destroy(); hud.destroy();
 });

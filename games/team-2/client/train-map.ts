@@ -1,4 +1,8 @@
 /** Map artwork coordinates only. Gameplay state and station rules live elsewhere. */
+// The geometry the rules also need (movement bounds) lives in shared/map.ts.
+import { carBounds, PASSAGE_WIDTH, PASSAGE_X } from "../shared/map.ts";
+export { CAR_HEIGHT, CAR_SPACING, CAR_START_Y, CAR_WIDTH, CAR_X } from "../shared/map.ts";
+
 export interface MapStation {
   id: string;
   label: string;
@@ -6,11 +10,6 @@ export interface MapStation {
   y: number;
   color: string;
 }
-export const CAR_WIDTH = 220;
-export const CAR_HEIGHT = 158;
-export const CAR_SPACING = 168;
-export const CAR_X = 690;
-export const CAR_START_Y = 50;
 
 const definitions = [
   { name: "Command & Guidance", floor: "#4b6263", color: "#4fa7c1", stations: [
@@ -33,10 +32,11 @@ const definitions = [
 ] as const;
 
 export const TRAIN_CARS = definitions.map((definition, index) => {
-  const y = CAR_START_Y + index * CAR_SPACING;
+  const bounds = carBounds(index);
+  const y = bounds.y;
   return {
     index, name: definition.name, floor: definition.floor,
-    bounds: { x: CAR_X, y, width: CAR_WIDTH, height: CAR_HEIGHT },
+    bounds,
     stations: definition.stations.map(([id, label], slot): MapStation => ({
       id, label, color: definition.color,
       // Keep a clear central aisle between both banks of equipment.
@@ -50,6 +50,6 @@ export const TRAIN_PASSAGES = TRAIN_CARS.slice(0, -1).map(car => ({
   id: `bulkhead-${car.index + 1}`,
   fromCar: car.index,
   toCar: car.index + 1,
-  bounds: { x: 778, y: car.bounds.y + 142, width: 44, height: 42 },
+  bounds: { x: PASSAGE_X, y: car.bounds.y + 142, width: PASSAGE_WIDTH, height: 42 },
   hatch: { x: 846, y: car.bounds.y + 139, width: 24, height: 14 },
 }));

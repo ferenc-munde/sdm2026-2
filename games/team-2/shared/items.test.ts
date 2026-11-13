@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createItems } from "./items.ts";
-import { SeededRandom } from "./random.ts";
+import { SeededRandom } from "@sdm/core/shared";
 import { Item, LastTrainState, Player } from "./state.ts";
 
 function createFixture() {

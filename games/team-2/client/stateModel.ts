@@ -1,67 +1,76 @@
-// Interim room adapter until @sdm/host exists (#73). Plays the room's role
-// locally: stamps sessionId from "the envelope" (a fixed local id, never
-// client-supplied), batches queued inputs per fixed tick, and drives the real
-// GameDefinition. When the platform lands, net.ts + schema callbacks replace
-// this file — nothing else changes. The 50ms driver is a dev-harness
+// Offline stand-in for the platform room (open the client with `?local`). It plays
+// the room's role in the browser: one fixed local player id, queued inputs handed
+// to step() once per fixed tick, and the tick counter advanced before every step,
+// exactly as the room does. The networked counterpart is net.ts; both give the
+// rest of the client the same GameSession. The 50 ms driver is a dev-harness
 // convenience; the rules in shared/ stay tick-pure and deterministic.
+import { SeededRandom } from "@sdm/core/shared";
+import type { GameContext, PlayerInput } from "@sdm/core/sim";
 import gameConfig from "../config/game.json";
+import { parseGameConfig, type GameConfig } from "../shared/config.ts";
 import { lastTrain } from "../shared/game.ts";
-import { SeededRandom } from "../shared/random.ts";
-import { LastTrainState } from "../shared/state.ts";
-import type { ClientInput, InputEvent } from "../shared/types.ts";
+import type { ClientInput } from "../shared/input.ts";
+import type { LastTrainState } from "../shared/state.ts";
 
 export const LOCAL_SESSION_ID = "local-player";
 
-type WithoutSeq<T> = T extends { seq: number } ? Omit<T, "seq"> : never;
-
-export interface StateModel {
+/** What main.ts, the HUD and the scene need from a game, local or networked. */
+export interface GameSession {
 	readonly state: LastTrainState;
-	/** Queue one input; the adapter stamps seq and sessionId (the room shell's job). */
-	send(input: WithoutSeq<ClientInput>): void;
-	/** One fixed step: drain queued inputs into step() as InputEvents, then tick. */
-	drainAndStep(dt?: number): InputEvent[];
+	/** This player's key in `state.players`. */
+	readonly playerId: string;
+	/** Room code to share; `""` offline. */
+	readonly code: string;
+	/** Send one input. The room (or this adapter) adds the player id and the sequence number. */
+	send(input: ClientInput): void;
 	start(): void;
 	stop(): void;
+	/** Calls `fn` every time the state changed. */
 	onTick(fn: (state: LastTrainState) => void): void;
 }
 
+export interface StateModel extends GameSession {
+	/** One fixed step: hand the queued inputs to step() and return what was applied. */
+	drainAndStep(): PlayerInput<ClientInput>[];
+}
+
 export function createLocalStateModel(seed = 1): StateModel {
-	const state = lastTrain.createState();
-	lastTrain.init(state, new SeededRandom(seed), gameConfig);
-	lastTrain.join(state, LOCAL_SESSION_ID, { name: "You" });
+	const ctx: GameContext<GameConfig> = { random: new SeededRandom(seed), config: parseGameConfig(gameConfig) };
+	const state = lastTrain.createState(ctx.config);
+	lastTrain.init(state, ctx);
+	lastTrain.join(state, LOCAL_SESSION_ID, ctx, { name: "You" });
 	state.phase = "running";
 
 	let timer: ReturnType<typeof setInterval> | undefined;
-	let seq = 0;
 	let queue: ClientInput[] = [];
 	const listeners: Array<(s: LastTrainState) => void> = [];
 
-	const notify = (): void => {
-		for (const fn of listeners) fn(state);
-	};
-
-	const send = (input: WithoutSeq<ClientInput>): void => {
-		queue.push({ ...input, seq: seq++ } as ClientInput);
-	};
-
-	const drainAndStep = (dt = 0.05): InputEvent[] => {
-		const events: InputEvent[] = queue.map((input) => ({
-			sessionId: LOCAL_SESSION_ID,
-			input,
-		}));
+	const drainAndStep = (): PlayerInput<ClientInput>[] => {
+		const inputs = queue.map((input) => ({ playerId: LOCAL_SESSION_ID, input }));
 		queue = [];
-		lastTrain.step(state, events, dt, new SeededRandom(seed + state.tick), gameConfig);
-		notify();
-		return events;
+		state.tick += 1;
+		lastTrain.step(state, inputs, ctx);
+		for (const fn of listeners) fn(state);
+		return inputs;
 	};
 
-	const start = (): void => {
-		timer = setInterval(() => drainAndStep(0.05), 50);
+	return {
+		state,
+		playerId: LOCAL_SESSION_ID,
+		code: "",
+		send: (input) => {
+			queue.push(input);
+		},
+		drainAndStep,
+		start: () => {
+			timer ??= setInterval(drainAndStep, 1000 / ctx.config.tickRate);
+		},
+		stop: () => {
+			if (timer) clearInterval(timer);
+			timer = undefined;
+		},
+		onTick: (fn) => {
+			listeners.push(fn);
+		},
 	};
-
-	const stop = (): void => {
-		if (timer) clearInterval(timer);
-	};
-
-	return { state, send, drainAndStep, start, stop, onTick: (fn) => listeners.push(fn) };
 }

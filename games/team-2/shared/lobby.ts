@@ -1,6 +1,13 @@
 import { MapSchema, Schema, type } from "@colyseus/schema";
 import { z } from "zod";
 
+/** Colyseus room name of the waiting room (the game room is the platform's GAME_ROOM_NAME). */
+export const LOBBY_ROOM_NAME = "train_lobby";
+/** Lobby message, both ways: the host tells the lobby its game room code, the lobby tells the crew. */
+export const GAME_ROOM_MESSAGE = "game-room";
+export const gameRoomMessageSchema = z.object({ code: z.string().regex(/^[A-Za-z0-9]{1,16}$/) });
+export type GameRoomMessage = z.infer<typeof gameRoomMessageSchema>;
+
 export const TEAM_SIZES = [2, 3, 4] as const;
 export const LOBBY_COUNTDOWN_SECONDS = 30;
 

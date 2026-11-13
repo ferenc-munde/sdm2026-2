@@ -1,6 +1,6 @@
 # Issue #37: five-carriage top-down map
 
-Start with `npm.cmd run dev` from `games/team-2/`. The default view shows the
+Start with `pnpm dev` from `games/team-2/`. The default view shows the
 whole train. Use **Inspect map** to zoom into any carriage and its neighbours.
 The vertical layout follows the team's supplied 2D reference; the older SPEC
 describes a horizontal arrangement. Car ordering and station contents follow
@@ -22,16 +22,18 @@ visual placeholders for the SPEC's emergency relief route.
 ## Handoff
 
 `client/train-map.ts` exports artwork bounds, station positions and passage
-connections. These are client map coordinates, not a replacement for shared
-state or an authoritative movement/collision contract. Coordinate system:
+connections. Since #241 the carriage and passage geometry comes from
+`shared/map.ts`, which the server also uses for movement bounds and spawn
+points; station positions are still client-only. Coordinate system:
 1600 x 1000, origin top-left, x right, y down. The camera uses the same artwork
 through Three.js with an orthographic projection.
 
 `createTrainScene().focusCar(index)` inspects a car; `focusCar(null)` shows
 the whole train. Scrolling scenery and speed controls remain available.
 
-Task/minigame interactions, avatar movement, collision enforcement, animated
-door locking, hatch traversal and multiplayer are separate integrations.
+Avatar movement and multiplayer arrived in #241 (`docs/PLATFORM.md`).
+Task/minigame interactions, station collisions, animated door locking and
+hatch traversal are separate integrations.
 The map supplies their visual locations; it does not implement their rules.
 
 ## Validation

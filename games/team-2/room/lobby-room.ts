@@ -2,6 +2,8 @@ import { Room, type Client } from "colyseus";
 import {
 	addLobbyPlayer,
 	createLobbyState,
+	GAME_ROOM_MESSAGE,
+	gameRoomMessageSchema,
 	isTeamSize,
 	LOBBY_COUNTDOWN_SECONDS,
 	lobbyJoinOptionsSchema,
@@ -27,6 +29,7 @@ export class TrainLobbyRoom extends Room<{ state: LobbyState }> {
 		this.autoDispose = true;
 		this.setState(createLobbyState(options.teamSize));
 		this.onMessage("start-now", (client) => this.requestStartNow(client));
+		this.onMessage(GAME_ROOM_MESSAGE, (client, message) => this.shareGameRoom(client, message));
 	}
 
 	onAuth(_client: Client, options: unknown): LobbyJoinOptions | false {
@@ -81,6 +84,13 @@ export class TrainLobbyRoom extends Room<{ state: LobbyState }> {
 			return;
 		}
 		if (startLobby(this.state)) this.finishMatch();
+	}
+
+	private shareGameRoom(client: Client, message: unknown): void {
+		// After departure the host creates the game room and reports its code; the crew joins by it.
+		const parsed = gameRoomMessageSchema.safeParse(message);
+		if (!parsed.success || this.state.status !== "running" || client.sessionId !== this.state.hostSessionId) return;
+		this.broadcast(GAME_ROOM_MESSAGE, parsed.data);
 	}
 
 	private stopCountdown(): void {
