@@ -85,7 +85,7 @@ const conductor = createConductor(document.body);
 const help = createHelp(document.body, () => keyboard.reset());
 help.update("lobby");
 
-// The main menu (#12). The room socket plugs in at `sendToRoom` (#145/#80).
+// The main menu (#12). The room socket plugs in at `sendToRoom` (#80).
 const sendToRoom = (_message: ClientMessage): void => {};
 /** Shown after "Create room" until #80 connects the platform room; not a real room. */
 const PLACEHOLDER_ROOM_CODE = "K7QF";
@@ -93,8 +93,8 @@ const PLACEHOLDER_ROOM_CODE = "K7QF";
 const lobby = createLobby(document.body, {
   onCreate: (name) => {
     sendToRoom({ type: "createRoom", name });
-    // Until the temporary server (#145) answers, open a mock room so the waiting
-    // room can be checked by hand; the `joined` reply will drive this instead.
+    // TODO(#80): PLACEHOLDER. Until the platform room exists, open a mock room so the
+    // waiting room can be checked by hand; the room's reply (roomView, #198) will drive this.
     enterWaiting(PLACEHOLDER_ROOM_CODE);
   },
   onJoin: (name, code) => {
@@ -196,8 +196,8 @@ addSoundButton("Win", "win");
 addSoundButton("Lose", "lose");
 document.body.append(soundBar);
 
-// The waiting room (#146): the crew on the platform. The room state comes from
-// #145; until then a mock room with two crewmates drives the screen.
+// The waiting room (#146): the crew on the platform. The room state will come from the
+// platform room (#80, via roomView in #198); until then a mock room with two crewmates drives the screen.
 const me = "p1";
 let mockState: GameState | null = null;
 let waitingMode = false;

@@ -1,7 +1,7 @@
 // The waiting room (#146): the crew on the platform before departure.
 //
 // Shows the crew list, the crew-size setting (host only), the ticket with the
-// share link, and the Depart button. The transport is #145; this screen only
+// share link, and the Depart button. The transport is the platform room (#80); this screen only
 // renders a view and calls the handlers.
 
 import { WIN_DISTANCE } from "../shared/constants.ts";

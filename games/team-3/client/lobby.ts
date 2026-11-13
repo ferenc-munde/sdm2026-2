@@ -1,7 +1,7 @@
 // The main menu (#12): enter a name, create a room, or join with a code.
 //
 // The screen only validates and calls the handlers; the room transport is
-// #145/#80. `updateError` shows whatever the server sends back via `error`.
+// #80. `updateError` shows whatever the server sends back via `error`.
 
 import type { ErrorCode } from "../shared/messages.ts";
 import {
