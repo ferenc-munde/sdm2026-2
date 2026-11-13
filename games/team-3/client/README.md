@@ -14,6 +14,7 @@ Browser code for **The Last Train**. What is in this folder today:
 | `keyboard.ts` | Keys → `input` message: WASD/arrows, Space/E to interact | #11 |
 | `screens.ts` | Win and lose screens, shown from `state.phase`, with "play again" | #21 |
 | `scenery.ts` | Ground and sleepers that scroll past the train at `journey.speedFactor` | #25 |
+| `sound.ts` | Event → sound mapping (hazard, repair, low fuel, win, lose), Web Audio player and mute button | #31 |
 | `vite.config.ts` | Vite config for this app only | #10 |
 | `docs/*.jpg` | Screenshots used in the PRs | #10, #11, #20, #21, #25 |
 
@@ -29,6 +30,6 @@ npm run typecheck
 ## Not here yet
 
 - **Lobby** (#12): name entry, create/join a room by code, showing server errors.
-- **Screens and effects** (#19, #31): hazard drawing, sound.
+- **Screens and effects** (#19): hazard drawing.
 
 The client draws the state it receives and sends inputs; it never changes the game state itself.
