@@ -16,10 +16,10 @@ importers:
         specifier: ^0.170.0
         version: 0.170.0
       typescript:
-        specifier: ^5.7.2
+        specifier: ^5.7.0
         version: 5.9.3
       vite:
-        specifier: ^6.0.1
+        specifier: ^6.0.0
         version: 6.4.6
 
 packages:

@@ -3,40 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#101a27" />
-    <title>THE LAST TRAIN</title>
-    <style>
-      html,
-      body,
-      #app {
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        overflow: hidden;
-      }
-
-      #game-canvas {
-        display: block;
-        width: 100%;
-        height: 100%;
-      }
-
-      .scene-label {
-        position: fixed;
-        top: 16px;
-        left: 18px;
-        color: #e4edf4;
-        font: 600 12px/1.4 system-ui, sans-serif;
-        letter-spacing: 0.12em;
-        pointer-events: none;
-      }
-    </style>
+    <meta name="theme-color" content="#11181b" />
+    <meta name="description" content="Gather your crew before the last train departs." />
+    <title>The Last Train — Crew Lobby</title>
   </head>
   <body>
-    <main id="app" aria-label="THE LAST TRAIN preview">
-      <canvas id="game-canvas" aria-label="Top-down 3D scene"></canvas>
-      <div class="scene-label">THE LAST TRAIN · ENVIRONMENT PREVIEW</div>
-    </main>
+    <div class="grain" aria-hidden="true"></div>
+    <main id="app" class="shell"></main>
     <script type="module" src="/client/main.ts"></script>
   </body>
 </html>
