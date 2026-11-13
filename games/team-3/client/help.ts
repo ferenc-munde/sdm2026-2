@@ -2,7 +2,7 @@ import type { Phase } from "../shared/types.ts";
 
 export const HOW_TO_PLAY = [
   "Work together to bring The Last Train to the station before the hull reaches zero.",
-  "Move with WASD or the arrow keys. Hold Space or E to interact.",
+  "Move with WASD or the arrow keys. Hold Space or E to interact. F picks up, drops and uses stations; G throws.",
   "Collect coal at the dispenser and deliver it to the engine to add 35 fuel (maximum 100).",
   "Hold a wrench near a breach and interact for 3 seconds. Letting go resets repair progress.",
   "Hold an extinguisher near a fire and interact for 2.5 seconds. Put out engine fires to get moving again.",
