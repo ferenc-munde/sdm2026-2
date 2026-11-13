@@ -61,3 +61,25 @@ describe("sim", () => {
     expect(state.seats.get("p1")?.connected).toBe(true);
   });
 });
+
+describe("client helper", () => {
+  it("derives the server address from the page, or takes the configured one", async () => {
+    const { serverAddress } = await import("../src/client");
+    expect(serverAddress({ protocol: "http:", hostname: "localhost" })).toEqual({
+      http: "http://localhost:2567",
+      ws: "ws://localhost:2567",
+    });
+    expect(serverAddress({ protocol: "http:", hostname: "localhost" }, " https://games.example/team-2/ ")).toEqual({
+      http: "https://games.example/team-2",
+      ws: "wss://games.example/team-2",
+    });
+  });
+
+  it("numbers input envelopes from 1 and the host's envelope schema accepts them", async () => {
+    const { createInputEnvelopes } = await import("../src/client");
+    const envelope = createInputEnvelopes<{ move: string }>();
+    expect(envelope({ move: "left" })).toEqual({ seq: 1, input: { move: "left" } });
+    expect(envelope({ move: "up" }).seq).toBe(2);
+    expect(InputEnvelopeSchema.safeParse(envelope({ move: "down" })).success).toBe(true);
+  });
+});
