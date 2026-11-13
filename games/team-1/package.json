@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "node tests/session-adapter.test.mjs && node tests/game-state-adapter.test.mjs && node tests/presentation-model.test.mjs"
+    "test": "node tests/session-adapter.test.mjs && node tests/game-state-adapter.test.mjs && node tests/presentation-model.test.mjs && node tests/hud-presentation.test.mjs"
   },
   "dependencies": {
     "three": "^0.170.0"

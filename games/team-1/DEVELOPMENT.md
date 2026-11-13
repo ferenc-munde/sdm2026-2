@@ -8,6 +8,7 @@ Issue #62 adds the `GameStateAdapter` boundary and a separate `MockGameStateAdap
 
 Issue #63 adds a minimal Three.js train view that consumes typed player positions from the game-state adapter. The scene does not implement movement physics or game rules.
 
+Issue #79 adds the snapshot-driven HUD, timer, task list, connected-player status, and result screens. The countdown display uses the received `secondsRemaining` value; it does not run its own timer. Preview controls publish local mock snapshots only.
 ## Commands
 
 - `npm install`

@@ -1,7 +1,7 @@
 import "./styles.css";
 import { MockSessionAdapter, SessionError, type LobbyPlayer, type SessionAdapter, type SessionEvent } from "./session-adapter.mjs";
 import { createPreviewSnapshot, MockGameStateAdapter } from "./game-state-adapter.mjs";
-import { mountSceneView } from "./gameplay-view";
+import { mountGameplayView, type PreviewAction } from "./gameplay-view";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Lobby root element #app was not found.");
@@ -142,9 +142,10 @@ function startGameplayPreview(): void {
     app.querySelector<HTMLElement>(selector)!.hidden = true;
   }
   gameScreen.hidden = false;
-  disposeGameplay = mountSceneView(gameScreen, gameplayAdapter, {
+  disposeGameplay = mountGameplayView(gameScreen, gameplayAdapter, {
     roomCode,
     onExit: returnToCrew,
+    onPreviewAction: applyPreviewAction,
   });
 }
 
@@ -155,6 +156,31 @@ function returnToCrew(): void {
   gameScreen.hidden = true;
   for (const selector of [".hero", ".preview-note", ".lobby-grid", "#feedback", "#crew-room"]) {
     app.querySelector<HTMLElement>(selector)!.hidden = false;
+  }
+}
+
+function applyPreviewAction(action: PreviewAction): void {
+  if (!gameplayAdapter) return;
+  const state = gameplayAdapter.getSnapshot();
+  if (action === "reset") {
+    gameplayAdapter.publish(createPreviewSnapshot(crew));
+  } else if (action === "advance-time") {
+    gameplayAdapter.publish({ ...state, secondsRemaining: Math.max(0, state.secondsRemaining - 15) });
+  } else if (action === "damage-train") {
+    gameplayAdapter.publish({ ...state, trainCondition: Math.max(0, state.trainCondition - 20) });
+  } else if (action === "progress-repair") {
+    const index = state.tasks.findIndex((task) => task.status !== "complete");
+    if (index < 0) return;
+    const tasks = state.tasks.map((task) => ({ ...task }));
+    const task = tasks[index];
+    task.progress = Math.min(100, task.progress + 25);
+    task.status = task.progress === 100 ? "complete" : "in-progress";
+    const completed = tasks.filter((candidate) => candidate.status === "complete").length;
+    gameplayAdapter.publish({ ...state, tasks, repairs: { ...state.repairs, completed } });
+  } else if (action === "win") {
+    gameplayAdapter.publish({ ...state, outcome: { kind: "victory", message: "Your crew brought the Night Line safely through." } });
+  } else if (action === "fail") {
+    gameplayAdapter.publish({ ...state, outcome: { kind: "failure", message: "The train lost power before reaching the station." } });
   }
 }
 
