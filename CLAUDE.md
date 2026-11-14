@@ -90,7 +90,8 @@ team-N/<issue>-<description>  →  Team_N_Feature  →  development  →  stagin
 - At least one approving review from someone other than the author before merging.
 - Test everything: say in the PR how you tested it. Once CI exists, all checks must be green.
 - Resolve every review comment before merging.
-- Delete the branch after it is merged.
+- The work branch is deleted automatically when its pull request is merged (the repository setting "Automatically delete head branches" is on). Do not delete it by hand, and do not reuse it: start the next issue from a fresh branch.
+- Long-lived branches (`main`, `staging`, `development`, `Team_N_Feature`) are never deleted. They must stay protected so that promotion and sync PRs, which use them as their head branch, cannot remove them.
 
 ## Deployment
 
