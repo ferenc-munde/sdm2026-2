@@ -80,7 +80,8 @@ jobs:
           fi
 
           echo "Removing $count file(s) from Git:"
-          tr '\0' '\n' < "$list" | head -n 200
+          # sed reads the whole stream; head can SIGPIPE tr under pipefail.
+          tr '\0' '\n' < "$list" | sed -n '1,200p'
 
           xargs -0 git rm --cached --quiet -- < "$list"
           git config user.name "github-actions[bot]"
@@ -98,7 +99,7 @@ jobs:
             echo "Run \`git pull\` on \`$HEAD_REF\` before you continue. The pull deletes these files from your working folder too: reinstall dependencies and rebuild afterwards, and **copy a local \`.env\` somewhere safe before you pull**."
             echo
             echo '```'
-            tr '\0' '\n' < "$list" | head -n 50
+            tr '\0' '\n' < "$list" | sed -n '1,50p'
             echo '```'
             if [ "$count" -gt 50 ]; then
               echo

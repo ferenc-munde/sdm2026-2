@@ -10,7 +10,7 @@ A co-operative survival game for 2 to 4 players on a train of 5 carriages. The c
 
 - **Runs on the shared platform.** The game is a `GameDefinition` hosted by `@sdm/host`; the client connects with `@sdm/core/client`. The old local copy of the platform types is gone.
 - **Multiplayer movement works on the server.** Players join one game room, get a spawn position, and move with WASD or the arrow keys inside the carriages and passages. Every client sees every player. This is covered by an integration test with two real clients.
-- **The lobby works as before** (name, crew size, countdown, host departure) and now leads into a shared game room.
+- **The lobby** (name, crew size, visible player count) waits indefinitely, starts automatically when full, and lets the host start early.
 - **Not built yet:** phases and the timer, win and lose, hazards, the task library, item spawning, station interactions, doors. See [NEXT_STEPS.md](NEXT_STEPS.md).
 - **Not checked in a browser** after the move to the platform: the automated tests, the typecheck and the build pass, but nobody has looked at two tabs yet. Do that first (steps below).
 
@@ -76,7 +76,7 @@ pnpm dev:client   # only the client
 1. Run `pnpm dev`.
 2. Open `http://127.0.0.1:5173/` in two tabs.
 3. In the first tab, enter a name, choose a crew size, and press **Create Room**. In the other tab, enter a name and the host's room code, then press **Join Room**.
-4. With a crew of 2 the lobby departs as soon as the second player joins. With a larger crew, the host can press **SKIP THE TIMER**.
+4. The lobby shows the start condition. A full crew starts automatically; the host can press **START NOW · CURRENT CREW** to start early.
 5. Both tabs are now in the same game room. The status line at the top shows `Room XXXX · 2 crew aboard`. Move with WASD or the arrow keys, hold Shift to run. Each tab shows two discs; your own has a white outline.
 
 Other ways to open the client:

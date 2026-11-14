@@ -14,6 +14,23 @@ What goes in it (`src/`):
 
 `createGameRoom` lives here, not in `@sdm/core`, so every room shares the host's single copy of the Colyseus runtime.
 
+## Registering rooms
+
+`startGameServer()` accepts the existing room-factory form and registrations with matchmaking options:
+
+```ts
+rooms: {
+  game: (deps) => createGameRoom(game, deps),
+  train_lobby: {
+    room: () => TrainLobbyRoom,
+    filterBy: ["teamSize"],
+    sortBy: { createdAt: 1 },
+  },
+}
+```
+
+`filterBy` and `sortBy` are applied to the Colyseus room handler. The existing `(deps) => RoomClass` form remains supported.
+
 ## What is built
 
 - **Replays:** every room runs on a `Simulation` from `@sdm/core/server`, which records join, leave, drop, reconnect, input and debug events with the room's seed. `GET /api/replays/:roomId` returns the replay of a live room or of one of the last 20 closed rooms (in memory). `runReplay()` re-runs a replay headless and checks the final state hash.

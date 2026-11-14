@@ -1,6 +1,6 @@
 // Room registration for the platform host (`startGameServer({ rooms })`).
 //   game         the game itself: the platform room shell running the Last Train rules
-//   train_lobby  the team's private waiting room (room code, crew, countdown, host departure)
+//   train_lobby  the team's private waiting room (room code, crew, full-room start, host departure)
 import type { Room } from "colyseus";
 import { GAME_ROOM_NAME } from "@sdm/core/shared";
 import { createGameRoom, type HostDeps } from "@sdm/host";

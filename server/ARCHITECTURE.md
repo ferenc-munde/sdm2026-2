@@ -18,8 +18,8 @@ What has been done so far:
 | `@sdm/core` | Done: contract (`shared`), simulation contract (`sim`), `Simulation` with replays that re-run to the same state hash (`server`), connection helpers for the browser (`client`). Not built: prediction, interpolation and debug tools in the client core |
 | `@sdm/host` | Done: `startGameServer()`, `createGameRoom()`, `/health`, join by code, replays, bug reports, stats, structured logs, input limits, serving the built client. Not built: storage that survives a restart (replays and bug reports are kept in memory), access control for `/api/stats` and the replay routes |
 | `@sdm/template` | Not built: only the README exists |
-| `@sdm/gateway`, Railway environments | Done in the repository: `@sdm/gateway` serves every game under `/<game>/` on one address (HTTP and WebSocket). `railway.json` builds all clients with `--base=./` and starts the gateway with every game of the monorepo as its own process, so one Railway service and one domain serve `/team-1/`, `/team-2/`, `/team-3/` from `main`. The Railway project and its service are set up by the platform team and not recorded here |
-| Game teams | Building: Team 1, Team 2 and Team 3 each start their game on the platform host with a `server.ts` and a room in `room/` |
+| `@sdm/gateway`, Railway environments | Done in the repository: `@sdm/gateway` serves every game under `/<game>/` on one address (HTTP and WebSocket). `railway.json` builds all clients with `--base=./` and starts the gateway with every game of the monorepo as its own process. Production is live at `https://sdm2026.online/`; the Railway-generated fallback is `https://sdm2026-2-production.up.railway.app/`. The Railway project and service are managed by the platform team |
+| Game teams | Building: Team 1, Team 2 and Team 3 each start their game on the platform host with a `server.ts` and a room in `room/`. Their production pages are served at `/team-1/`, `/team-2/` and `/team-3/` on the public gateway |
 
 All three games already run on `@sdm/core` and `@sdm/host`. `@sdm/template` is the part the teams still wait for (Team 2 asked for it in issue #73). The build order is in [README.md](README.md#build-order).
 
@@ -113,7 +113,7 @@ team-N/<issue>-<description>  →  Team_N_Feature  →  development  →  stagin
 
 | Branch | Purpose | Receives pull requests from |
 |---|---|---|
-| `main` | Production: the stable, released state | `staging` only |
+| `main` | Production: the stable, released state | `staging` only, merged by an instructor (enforced by a repository ruleset) |
 | `staging` | Release candidate, checked before it goes to production | `development` only |
 | `development` | Integration branch for all teams | `Team_N_Feature`, and `platform` and `team-instructor` work branches |
 | `Team_N_Feature` | Team N's integration branch | Team N's work branches (`team-N/<issue>-<description>`) |
@@ -122,6 +122,7 @@ Rules:
 
 - **A feature branch goes into `development`.** `Team_N_Feature` is never merged into `staging` or `main` directly, and a team's work branch is never merged into anything but its own `Team_N_Feature`.
 - Nobody commits directly to `main`, `staging`, `development` or `Team_N_Feature`: they change only through merged pull requests.
+- Two repository rulesets enforce this. `main: only instructors promote` protects `main` (only the repository admin, an instructor, merges into it). `long-lived branches` protects `development`, `staging` and `Team_*_Feature`. Both forbid deleting and force-pushing these branches, so the automatic deletion of merged head branches never removes them.
 - `platform` and `team-instructor` have no feature branch. Their work branches start from `development` and their pull requests go into `development`.
 - A team keeps its `Team_N_Feature` up to date by merging `development` into it.
 
@@ -129,14 +130,14 @@ The same rules, with the commit and pull request format, are in [../CLAUDE.md](.
 
 ## Environments (Railway)
 
-> **Not set up yet.** This is the target.
+Production is live at <https://sdm2026.online/>. The Railway-generated address, <https://sdm2026-2-production.up.railway.app/>, remains available as a fallback. The gateway health check is `GET /health`; each game's health check is available at `/team-N/health`.
 
-Railway project `sdm2026-2`, separate from Team 10's `sdm2026-1` project (see the instructors' setup issues). The gateway plus one service per game, one replica each.
+Railway project `sdm2026-2`, separate from Team 10's `sdm2026-1` project (see the instructors' setup issues). One gateway service builds and starts the monorepo's games as internal processes.
 
 | Environment | Deploys | `APP_ENV` |
 |---|---|---|
 | development | `development`, after CI passed on the commit | `development` |
-| production | `main`, through a reviewed promotion PR from `staging` | `production` |
+| production | `main`, through a promotion PR from `staging` that an instructor merges | `production` |
 
 `staging` has no environment of its own yet: it is the release candidate that CI checks before the promotion to `main`.
 

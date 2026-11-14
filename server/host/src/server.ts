@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { defineRoom, defineServer, Room, type Server } from "colyseus";
+import { defineRoom, defineServer, Room, type Server, type SortOptions } from "colyseus";
 import express from "express";
 import {
   BugReportSchema,
@@ -26,12 +26,20 @@ export const PROCESS_STATS_LOG_SECONDS = 30;
 
 type RoomFactory = (deps: HostDeps) => new () => Room<any>;
 
+export interface RoomRegistration {
+  room: RoomFactory;
+  filterBy?: string[];
+  sortBy?: SortOptions;
+}
+
+export type RoomDefinition = RoomFactory | RoomRegistration;
+
 export interface StartGameServerOptions {
   gameId: string;
   /** Contents of the game's config/game.json. */
   config: unknown;
-  /** Room factories, for example `{ game: (deps) => createGameRoom(myGame, deps) }`. */
-  rooms: Record<string, RoomFactory>;
+  /** Room factories or registrations with matchmaking options. */
+  rooms: Record<string, RoomDefinition>;
   port?: number;
   env?: AppEnv;
   sha?: string;
@@ -85,7 +93,13 @@ export async function startGameServer(options: StartGameServerOptions): Promise<
   const findReplay = (roomId: string): Replay | undefined => registry.byRoomId(roomId)?.replay() ?? replays.get(roomId);
 
   const rooms = Object.fromEntries(
-    Object.entries(options.rooms).map(([name, factory]) => [name, defineRoom(factory(deps))]),
+    Object.entries(options.rooms).map(([name, definition]) => {
+      const registration = typeof definition === "function" ? { room: definition } : definition;
+      const handler = defineRoom(registration.room(deps));
+      if (registration.filterBy) handler.filterBy(registration.filterBy);
+      if (registration.sortBy) handler.sortBy(registration.sortBy);
+      return [name, handler];
+    }),
   );
 
   const server = defineServer({

@@ -8,6 +8,48 @@ const browser = new Window({ url: "http://localhost/?mock" });
 browser.document.body.innerHTML = '<main id="app" class="shell"></main>';
 globalThis.window = browser;
 globalThis.document = browser.document;
+const audioContexts = [];
+class FakeAudioParam {
+  value = 0;
+  setTargetAtTime(value) { this.value = value; }
+}
+class FakeAudioNode {
+  connect(destination) { this.destination = destination; }
+  disconnect() { this.destination = undefined; }
+}
+class FakeAudioContext {
+  state = "suspended";
+  currentTime = 0;
+  destination = new FakeAudioNode();
+  oscillators = [];
+
+  async resume() { this.state = "running"; }
+  async close() { this.state = "closed"; }
+  createGain() {
+    return Object.assign(new FakeAudioNode(), { gain: new FakeAudioParam() });
+  }
+  createOscillator() {
+    const oscillator = Object.assign(new FakeAudioNode(), {
+      frequency: new FakeAudioParam(),
+      type: "sine",
+      started: false,
+      stopped: false,
+      start() { this.started = true; },
+      stop() { this.stopped = true; },
+    });
+    this.oscillators.push(oscillator);
+    return oscillator;
+  }
+}
+Object.defineProperty(browser, "AudioContext", {
+  configurable: true,
+  value: class extends FakeAudioContext {
+    constructor() {
+      super();
+      audioContexts.push(this);
+    }
+  },
+});
 const animationFrames = new Map();
 let nextAnimationFrameId = 1;
 globalThis.requestAnimationFrame = (callback) => {
@@ -43,6 +85,22 @@ try {
     assert.match(html, /<main id="app"/);
     assert.match(html, /src="\/client\/main\.ts"/);
     assert.doesNotMatch(html, /src="\/client\/main\.js"/);
+  });
+
+  await test("background music starts only after activation and exposes its state", async () => {
+    const button = app.querySelector("#music-toggle");
+    assert.equal(audioContexts.length, 0);
+    assert.equal(button.getAttribute("aria-pressed"), "false");
+
+    button.click();
+    await tick();
+
+    assert.equal(audioContexts.length, 1);
+    assert.equal(audioContexts[0].state, "running");
+    assert.equal(audioContexts[0].oscillators.length, 2);
+    assert.ok(audioContexts[0].oscillators.every((oscillator) => oscillator.started));
+    assert.equal(button.getAttribute("aria-pressed"), "true");
+    assert.equal(app.querySelector("#music-status").textContent, "Background music enabled.");
   });
 
   await test("lobby DOM connects, announces player changes, enforces visible seats, and recovers from errors", async () => {
@@ -97,6 +155,7 @@ try {
       assert.equal(app.querySelector("#crew-room").hidden, true);
       assert.equal(app.querySelector("#game-screen").hidden, false);
       assert.equal(app.querySelector("#crew-count").textContent, "3 / 4");
+      assert.equal(audioContexts[0].state, "running", "music continues when gameplay opens");
       await guest.leaveSession();
       await tick();
       assert.equal(app.querySelector("#crew-room").hidden, true);
@@ -109,6 +168,18 @@ try {
     assert.equal(app.querySelector("#game-screen").hidden, true);
     assert.equal(app.querySelector("#room-capacity").textContent, "2 / 4 CREW ABOARD");
     assert.doesNotMatch(app.querySelector("#player-list").textContent, /Late Passenger/);
+    assert.equal(audioContexts[0].state, "running", "music continues when returning to the lobby");
+
+    const musicButton = app.querySelector("#music-toggle");
+    musicButton.click();
+    await tick();
+    assert.equal(musicButton.getAttribute("aria-pressed"), "false");
+    assert.equal(audioContexts[0].state, "closed", "muting releases the audio context");
+
+    musicButton.click();
+    await tick();
+    assert.equal(audioContexts.length, 2);
+    assert.equal(audioContexts[1].state, "running");
   });
 
   await test("HUD DOM reflects snapshots and displays both terminal results", async () => {
@@ -179,8 +250,10 @@ try {
     app.querySelector("#board-train").click();
     assert.ok(animationFrames.size > 0);
     browser.dispatchEvent(new browser.Event("pagehide"));
+    await tick();
     assert.equal(animationFrames.size, 0);
     assert.equal(app.querySelector("#game-screen").childElementCount, 0);
+    assert.equal(audioContexts[1].state, "closed", "page exit closes the active audio context");
   });
 
   console.log(`${passed}/${passed + failures.length} DOM integration tests passed.`);

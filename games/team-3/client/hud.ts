@@ -53,13 +53,26 @@ export function createHudBars(container: HTMLElement): HudBars {
   const fuel = createBar(root, "Fuel");
   const distance = createBar(root, "Distance");
 
+  // What is draining the hull, next to its value (#421); hidden when nothing is.
+  const drain = document.createElement("span");
+  drain.className = "hud-bar-drain";
+  drain.hidden = true;
+  hull.value.after(drain);
+
   return {
     root,
     update(view: HudView): void {
       hull.fill.style.width = `${view.hullWidth * 100}%`;
       hull.fill.style.background = BAR_COLORS.hull;
       hull.value.textContent = `${view.hull}`;
+      drain.textContent = view.hullDrain > 0 ? `-${view.hullDrain.toFixed(1)}/s` : "";
+      drain.hidden = view.hullDrain <= 0;
+      root.classList.toggle("is-hull-critical", view.hullCritical);
       hull.track.setAttribute("aria-valuenow", `${view.hull}`);
+      hull.track.setAttribute(
+        "aria-valuetext",
+        view.hullDrain > 0 ? `${view.hull}, losing ${view.hullDrain.toFixed(1)} per second` : `${view.hull}`,
+      );
 
       fuel.fill.style.width = `${view.fuelWidth * 100}%`;
       fuel.fill.style.background = view.fuelColor;

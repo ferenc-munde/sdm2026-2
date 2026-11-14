@@ -8,7 +8,7 @@
  * - Interactions
  */
 
-import { InputHandler } from '../input/InputHandler';
+import { InputHandler, isTextEntryTarget } from '../input/InputHandler';
 import { Movement } from './Movement';
 import { Animator } from './Animator';
 import { Inventory, InventoryItem } from './Inventory';
@@ -17,6 +17,9 @@ import { CollisionMap } from '../physics/Collision';
 import type { PlayerState } from '../../shared/types/game';
 
 export class Player {
+  private readonly handleKeyDown = (event: KeyboardEvent) => {
+    if (event.key.toLowerCase() === 'e' && !event.repeat && !isTextEntryTarget(event.target)) this.interact();
+  };
   private id: string;
   private x: number;
   private y: number;
@@ -46,6 +49,7 @@ export class Player {
     this.animator = new Animator();
     this.inventory = new Inventory(config.maxInventorySlots);
     this.interactionSystem = new InteractionSystem(config.interactionRange);
+    window.addEventListener('keydown', this.handleKeyDown);
   }
 
   /**
@@ -170,6 +174,7 @@ export class Player {
    * Cleanup
    */
   destroy(): void {
+    window.removeEventListener('keydown', this.handleKeyDown);
     this.inputHandler.destroy();
     this.interactionSystem.destroy();
   }

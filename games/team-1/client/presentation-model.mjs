@@ -6,6 +6,7 @@ export function toPlayerViewModels(snapshot) {
     color: player.color,
     direction: player.direction,
     isMoving: player.isMoving,
+    ...(player.signal !== undefined && { signal: player.signal }),
     x: Math.min(1, Math.max(0, player.position.x)),
     z: Math.min(1, Math.max(0, player.position.z)),
   }));

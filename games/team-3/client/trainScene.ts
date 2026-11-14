@@ -608,11 +608,26 @@ export function buildTrainScene(
   const body = buildTrainBody(map);
   hullGroup.add(body.group);
 
+  // Warm carriage light (visual polish): one soft point light per car under its far-wall lamps,
+  // so the interiors glow a little in the evening. No shadows, so it stays cheap. They sit in the
+  // train body, so the bend in a sharp curve (#400) carries them with their car.
+  for (const car of map.cars) {
+    const lamp = new PointLight(LIGHTING.carLamp.color, LIGHTING.carLamp.intensity, LIGHTING.carLamp.distance, 2);
+    lamp.name = `car-light-${car.index}`;
+    lamp.position.set(car.x, LIGHTING.carLamp.height, car.y - car.depth / 4);
+    lamp.castShadow = false;
+    lamp.userData = { kind: "carLight", car: car.index };
+    body.group.add(lamp);
+  }
+
   // Chimney smoke: a few puffs that rise, grow and fade, faster when the train goes faster.
   const smoke: Mesh[] = [];
-  for (let index = 0; index < 6; index += 1) {
-    const puff = new Mesh(new SphereGeometry(9, 8, 6), ownMat(PALETTE.steam, { opacity: 0.5 }));
-    puff.userData = { phase: index / 6 };
+  const SMOKE_PUFFS = 10;
+  const puffGeometry = new SphereGeometry(9, 8, 6);
+  for (let index = 0; index < SMOKE_PUFFS; index += 1) {
+    const puff = new Mesh(puffGeometry, ownMat(PALETTE.steam, { opacity: 0.45 }));
+    // Each puff drifts a little to one side and grows at its own rate, so the plume looks soft.
+    puff.userData = { phase: index / SMOKE_PUFFS, drift: ((index * 7) % 5) - 2, grow: 1.9 + ((index * 3) % 4) * 0.25 };
     smoke.push(puff);
     hullGroup.add(puff);
   }
@@ -712,9 +727,16 @@ export function buildTrainScene(
     for (const puff of smoke) {
       const phase = Number(puff.userData.phase) || 0;
       const rise = (seconds * (0.35 + 0.5 * speedFactor) + phase) % 1;
-      puff.position.set(body.chimneyTop.x + rise * 160 * (0.3 + speedFactor), body.chimneyTop.y + rise * 120, body.chimneyTop.z);
-      puff.scale.setScalar(0.6 + rise * 2.2);
-      (puff.material as MeshStandardMaterial).opacity = 0.55 * (1 - rise);
+      const drift = Number(puff.userData.drift) || 0;
+      const grow = Number(puff.userData.grow) || 2.2;
+      puff.position.set(
+        body.chimneyTop.x + rise * 160 * (0.3 + speedFactor),
+        body.chimneyTop.y + rise * 120,
+        body.chimneyTop.z + drift * rise * 9,
+      );
+      puff.scale.setScalar(0.6 + rise * grow);
+      // Fade in quickly at the chimney, then out as it rises, so puffs never pop.
+      (puff.material as MeshStandardMaterial).opacity = 0.5 * Math.min(1, rise * 6) * (1 - rise);
     }
 
 

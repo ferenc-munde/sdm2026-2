@@ -10,7 +10,7 @@
 import { LOW_FUEL_THRESHOLD } from "../shared/constants.ts";
 import type { GameState } from "../shared/types.ts";
 
-export type SoundName = "hazard" | "repairDone" | "lowFuel" | "win" | "lose";
+export type SoundName = "hazard" | "repairDone" | "coal" | "depart" | "pickup" | "lowFuel" | "win" | "lose";
 
 /** One beep: a frequency and how long it lasts. */
 export interface Note {
@@ -43,12 +43,33 @@ export const SOUNDS: Record<SoundName, SoundSpec> = {
       { frequency: 880, seconds: 0.14 },
     ],
   },
+  coal: {
+    type: "sine",
+    volume: 0.16,
+    notes: [
+      { frequency: 523, seconds: 0.08 },
+      { frequency: 784, seconds: 0.1 },
+    ],
+  },
+  pickup: {
+    type: "sine",
+    volume: 0.12,
+    notes: [{ frequency: 1046, seconds: 0.05 }],
+  },
   lowFuel: {
     type: "triangle",
     volume: 0.18,
     notes: [
       { frequency: 440, seconds: 0.14 },
       { frequency: 440, seconds: 0.14 },
+    ],
+  },
+  depart: {
+    type: "triangle",
+    volume: 0.22,
+    notes: [
+      { frequency: 784, seconds: 0.14 },
+      { frequency: 1046, seconds: 0.22 },
     ],
   },
   win: {
@@ -81,6 +102,8 @@ export function eventsBetween(previous: GameState, next: GameState): SoundName[]
   if (next.phase !== previous.phase) {
     if (next.phase === "won") return ["win"];
     if (next.phase === "lost") return ["lose"];
+    // The host's confirmed departure, after the 5 s countdown (#385/#401).
+    if (previous.phase === "lobby" && next.phase === "playing") return ["depart"];
   }
 
   const before = hazardIds(previous);
@@ -88,6 +111,17 @@ export function eventsBetween(previous: GameState, next: GameState): SoundName[]
   const sounds: SoundName[] = [];
   if ([...after].some((id) => !before.has(id))) sounds.push("hazard");
   if ([...before].some((id) => !after.has(id))) sounds.push("repairDone");
+
+  // Delivering coal is the main positive action; the tank only rises while the run is playing.
+  const deliveredCoal =
+    previous.phase === "playing" && next.phase === "playing" && next.journey.fuel > previous.journey.fuel + 0.01;
+  if (deliveredCoal) sounds.push("coal");
+
+  // A player goes from empty hands to holding something; dropping or swapping stays quiet.
+  const pickedUp = Object.values(next.players).some(
+    (player) => player.connected && player.heldItem !== null && previous.players[player.id]?.heldItem === null,
+  );
+  if (pickedUp) sounds.push("pickup");
 
   const crossedLowFuel =
     previous.journey.fuel > LOW_FUEL_THRESHOLD && next.journey.fuel <= LOW_FUEL_THRESHOLD;

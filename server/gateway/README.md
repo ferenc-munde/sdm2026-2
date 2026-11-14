@@ -14,7 +14,7 @@ Settings (environment variables): `GAMES` (the games it serves, comma separated)
 
 ## Two ways to run it
 
-- **One service for the whole monorepo (what `railway.json` does):** `pnpm --filter ./server/gateway run start:all` starts every game in `games/` that has a `server` script as its own process on an internal port (`GAME_PORT_BASE`, default 8101, counting up), restarts a game that crashes, and runs the gateway on `$PORT` in front of them. One Railway service, one domain: `https://<domain>/team-1/`, `/team-2/`, `/team-3/`. `GAMES` limits the games, `GAMES_DIR` points at another `games/` folder.
+- **One service for the whole monorepo (what `railway.json` does):** `pnpm --filter ./server/gateway run start:all` starts every game in `games/` that has a `server` script as its own process on an internal port (`GAME_PORT_BASE`, default 8101, counting up), restarts a game that crashes, and runs the gateway on `$PORT` in front of them. Production serves `https://sdm2026.online/team-1/`, `/team-2/` and `/team-3/`. `GAMES` limits the games, `GAMES_DIR` points at another `games/` folder.
 - **Gateway only:** `pnpm --filter ./server/gateway run start` serves games that run as their own services and are reached by their private address (see the settings above).
 
 Games must work under a path prefix: the build uses `--base=./` (the `railway.json` build does) and the client connects to `<address>/team-N`, which `serverAddress()` from `@sdm/core/client` already does.

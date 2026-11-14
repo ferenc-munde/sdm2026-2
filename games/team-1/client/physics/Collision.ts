@@ -7,6 +7,7 @@ export interface CollisionMap {
   getTile(x: number, y: number): boolean; // true = walkable, false = blocked
   getWidth(): number;
   getHeight(): number;
+  move?(x: number, y: number, dx: number, dy: number): { x: number; y: number };
 }
 
 export class CollisionDetector {
@@ -46,6 +47,7 @@ export class CollisionDetector {
    * Returns the actual position after collision resolution
    */
   moveWithCollision(currentX: number, currentY: number, deltaX: number, deltaY: number): { x: number; y: number } {
+    if (this.collisionMap.move) return this.collisionMap.move(currentX, currentY, deltaX, deltaY);
     // Try full movement first
     const newX = currentX + deltaX;
     const newY = currentY + deltaY;

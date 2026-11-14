@@ -5,7 +5,6 @@ import {
 	GAME_ROOM_MESSAGE,
 	gameRoomMessageSchema,
 	isTeamSize,
-	LOBBY_COUNTDOWN_SECONDS,
 	lobbyCreateOptionsSchema,
 	lobbyJoinOptionsSchema,
 	removeLobbyPlayer,
@@ -16,8 +15,6 @@ import {
 
 export class TrainLobbyRoom extends Room<{ state: LobbyState }> {
 	maxClients = 4;
-	private countdownTask?: { clear: () => void };
-	private countdownStartedAt = 0;
 	private matchAnnounced = false;
 
 	onCreate(options: unknown): void {
@@ -46,35 +43,11 @@ export class TrainLobbyRoom extends Room<{ state: LobbyState }> {
 			return;
 		}
 
-		if (this.state.playerCount === 1) this.startCountdown();
 		if (this.state.status === "running") this.finishMatch();
 	}
 
 	onLeave(client: Client): void {
 		removeLobbyPlayer(this.state, client.sessionId);
-		if (this.state.playerCount === 0 && this.state.status === "waiting") {
-			this.stopCountdown();
-		}
-	}
-
-	onDispose(): void {
-		this.stopCountdown();
-	}
-
-	private startCountdown(): void {
-		this.stopCountdown();
-		// Use server time as the source of truth so client clocks cannot change the wait.
-		this.countdownStartedAt = this.clock.currentTime;
-		this.countdownTask = this.clock.setInterval(() => {
-			const elapsed = Math.floor((this.clock.currentTime - this.countdownStartedAt) / 1000);
-			const secondsRemaining = Math.max(0, LOBBY_COUNTDOWN_SECONDS - elapsed);
-			if (secondsRemaining !== this.state.secondsRemaining) {
-				this.state.secondsRemaining = secondsRemaining;
-			}
-			if (this.state.secondsRemaining === 0) {
-				if (startLobby(this.state)) this.finishMatch();
-			}
-		}, 100);
 	}
 
 	private requestStartNow(client: Client): void {
@@ -90,19 +63,14 @@ export class TrainLobbyRoom extends Room<{ state: LobbyState }> {
 		// After departure the host creates the game room and reports its code; the crew joins by it.
 		const parsed = gameRoomMessageSchema.safeParse(message);
 		if (!parsed.success || this.state.status !== "running" || client.sessionId !== this.state.hostSessionId) return;
+		this.state.gameRoomCode = parsed.data.code;
 		this.broadcast(GAME_ROOM_MESSAGE, parsed.data);
-	}
-
-	private stopCountdown(): void {
-		this.countdownTask?.clear();
-		this.countdownTask = undefined;
 	}
 
 	private finishMatch(): void {
 		if (this.matchAnnounced || this.state.status !== "running" || this.state.playerCount === 0) return;
-		// Guard the room transition so timer and skip requests cannot announce twice.
+		// Guard against the full-crew join and a host start-now racing each other.
 		this.matchAnnounced = true;
-		this.stopCountdown();
 		this.lock();
 		this.broadcast("match-started", {
 			teamSize: this.state.teamSize,
