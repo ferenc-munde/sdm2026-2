@@ -4,9 +4,9 @@ export const HOW_TO_PLAY = [
   "Work together to bring The Last Train to the station before the hull reaches zero.",
   "Move with WASD or the arrow keys. Tap E (or left-click) to pick up or drop; hold E or Space to interact; Shift or F throws.",
   "Collect coal at the dispenser and deliver it to the engine to add 35 fuel (maximum 100).",
-  "Hold a wrench near a breach and interact for 3 seconds. Letting go resets repair progress.",
+  "Hold a wrench near a broken steam pipe and interact for 3 seconds. Letting go resets repair progress.",
   "Hold an extinguisher near a fire and interact for 2.5 seconds. Put out engine fires to get moving again.",
-  "Watch hull, fuel and distance. Share jobs with the crew; tools are kept after repairs.",
+  "For a sharp curve, hold the brake lever during the final 2 seconds. Watch hull, fuel and distance.",
 ] as const;
 export const CONTROL_HINTS = "Move: WASD / arrows · Tap E: pick up / drop · Hold E: interact · Shift / F: throw";
 
