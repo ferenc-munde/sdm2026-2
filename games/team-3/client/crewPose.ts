@@ -83,6 +83,23 @@ export function crewPose(input: PoseInput): CrewPose {
   };
 }
 
+/** Local +x is the resting facing; a facing direction turns the figure, a zero one leaves it at 0. */
+export function headingFor(facing?: { dx: number; dy: number }): number {
+  if (!facing || (facing.dx === 0 && facing.dy === 0)) return 0;
+  const angle = -Math.atan2(facing.dy, facing.dx);
+  return angle === 0 ? 0 : angle; // never return -0, so callers can compare with 0
+}
+
+/**
+ * Eases an angle toward `target` the shortest way round (#355), so a figure never spins the long
+ * way through 360 degrees. The wrap is in (-pi, pi].
+ */
+export function easeAngle(current: number, target: number, dt: number, rate = 12): number {
+  if (!Number.isFinite(dt) || dt <= 0) return current;
+  const delta = Math.atan2(Math.sin(target - current), Math.cos(target - current));
+  return current + delta * (1 - Math.exp(-rate * dt));
+}
+
 /** World units per second between two drawn positions; 0 for an invalid frame time. */
 export function speedBetween(from: Vec2, to: Vec2, dt: number): number {
   if (!Number.isFinite(dt) || dt <= 0) return 0;

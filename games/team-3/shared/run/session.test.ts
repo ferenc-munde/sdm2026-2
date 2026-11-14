@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { roomSettings } from "../config.ts";
-import { TICK_SECONDS, WIN_DISTANCE } from "../constants.ts";
+import { FIRST_HAZARD_SECONDS, TICK_SECONDS, WIN_DISTANCE } from "../constants.ts";
 import type { GameState } from "../types.ts";
 import type { HazardSpot } from "./director.ts";
 import { createSeededRandom } from "./random.ts";
@@ -118,10 +118,10 @@ describe("starting", () => {
     expect(startSession(oneLeft).ok).toBe(false);
   });
 
-  it("starts the run and sets the director for the crew size", () => {
+  it("starts the run with the grace period before the first hazard, for every crew size (#335)", () => {
     expect(ok(startSession(lobbyOf(2))).state.phase).toBe("playing");
-    expect(ok(startSession(lobbyOf(2))).director.secondsUntilNext).toBe(14);
-    expect(ok(startSession(lobbyOf(4))).director.secondsUntilNext).toBe(9);
+    expect(ok(startSession(lobbyOf(2))).director.secondsUntilNext).toBe(FIRST_HAZARD_SECONDS);
+    expect(ok(startSession(lobbyOf(4))).director.secondsUntilNext).toBe(FIRST_HAZARD_SECONDS);
   });
 
   it("is refused while a run is being played", () => {
@@ -136,9 +136,12 @@ describe("stepping", () => {
     expect(stepFor(lobby, 30)).toBe(lobby);
   });
 
-  it("advances the run clock and starts hazards at the crew's interval", () => {
-    const after = stepFor(ok(startSession(lobbyOf(4))), 20);
-    expect(after.state.time).toBeCloseTo(20, 5);
+  it("advances the run clock, waits out the grace period, then uses the crew's interval", () => {
+    const quiet = stepFor(ok(startSession(lobbyOf(4))), FIRST_HAZARD_SECONDS - 1);
+    expect(quiet.state.time).toBeCloseTo(FIRST_HAZARD_SECONDS - 1, 5);
+    expect(Object.keys(quiet.state.hazards)).toHaveLength(0);
+    // First hazard at 20 s, then every 9 s for a crew of four: two by 29.5 s.
+    const after = stepFor(ok(startSession(lobbyOf(4))), FIRST_HAZARD_SECONDS + 9.5);
     expect(Object.keys(after.state.hazards)).toHaveLength(2);
   });
 

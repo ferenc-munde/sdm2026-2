@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PLAYER_RADIUS, PLAYER_SPEED } from "../constants.ts";
+import { COURSE_IMPULSE_SPEED, PLAYER_RADIUS, PLAYER_SPEED } from "../constants.ts";
 import { CAR_WIDTH, carAt, carCentreX, createTrainMap, insideBox } from "../map/map.ts";
 import { createSeededRandom } from "../run/random.ts";
 import { makePlayer, makeState } from "../run/testState.ts";
@@ -186,5 +186,23 @@ describe("stepMovement", () => {
     expect(stepMovement(state, {}, 0.5, map)).toBe(state);
     stepMovement(state, { p1: dir(1, 1), p2: dir(-1, 0) }, 0.5, map);
     expect(state).toEqual(before);
+  });
+});
+
+describe("course knockback from the middle of a car (#335)", () => {
+  it("pushes hard but stops before the wall, so no stun", () => {
+    for (const dy of [1, -1]) {
+      let state = makeState({ phase: "playing" }, ["p1"]);
+      state.players.p1!.position = { x: carCentreX(1), y: 0 };
+      state.players.p1!.velocity = { x: 0, y: dy * COURSE_IMPULSE_SPEED };
+      let stunned = 0;
+      // Check every tick of the push: a wall hit sets a stun that wears off later.
+      for (let t = 0; t < 20; t++) {
+        state = stepMovement(state, {}, 1 / 20, map);
+        stunned = Math.max(stunned, state.players.p1!.stunnedSeconds ?? 0);
+      }
+      expect(Math.abs(state.players.p1!.position.y)).toBeGreaterThan(80);
+      expect(stunned).toBe(0);
+    }
   });
 });
