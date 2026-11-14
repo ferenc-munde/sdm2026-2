@@ -336,6 +336,9 @@ function openGameplay(state: GameStateAdapter): void {
     roomCode,
     onExit: returnToCrew,
     onPreviewAction: applyPreviewAction,
+    onRemoveItem: (id) => {
+      if (localPlayer instanceof PlayerPreviewController) localPlayer.removeItem(id);
+    },
     live: Boolean(live),
 
     // Brake calibration actions are sent to the authoritative room.

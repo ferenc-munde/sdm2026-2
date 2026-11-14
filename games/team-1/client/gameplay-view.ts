@@ -27,6 +27,7 @@ export type GameplayViewOptions = {
   onExit: () => void;
   onPreviewAction: (action: PreviewAction) => void;
   onBrakeAction?: (action: BrakeCalibrationAction) => void;
+  onRemoveItem?: (id: string) => void;
   /** True when the snapshots come from a platform room: hides the mock controls and labels. */
   live?: boolean;
   createScene?: (canvas: HTMLCanvasElement, fallback: HTMLElement) => TrainScene;
@@ -63,7 +64,7 @@ export function mountGameplayView(
     <div class="game-room-code">
       CREW CODE <strong>${escapeHtml(options.roomCode)}</strong>
       <span>${options.live ? "LIVE ROOM STATE" : "LOCAL MOCK STATE"}</span>
-      <span class="movement-hint">MOVE: WASD / ARROWS${options.live ? " · REPAIR: E" : ""}</span>
+      <span class="movement-hint">MOVE: WASD / ARROWS · INTERACT: E · SIGNAL: 1 READY / 2 HELP / 3 ON MY WAY</span>
     </div>
 
     <div class="game-layout">
@@ -79,6 +80,7 @@ export function mountGameplayView(
         <div class="scene-label">
           <span class="live-dot"></span> CARRIAGE 01 <span>·</span> NIGHT LINE
         </div>
+        <p id="interaction-prompt" class="repair-hint" role="status" aria-live="polite"></p>
       </section>
 
       <aside class="hud-panel" aria-label="Train status">
@@ -143,6 +145,7 @@ export function mountGameplayView(
           <div class="hud-label">CREW ON BOARD <strong id="crew-count">0 / 4</strong></div>
           <ul id="game-players" class="game-player-list" aria-label="Crew connection status"></ul>
         </section>
+        ${options.live ? "" : `<section class="hud-block"><div class="hud-label">INVENTORY · LOCAL PREVIEW</div><ul id="inventory-list" class="task-list"></ul></section>`}
       </aside>
     </div>
 
@@ -206,6 +209,10 @@ export function mountGameplayView(
       const action = button.dataset.brakeAction as BrakeCalibrationAction | undefined;
       if (action) options.onBrakeAction?.(action);
     });
+    root.querySelector("#inventory-list")?.addEventListener("click", (event) => {
+      const button = (event.target as Element).closest<HTMLButtonElement>("[data-remove-item]");
+      if (button?.dataset.removeItem) options.onRemoveItem?.(button.dataset.removeItem);
+    });
   });
 
   renderSnapshot(adapter.getSnapshot());
@@ -256,6 +263,14 @@ export function mountGameplayView(
     const repairHintElement = root.querySelector<HTMLElement>("#repair-hint")!;
     repairHintElement.textContent = repairHint.text;
     repairHintElement.dataset.mode = repairHint.mode;
+    root.querySelector<HTMLElement>("#interaction-prompt")!.textContent = snapshot.previewMechanics?.prompt ?? "";
+    const inventory = root.querySelector<HTMLElement>("#inventory-list");
+    if (inventory) {
+      const contents = snapshot.previewMechanics?.inventory.map((item) =>
+        `<li>${escapeHtml(item.name)} <button type="button" data-remove-item="${escapeHtml(item.id)}">Remove</button></li>`,
+      ).join("") || "<li>Empty</li>";
+      if (inventory.innerHTML !== contents) inventory.innerHTML = contents;
+    }
 
     root.querySelector<HTMLElement>("#task-list")!.innerHTML =
       toTaskViewModels(snapshot.tasks).map((task) => `

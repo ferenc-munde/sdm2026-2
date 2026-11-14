@@ -9,7 +9,10 @@ export type GamePlayer = {
   section?: "engine" | "electrical" | "control" | "passenger" | "rear";
   direction?: "up" | "down" | "left" | "right";
   isMoving?: boolean;
+  signal?: string;
 };
+
+export type PreviewItem = { id: string; name: string; x: number; z: number };
 
 export type TaskStatus = "available" | "in-progress" | "complete";
 
@@ -40,6 +43,7 @@ export type GameClientSnapshot = {
   localPlayerId?: string;
   /** The room's phase. Only the room-backed adapter sets it; mock snapshots leave it out. */
   phase?: "lobby" | "playing" | "victory" | "failure";
+  previewMechanics?: { inventory: PreviewItem[]; items: PreviewItem[]; prompt: string };
 };
 
 export interface GameStateAdapter {
@@ -58,6 +62,7 @@ export type GameInput =
   | { type: "move"; x: number; z: number }
   | { type: "start" }
   | { type: "repair" }
+  | { type: "signal"; signal: "Ready" | "Help!" | "On my way" }
   | { type: "brake-calibrate"; action: BrakeCalibrationAction };
 
 export interface GameInputSender {
