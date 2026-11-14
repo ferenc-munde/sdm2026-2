@@ -4,6 +4,7 @@ import type { Item, Player } from "../shared/state.ts";
 import { createPlayerVisuals } from "./player-visuals";
 import { createItemVisuals } from "./item-visuals";
 import { TRAIN_CARS, TRAIN_PASSAGES } from "./train-map";
+import { followFrame, localCameraTarget, smoothCameraY, type CameraTarget } from "./camera-framing";
 
 /** One colour per seat, in the order players joined (same order as the lobby avatars). */
 export const PLAYER_COLORS = ["#62cdd3", "#e46c63", "#e0bc4e", "#6f9bea"] as const;
@@ -125,6 +126,10 @@ export function createTrainScene(container: HTMLElement) {
   renderer.domElement.setAttribute("aria-label", "2D top-down train with five carriages and forest tracks");
   container.append(renderer.domElement);
   let focusedCar: number | null = null;
+  let followLocalPlayer = true;
+  let followTarget: CameraTarget | null = null;
+  let followedId: string | undefined;
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let viewportWidth = 1, viewportHeight = 1, playHeight = 1;
   function render() {
     // Draw one continuous moving landscape across the entire page.
@@ -142,10 +147,12 @@ export function createTrainScene(container: HTMLElement) {
     viewportWidth = w; viewportHeight = h;
     playHeight = Math.max(1, h - Math.min(hudTop, h - 1));
     const ratio = w / playHeight;
-    const height = focusedCar === null ? Math.max(1000, 1600 / ratio) : Math.max(400, 560 / ratio);
+    const frame = followLocalPlayer && followTarget ? followFrame(followTarget, ratio) : null;
+    const height = frame?.height ?? (focusedCar === null ? Math.max(1000, 1600 / ratio) : Math.max(400, 560 / ratio));
     camera.left = -height * ratio / 2; camera.right = height * ratio / 2;
     camera.top = height / 2; camera.bottom = -height / 2;
-    camera.position.y = focusedCar === null ? 0 : 500 - (TRAIN_CARS[focusedCar]!.bounds.y + 79);
+    camera.position.x = frame ? frame.centerX - MAP_WIDTH / 2 : 0;
+    camera.position.y = frame ? MAP_HEIGHT / 2 - frame.centerY : focusedCar === null ? 0 : 500 - (TRAIN_CARS[focusedCar]!.bounds.y + 79);
     camera.updateProjectionMatrix();
     const fullHeight = height * h / playHeight;
     const fullWidth = height * ratio;
@@ -168,6 +175,11 @@ export function createTrainScene(container: HTMLElement) {
   renderer.setAnimationLoop((time: number) => {
     const dt = previousTime === undefined ? 0 : Math.min(0.05, Math.max(0, (time - previousTime) / 1000));
     previousTime = time;
+    if (followLocalPlayer && followTarget) {
+      const frame = followFrame(followTarget, viewportWidth / playHeight);
+      const y = MAP_HEIGHT / 2 - frame.centerY;
+      camera.position.y = reduceMotion ? y : smoothCameraY(camera.position.y, y, dt);
+    }
     // Presentation only: 1x = 120 artwork pixels/second. Never updates game state.
     if (!paused && !document.hidden) {
       landscapeTexture.offset.y = (landscapeTexture.offset.y + dt * speed * 0.12) % 1;
@@ -177,7 +189,14 @@ export function createTrainScene(container: HTMLElement) {
   return {
     /** Inspect approximately two cars; null restores the full map overview. */
     focusCar(index: number | null) {
+      followLocalPlayer = false;
       focusedCar = index === null ? null : Math.max(0, Math.min(4, Math.floor(index)));
+      resize();
+    },
+    /** Normal gameplay: each client follows only its own session player. */
+    followPlayer() {
+      followLocalPlayer = true;
+      focusedCar = null;
       resize();
     },
     /** Visual multiplier, not a gameplay speed formula. Zero stops the scenery. */
@@ -185,7 +204,13 @@ export function createTrainScene(container: HTMLElement) {
     setPaused(value: boolean) { paused = value; },
     /** Draw the crew from the game state, delegated to the player-visuals module. */
     setPlayers(players: Iterable<[string, Player]>, localId?: string) {
-      playerVisuals.update(players, localId);
+      const entries = Array.from(players);
+      const nextTarget = localCameraTarget(entries, localId);
+      const reframe = followedId !== localId || Boolean(nextTarget) !== Boolean(followTarget);
+      followTarget = nextTarget;
+      followedId = localId;
+      playerVisuals.update(entries, localId);
+      if (followLocalPlayer && reframe) resize();
     },
     /** Draw items from the game state, delegated to the item-visuals module. */
     setItems(items: Iterable<[string, Item]>) {
