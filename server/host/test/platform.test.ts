@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -14,6 +14,7 @@ import {
   RateLimiter,
   TokenBucket,
   createGameRoom,
+  findClientDir,
   GAME_ROOM_NAME,
 } from "../src";
 import { startTestServer, type TestServer } from "../src/testing";
@@ -215,6 +216,44 @@ describe("serving the built client", () => {
     folders.push(folder);
     const server = await boot(counter, { clientDir: folder });
     expect((await fetch(`${server.url}/`)).status).toBe(404);
+  });
+});
+
+describe("finding the client folder", () => {
+  function gameFolder(...built: string[]) {
+    const folder = mkdtempSync(join(tmpdir(), "sdm-game-"));
+    folders.push(folder);
+    for (const dir of built) {
+      mkdirSync(join(folder, dir), { recursive: true });
+      writeFileSync(join(folder, dir, "index.html"), "<h1>built</h1>");
+    }
+    return folder;
+  }
+
+  it("finds the build in dist", () => {
+    const game = gameFolder("dist");
+    expect(findClientDir(undefined, undefined, game)).toBe(join(game, "dist"));
+  });
+
+  it("finds the build in client/dist, where a Vite root of client puts it", () => {
+    const game = gameFolder("client/dist");
+    expect(findClientDir(undefined, undefined, game)).toBe(join(game, "client", "dist"));
+  });
+
+  it("prefers dist when both exist", () => {
+    const game = gameFolder("dist", "client/dist");
+    expect(findClientDir(undefined, undefined, game)).toBe(join(game, "dist"));
+  });
+
+  it("lets the option and then $CLIENT_DIR override the defaults, without falling back", () => {
+    const game = gameFolder("dist", "custom", "other");
+    expect(findClientDir("custom", "other", game)).toBe(join(game, "custom"));
+    expect(findClientDir(undefined, "other", game)).toBe(join(game, "other"));
+    expect(findClientDir("missing", undefined, game)).toBeUndefined();
+  });
+
+  it("finds nothing when no folder holds an index.html", () => {
+    expect(findClientDir(undefined, undefined, gameFolder())).toBeUndefined();
   });
 });
 

@@ -22,7 +22,8 @@ Built so far in `client`: the connection helper. Every game's browser code uses 
 ```ts
 import { hostRoom, joinRoomByCode, serverAddress, JoinError } from "@sdm/core/client";
 
-const server = serverAddress(location, import.meta.env.VITE_SERVER_URL); // local: http://<host>:2567
+// `pnpm dev` (Vite): http://<host>:2567. Built and served by the game server: the page's own address.
+const server = serverAddress(location, import.meta.env.VITE_SERVER_URL);
 
 // Create a room and take the first seat. The options go to the game's `join` hook.
 const connection = await hostRoom<MyState, MyInput>(server, { name: "Ada" });

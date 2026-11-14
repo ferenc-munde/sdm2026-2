@@ -1,3 +1,5 @@
+import { journeyView } from "./journey-view";
+
 export interface HudTask {
   id: string;
   title: string;
@@ -10,6 +12,7 @@ export interface HudJourney {
   remainingSeconds: number;
   totalSeconds: number;
   phase: "lobby" | "running" | "won" | "lost";
+  speed?: number; // normalized route distance per second (SPEC §8.4)
   reason?: string;
 }
 
@@ -54,12 +57,21 @@ export function createHud(container: HTMLElement) {
   journey.className = "train-journey";
   journey.setAttribute("aria-label", "Journey to station");
   const journeyText = document.createElement("div");
+  journeyText.className = "journey-heading";
+  const journeyDistance = document.createElement("div");
+  const journeyStats = document.createElement("div");
+  journeyStats.className = "journey-stats";
   const track = document.createElement("div");
   track.className = "train-track";
+  track.setAttribute("role", "progressbar");
+  track.setAttribute("aria-label", "Journey distance");
+  track.setAttribute("aria-valuemin", "0");
+  track.setAttribute("aria-valuemax", "100");
   const ghost = document.createElement("span");
   ghost.className = "train-ghost";
   ghost.textContent = "│";
   ghost.title = "Required pace";
+  ghost.setAttribute("aria-hidden", "true");
   const train = document.createElement("span");
   train.className = "train-marker";
   train.textContent = "🚂";
@@ -68,7 +80,7 @@ export function createHud(container: HTMLElement) {
   station.textContent = "⚑";
   const pace = document.createElement("small");
   track.append(ghost, train, station);
-  journey.append(journeyText, track, pace);
+  journey.append(journeyText, journeyDistance, track, journeyStats, pace);
   const result = document.createElement("section");
   result.className = "train-result";
   result.setAttribute("role", "status");
@@ -80,18 +92,19 @@ export function createHud(container: HTMLElement) {
 
   return {
     updateJourney(values: HudJourney) {
-      const finite = (n: number) => Number.isFinite(n) ? n : 0;
-      const distance = Math.max(0, Math.min(1, finite(values.distance)));
-      const total = Math.max(1, finite(values.totalSeconds));
-      const remaining = Math.max(0, Math.min(total, finite(values.remainingSeconds)));
-      const seconds = Math.ceil(remaining);
-      const required = 1 - remaining / total;
-      journeyText.textContent = `${values.phase === "lobby" ? "Waiting for crew" : "Journey to station"} · ${Math.round(distance * 100)}% · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} remaining`;
-      train.style.left = `${distance * 100}%`;
-      ghost.style.left = `${required * 100}%`;
-      const behind = values.phase === "running" && distance < required;
-      journey.classList.toggle("is-behind", behind);
-      pace.textContent = values.phase === "lobby" ? "Board the train to begin." : behind ? "Behind schedule — repairs help restore speed." : "On schedule · vertical marker shows required pace";
+      const view = journeyView(values);
+      journeyText.textContent = values.phase === "lobby" ? "Waiting for crew" : "Journey to station";
+      journeyDistance.textContent = view.distanceText;
+      journeyStats.textContent = `Time left ${view.timeText} · Speed ${view.speedText}`;
+      train.style.left = `${view.distance * 100}%`;
+      ghost.style.left = `${view.required * 100}%`;
+      track.setAttribute("aria-valuenow", String(view.distance * 100));
+      track.setAttribute("aria-valuetext", view.distanceText);
+      journey.classList.toggle("is-behind", view.behind);
+      pace.textContent = values.phase === "lobby" ? "Board the train to begin."
+        : values.phase === "won" || values.phase === "lost" ? "Journey ended"
+        : view.behind ? "Behind schedule — repairs help restore speed."
+        : "On schedule · vertical marker shows required pace";
       result.hidden = values.phase !== "won" && values.phase !== "lost";
       result.classList.toggle("is-won", values.phase === "won");
       resultTitle.textContent = values.phase === "won" ? "Docked Safe" : "Journey Lost";
