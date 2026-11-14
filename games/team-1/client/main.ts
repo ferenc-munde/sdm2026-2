@@ -112,6 +112,12 @@ const unsubscribeRoom = live?.game.subscribe((snapshot) => handleRoomSnapshot(sn
 window.addEventListener("pagehide", () => {
   unsubscribe();
   unsubscribeRoom?.();
+  // Stop the local player loop and the gameplay view, so no animation frame or renderer outlives the page.
+  cancelAnimationFrame(localPlayerFrame);
+  localPlayer?.dispose();
+  localPlayer = undefined;
+  disposeGameplay?.();
+  disposeGameplay = undefined;
   void adapter.leaveSession();
 }, { once: true });
 

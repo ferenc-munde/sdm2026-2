@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { Window } from "happy-dom";
 import { createTestViteServer } from "./helpers/vite-loader.mjs";
 
@@ -36,6 +37,13 @@ try {
       console.error(`FAIL ${name}: ${error.message}`);
     }
   }
+
+  await test("HTML loads the single TypeScript application entry point", async () => {
+    const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+    assert.match(html, /<main id="app"/);
+    assert.match(html, /src="\/client\/main\.ts"/);
+    assert.doesNotMatch(html, /src="\/client\/main\.js"/);
+  });
 
   await test("lobby DOM connects, announces player changes, enforces visible seats, and recovers from errors", async () => {
     app.querySelector("#join-name").value = "Passenger";
@@ -165,6 +173,14 @@ try {
     dispose();
     assert.equal(sceneDisposed, true);
     assert.equal(root.childElementCount, 0);
+  });
+
+  await test("page exit disposes the player controller and gameplay view", async () => {
+    app.querySelector("#board-train").click();
+    assert.ok(animationFrames.size > 0);
+    browser.dispatchEvent(new browser.Event("pagehide"));
+    assert.equal(animationFrames.size, 0);
+    assert.equal(app.querySelector("#game-screen").childElementCount, 0);
   });
 
   console.log(`${passed}/${passed + failures.length} DOM integration tests passed.`);
