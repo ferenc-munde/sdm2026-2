@@ -35,7 +35,7 @@ import { createSharedLinkJoin } from "./sharedLinkJoin.ts";
 
 /** `?demo` opens the hand-check page; otherwise the page plays a real room. */
 const demo = new URLSearchParams(window.location.search).has("demo");
-const server = serverAddress(window.location, import.meta.env?.VITE_SERVER_URL as string | undefined);
+const server = serverAddress(window.location, import.meta.env?.VITE_SERVER_URL as string | undefined, import.meta.env?.DEV === true);
 import { createPlatformBoard } from "./platformBoard.ts";
 
 const container = document.getElementById("app");
