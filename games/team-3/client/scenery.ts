@@ -138,14 +138,36 @@ export function buildScenery(bounds: SceneryBounds): Scenery {
   group.add(countryside);
   const random = seeded(7);
   const tile: { dx: number; z: number; kind: "tree" | "bush" | "rock"; size: number }[] = [];
-  for (let n = 0; n < 16; n += 1) {
+  for (let n = 0; n < 26; n += 1) {
     // Far side (behind the train): trees and bushes. Near side (in front of the camera): low bushes and rocks only.
-    const farSide = n < 11;
+    const farSide = n < 18;
     const z = farSide ? -(bounds.depth / 2 + 230 + random() * 700) : bounds.depth / 2 + 190 + random() * 260;
     const kind = farSide ? (random() < 0.65 ? "tree" : "bush") : random() < 0.6 ? "bush" : "rock";
     tile.push({ dx: random() * COUNTRYSIDE_PERIOD, z, kind, size: 0.7 + random() * 0.7 });
   }
   const leaves = [mat(PALETTE.leaves), mat(PALETTE.leavesLight)];
+  const trunkGeometry = new CylinderGeometry(5, 7, 40, 6);
+  const lowerCrown = new ConeGeometry(34, 60, 7);
+  const upperCrown = new ConeGeometry(26, 46, 7);
+
+  // Grass patches in two shades (#358): flat discs just above the ground, so the field reads as
+  // moving past instead of a flat sheet. They catch shadows but cast none.
+  const patches: { dx: number; z: number; r: number; light: boolean }[] = [];
+  for (let n = 0; n < 34; n += 1) {
+    const side = n % 3 === 0 ? 1 : -1;
+    const z = side * (bounds.depth / 2 + 120 + random() * (side > 0 ? 360 : 900));
+    patches.push({ dx: random() * COUNTRYSIDE_PERIOD, z, r: 30 + random() * 70, light: random() < 0.5 });
+  }
+  const patchGeometry = new CylinderGeometry(1, 1, 0.6, 7);
+  const patchMaterials = [mat(PALETTE.grassLight, { roughness: 1 }), mat(PALETTE.grassDark, { roughness: 1 })];
+
+  // A wooden fence along the near side (#358), between the track and the field.
+  const fenceZ = bounds.depth / 2 + 150;
+  const fenceMaterial = mat(PALETTE.fence, { roughness: 0.9 });
+  const postGeometry = new BoxGeometry(4, 24, 4);
+  const fenceRail = new BoxGeometry(COUNTRYSIDE_PERIOD, 2.5, 2);
+  const FENCE_POST_SPACING = SLEEPER_SPACING;
+
   for (let start = first - COUNTRYSIDE_PERIOD; start <= last + COUNTRYSIDE_PERIOD; start += COUNTRYSIDE_PERIOD) {
     tile.forEach((spot, index) => {
       const x = start + spot.dx;
@@ -155,9 +177,9 @@ export function buildScenery(bounds: SceneryBounds): Scenery {
         tree.position.set(x, SCENERY_Y - 5, spot.z);
         tree.scale.setScalar(spot.size);
         tree.userData = { kind: "tree" };
-        put(tree, new Mesh(new CylinderGeometry(5, 7, 40, 6), wood), 0, 20, 0, "trunk");
-        put(tree, new Mesh(new ConeGeometry(34, 60, 7), foliage), 0, 62, 0, "foliage");
-        put(tree, new Mesh(new ConeGeometry(26, 46, 7), foliage), 0, 92, 0, "foliage");
+        put(tree, new Mesh(trunkGeometry, wood), 0, 20, 0, "trunk");
+        put(tree, new Mesh(lowerCrown, foliage), 0, 62, 0, "foliage");
+        put(tree, new Mesh(upperCrown, foliage), 0, 92, 0, "foliage");
         countryside.add(tree);
       } else if (spot.kind === "bush") {
         put(countryside, new Mesh(new DodecahedronGeometry(16 * spot.size, 0), foliage), x, SCENERY_Y + 4, spot.z, "bush");
@@ -165,6 +187,17 @@ export function buildScenery(bounds: SceneryBounds): Scenery {
         put(countryside, new Mesh(new DodecahedronGeometry(11 * spot.size, 0), mat(PALETTE.rock)), x, SCENERY_Y, spot.z, "rock");
       }
     });
+    patches.forEach((patch, index) => {
+      const disc = put(countryside, new Mesh(patchGeometry, patchMaterials[patch.light ? 0 : 1]!), start + patch.dx, SCENERY_Y - 4.6 + (index % 3) * 0.05, patch.z, "grassPatch");
+      disc.scale.set(patch.r, 1, patch.r * 0.7);
+      disc.castShadow = false;
+    });
+    for (let x = start; x < start + COUNTRYSIDE_PERIOD; x += FENCE_POST_SPACING) {
+      put(countryside, new Mesh(postGeometry, fenceMaterial), x, SCENERY_Y + 7, fenceZ, "fencePost");
+    }
+    for (const y of [SCENERY_Y + 10, SCENERY_Y + 16]) {
+      put(countryside, new Mesh(fenceRail, fenceMaterial), start + COUNTRYSIDE_PERIOD / 2, y, fenceZ, "fenceRail");
+    }
   }
 
   let distance = 0;

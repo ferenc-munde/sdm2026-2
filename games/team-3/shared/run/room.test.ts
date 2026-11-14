@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COAL_FUEL } from "../constants.ts";
+import { COAL_FUEL, DEPART_COUNTDOWN_SECONDS } from "../constants.ts";
 import { COURSE_INTERVAL_SECONDS } from "./courseTrigger.ts";
 import { platformSpawn } from "../map/platform.ts";
 import type { ClientMessage } from "../messages.ts";
@@ -38,6 +38,8 @@ const ticks = (room: Room, count: number): Room => {
   for (let i = 0; i < count; i++) next = stepRoom(next, TICK, world);
   return next;
 };
+/** Host presses Depart and the 5 s countdown runs out. */
+const depart = (room: Room): Room => ticks(send(room, "host", { type: "startGame" }), Math.round(DEPART_COUNTDOWN_SECONDS / TICK));
 
 /** A room with a host and one crew member, crew size 2, ready to depart. */
 function readyRoom(seed = 1): Room {
@@ -54,7 +56,7 @@ describe("createRoom", () => {
     let room = createRoom("ROOM", random, world);
     room = send(room, "host", { type: "createRoom", name: "Ada" });
     room = send(room, "crew", { type: "joinRoom", name: "Bo", code: "ROOM" });
-    room = send(send(room, "host", { type: "configureRoom", crewSize: 2 }), "host", { type: "startGame" });
+    room = depart(send(room, "host", { type: "configureRoom", crewSize: 2 }));
     ticks(room, 400); // 20 seconds: the director starts at least one hazard
     expect(calls).toBeGreaterThan(0);
   });
@@ -123,7 +125,7 @@ describe("the lobby", () => {
   it("only lets the host depart, then boards everyone with the tools on their racks", () => {
     const room = readyRoom();
     expect(handleMessage(room, "crew", { type: "startGame" }, world)).toMatchObject({ ok: false, error: "notHost" });
-    const boarded = send(room, "host", { type: "startGame" });
+    const boarded = depart(room);
     const state = roomView(boarded, world);
     expect(state.phase).toBe("playing");
     expect(state.players.host!.position).toEqual(world.train.playerSpawns[0]);
@@ -131,9 +133,31 @@ describe("the lobby", () => {
     expect(Object.values(state.items).map((item) => item.kind).sort()).toEqual(["extinguisher", "wrench"]);
   });
 
+  it("counts five seconds before the train leaves (#385)", () => {
+    let room = send(readyRoom(), "host", { type: "startGame" });
+    const waiting = roomView(room, world);
+    expect(waiting.phase).toBe("lobby");
+    expect(waiting.lobby.departingIn).toBe(DEPART_COUNTDOWN_SECONDS);
+
+    room = ticks(room, Math.round((DEPART_COUNTDOWN_SECONDS - 0.1) / TICK)); // 4.9 s
+    expect(roomView(room, world).phase).toBe("lobby");
+    room = ticks(room, 2);
+    expect(roomView(room, world).phase).toBe("playing");
+    expect(roomView(room, world).lobby.departingIn ?? null).toBeNull();
+  });
+
+  it("cancels the countdown if the crew is no longer complete (#385)", () => {
+    let room = send(readyRoom(), "host", { type: "startGame" });
+    room = disconnectFromRoom(room, "crew");
+    room = ticks(room, Math.round(DEPART_COUNTDOWN_SECONDS / TICK));
+    const waiting = roomView(room, world);
+    expect(waiting.phase).toBe("lobby");
+    expect(waiting.lobby.departingIn ?? null).toBeNull();
+  });
+
   it("keeps a held direction across the departure, so nobody stands frozen on the train", () => {
     let room = send(readyRoom(), "crew", { type: "input", direction: { dx: 1, dy: 0 }, interacting: false });
-    room = send(room, "host", { type: "startGame" });
+    room = depart(room);
     const start = room.lobby.session.state.players.crew!.position.x;
     room = ticks(room, 10);
     expect(room.lobby.session.state.players.crew!.position.x).toBeGreaterThan(start);
@@ -146,7 +170,7 @@ describe("the lobby", () => {
 
 describe("a run", () => {
   it("takes coal at the dispenser and delivers it at the engine", () => {
-    let room = send(readyRoom(), "host", { type: "startGame" });
+    let room = depart(readyRoom());
     room = at(room, "host", station("coalDispenser"));
     room = send(room, "host", { type: "pickUpOrDrop" });
     const coal = room.lobby.session.state.players.host!.heldItem;
@@ -161,7 +185,7 @@ describe("a run", () => {
   });
 
   it("throws a held item, which flies and then lands", () => {
-    let room = send(readyRoom(), "host", { type: "startGame" });
+    let room = depart(readyRoom());
     const wrench = Object.values(room.lobby.session.state.items).find((item) => item.kind === "wrench")!;
     room = at(room, "host", wrench.position);
     room = send(room, "host", { type: "pickUpOrDrop" });
@@ -188,7 +212,7 @@ describe("a run", () => {
       }
       return next;
     };
-    let room = send(readyRoom(), "host", { type: "startGame" });
+    let room = depart(readyRoom());
     room = fixEverything(room, Math.round(COURSE_INTERVAL_SECONDS / TICK) - 2);
     const course = () => Object.values(room.lobby.session.state.hazards).some((hazard) => hazard.kind === "course");
     expect(course()).toBe(false);
@@ -198,7 +222,7 @@ describe("a run", () => {
   });
 
   it("goes back to a fresh platform after play again", () => {
-    let room = send(readyRoom(), "host", { type: "startGame" });
+    let room = depart(readyRoom());
     const lost = { ...room.lobby.session.state, phase: "lost" as const };
     room = { ...room, lobby: { ...room.lobby, session: { ...room.lobby.session, state: lost } } };
     room = send(room, "crew", { type: "playAgain" });
@@ -210,7 +234,7 @@ describe("a run", () => {
 
   it("is deterministic: the same seed and messages give the same run", () => {
     const play = (seed: number) => {
-      let room = send(readyRoom(seed), "host", { type: "startGame" });
+      let room = depart(readyRoom(seed));
       room = send(room, "crew", { type: "input", direction: { dx: 0, dy: 1 }, interacting: true });
       return roomView(ticks(room, 600), world); // 30 seconds
     };
@@ -221,7 +245,7 @@ describe("a run", () => {
 
 describe("dash through the room (#228)", () => {
   it("dashes on throw with empty hands, and cools down", () => {
-    let room = send(readyRoom(), "host", { type: "startGame" });
+    let room = depart(readyRoom());
     const start = room.lobby.session.state.players.host!.position;
     room = send(room, "host", { type: "throw" });
     expect(room.lobby.session.state.players.host!.dashSeconds).toBeGreaterThan(0);

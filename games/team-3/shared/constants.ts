@@ -9,6 +9,8 @@
 // Once #42 is merged, these should read from there instead of repeating the numbers.
 export const MIN_PLAYERS = 2; // plan §2
 export const MAX_PLAYERS = 4; // plan §2
+/** Seconds between the host pressing Depart and the train leaving (#385). */
+export const DEPART_COUNTDOWN_SECONDS = 5;
 export const TICK_RATE = 20; // ticks per second, from #9
 export const TICK_SECONDS = 1 / TICK_RATE;
 export const JOIN_CODE_LENGTH = 4; // TO CONFIRM
@@ -49,6 +51,12 @@ export const FIRE_SPREAD_SECONDS = 15; // plan §2, from #30
 
 /** Seconds between new hazards. plan §3 */
 export const HAZARD_INTERVAL_SECONDS = 12;
+/**
+ * Grace period: seconds before the first hazard of a run, for every crew size (#335). The
+ * per-crew intervals apply after it. A first bot play-test lost a non-repairing crew of 4 in
+ * about 30 s with the first hazard at 9 s, which leaves new crews no time to learn the stations.
+ */
+export const FIRST_HAZARD_SECONDS = 20;
 /** Seconds between new hazards once the late part of the journey starts. plan §3 */
 export const HAZARD_INTERVAL_LATE_SECONDS = 7;
 /** Share of WIN_DISTANCE after which the late interval applies. plan §3 */
@@ -68,7 +76,10 @@ export const HAZARD_INTERVAL_BY_PLAYERS: Readonly<Record<number, number>> = {
 export const COURSE_WARNING_SECONDS = 5; // from #28
 export const COURSE_HOLD_WINDOW_SECONDS = 2; // from #28 (hold in the last 2 seconds)
 export const COURSE_HULL_DAMAGE = 12; // from #28
-export const COURSE_IMPULSE_SPEED = 450; // idea document §3
+// Knockback travel is v² / (2 × THROW_FRICTION) = 260² / 800 ≈ 84.5 units: about 13 short of the
+// wall from the centre of a car (110 − 12 = 98), so a player near the middle is pushed hard but
+// not stunned (#335). 280 travels exactly 98 and still touches the wall.
+export const COURSE_IMPULSE_SPEED = 260;
 export const COURSE_STUN_SECONDS = 1.5; // idea document §3
 
 // --- Dash (#228): Shift or F with empty hands ---

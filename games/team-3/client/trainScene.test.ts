@@ -1,9 +1,10 @@
 import { LOCOMOTIVE_LENGTH } from "./trainModel.ts";
-import { Color, Mesh, MeshStandardMaterial, Object3D, Vector3 } from "three";
+import { Color, Mesh, MeshStandardMaterial, Object3D, PointLight, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { CARRY_ARM_LIFT, INTERACT_ARM_LIFT } from "./crewPose.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import {
+  HELD_SHINE,
   PLAYER_COLORS,
   buildTrainScene,
   fitCameraToMap,
@@ -12,6 +13,7 @@ import {
   type RenderItem,
   type RenderWorld,
 } from "./trainScene.ts";
+import { PALETTE } from "./style.ts";
 
 const labelFactory = (name: string): Object3D => {
   const label = new Object3D();
@@ -204,12 +206,16 @@ describe("updateState", () => {
 
     const breach = train.hazardsGroup.children.find((group) => group.userData.hazardId === "b");
     const steam = breach?.children.filter((child) => child.userData.kind === "steam") ?? [];
-    expect(steam).toHaveLength(4);
+    expect(steam).toHaveLength(8);
 
     train.updateEffects(0.1);
     const early = steam[0]?.position.y;
     train.updateEffects(0.9);
     expect(steam[0]?.position.y).not.toBe(early);
+    // Staggered phases: the puffs are not all at the same height at once.
+    expect(new Set(steam.map((puff) => puff.position.y.toFixed(2))).size).toBeGreaterThan(1);
+    // And they drift a little to the side as they climb (#356).
+    expect(steam.some((puff) => puff.position.x !== 0)).toBe(true);
 
     const fire = train.hazardsGroup.children.find((group) => group.userData.hazardId === "f");
     const flame = fire?.children.find((child) => child.name === "fire");
@@ -217,6 +223,34 @@ describe("updateState", () => {
     const firstScale = flame?.scale.x;
     train.updateEffects(0.5);
     expect(flame?.scale.x).not.toBe(firstScale);
+  });
+
+  it("lights a fire and keeps at most three fire lights (#356)", () => {
+    const fires: RenderHazard[] = [0, 1, 2, 3].map((index) => ({
+      id: `fire-${index}`,
+      kind: "fire",
+      position: { x: index * 100, y: 0 },
+      progress: 0,
+    }));
+    const train = build({ hazards: fires });
+    const lights = train.hazardsGroup.children.map((group) =>
+      group.children.find((child) => child.name === "fireLight"),
+    );
+
+    const light = lights[0];
+    expect(light).toBeInstanceOf(PointLight);
+    if (!(light instanceof PointLight)) return;
+    expect(light.distance).toBe(120);
+    expect(light.castShadow).toBe(false);
+    expect(light.color.getHexString()).toBe(new Color(PALETTE.fire).getHexString());
+
+    train.updateEffects(0.1);
+    expect(lights.filter((candidate) => candidate?.visible)).toHaveLength(3);
+
+    // The light goes with its fire when the hazard is repaired.
+    train.updateState({ hazards: fires.slice(0, 1) });
+    expect(train.hazardsGroup.children).toHaveLength(1);
+    expect(train.hazardsGroup.children[0]?.getObjectByName("fireLight")).toBeDefined();
   });
 
   it("can be disposed without throwing", () => {
@@ -266,6 +300,7 @@ describe("updateState keeps what did not change", () => {
     const first = train.playersGroup.children[0]!;
     expect(first.position.x).toBe(15);
     expect(first.position.z).toBe(7);
+    for (let frame = 0; frame < 40; frame += 1) train.updateMotion(0.1, 1);
     expect(first.rotation.y).toBeCloseTo(-Math.PI);
     expect(train.itemsGroup.children[0]!.position.x).toBe(103);
     const fill = train.hazardsGroup.children[0]!.children
@@ -274,12 +309,18 @@ describe("updateState keeps what did not change", () => {
     expect(fill.scale.x).toBeCloseTo(0.75);
   });
 
-  it("faces +x again when a player stops having a direction", () => {
+  it("faces +x again when a player stops having a direction, easing the turn (#355)", () => {
     const { train } = counting();
-    train.updateState({ players: [{ ...players[0]!, facing: { dx: 0, dy: 1 } }], items: [], hazards: [] });
-    expect(train.playersGroup.children[0]!.rotation.y).toBeCloseTo(-Math.PI / 2);
-    train.updateState({ players: [{ ...players[0]!, facing: { dx: 0, dy: 0 } }], items: [], hazards: [] });
-    expect(train.playersGroup.children[0]!.rotation.y).toBe(0);
+    // Keep the held item so the figure is moved, not rebuilt: this is about the turn.
+    train.updateState({ players: [{ ...players[0]!, facing: { dx: 0, dy: 1 } }], items, hazards: [] });
+    const figure = train.playersGroup.children[0]!;
+    expect(figure.rotation.y).toBe(0); // still facing +x on the frame the facing changed
+    for (let frame = 0; frame < 40; frame += 1) train.updateMotion(0.1, 1);
+    expect(figure.rotation.y).toBeCloseTo(-Math.PI / 2);
+
+    train.updateState({ players: [{ ...players[0]!, facing: { dx: 0, dy: 0 } }], items, hazards: [] });
+    for (let frame = 0; frame < 40; frame += 1) train.updateMotion(0.1, 1);
+    expect(figure.rotation.y).toBeCloseTo(0);
   });
 
   it("rebuilds only the player whose name, seat or held item changed", () => {
@@ -394,6 +435,44 @@ describe("crew and wheel animation (#294)", () => {
   });
 });
 
+describe("carriage details and smooth turning (#355)", () => {
+  it("gives every car a rug, warm far-wall lamps and a number plate", () => {
+    const train = build({ players: [], items: [], hazards: [] });
+    const details: Object3D[] = [];
+    train.hullGroup.traverse((object) => {
+      if (object.userData.carDetail) details.push(object);
+    });
+    const of = (kind: string): Object3D[] => details.filter((object) => object.userData.carDetail === kind);
+    expect(of("rug")).toHaveLength(train.map.cars.length);
+    expect(of("plate")).toHaveLength(train.map.cars.length);
+    expect(of("lamp")).toHaveLength(train.map.cars.length * 3);
+    for (const rug of of("rug")) {
+      expect(rug.position.y).toBeLessThan(2);
+      expect(rug.castShadow).toBe(false);
+    }
+  });
+
+  it("eases a change of facing instead of snapping", () => {
+    const world = (facing: NonNullable<RenderPlayer["facing"]>): RenderWorld => ({
+      players: [{ id: "a", name: "Ada", position: { x: 0, y: 0 }, facing }],
+      items: [],
+      hazards: [],
+    });
+    const train = build(world({ dx: 1, dy: 0 }));
+    const figure = train.playersGroup.children[0]!;
+    expect(figure.rotation.y).toBe(0);
+
+    train.updateState(world({ dx: 0, dy: 1 }));
+    expect(figure.rotation.y).toBe(0); // not snapped on the state frame
+    train.updateMotion(0.05, 1);
+    expect(figure.rotation.y).toBeLessThan(0);
+    expect(figure.rotation.y).toBeGreaterThan(-Math.PI / 2);
+
+    for (let frame = 0; frame < 60; frame += 1) train.updateMotion(0.1, 1);
+    expect(figure.rotation.y).toBeCloseTo(-Math.PI / 2);
+  });
+});
+
 describe("the action highlight (#295)", () => {
   it("rings the target on the floor and hides it again", () => {
     const train = build({ players: [], items: [], hazards: [] });
@@ -407,5 +486,48 @@ describe("the action highlight (#295)", () => {
 
     train.updateHighlight(null, 0);
     expect(ring?.visible).toBe(false);
+  });
+});
+
+describe("item shadows and held shine (#357)", () => {
+  const shadowOf = (item: Object3D) => item.getObjectByName("itemShadow");
+  const meshes = (root: Object3D): Mesh[] => {
+    const out: Mesh[] = [];
+    root.traverse((child) => { if (child instanceof Mesh && child.name !== "itemShadow") out.push(child); });
+    return out;
+  };
+
+  it("puts a shadow under every loose item, and none under a held one", () => {
+    const train = build();
+    expect(train.itemsGroup.children).toHaveLength(2);
+    for (const item of train.itemsGroup.children) expect(shadowOf(item)).toBeInstanceOf(Mesh);
+    let held: Object3D | undefined;
+    train.playersGroup.traverse((child) => { if (child.userData.kind === "heldItem") held = child; });
+    expect(held && shadowOf(held)).toBeUndefined();
+  });
+
+  it("keeps the shadow on the floor while the item bobs", () => {
+    const train = build();
+    for (const t of [0.1, 0.4, 0.9, 1.7]) {
+      train.updateEffects(t);
+      for (const item of train.itemsGroup.children) {
+        const shadow = shadowOf(item)!;
+        expect(item.position.y + shadow.position.y * item.scale.y).toBeCloseTo(0.5, 5);
+      }
+    }
+  });
+
+  it("makes a held tool glow with its own materials, leaving loose items unchanged", () => {
+    const train = build();
+    let held: Object3D | undefined;
+    train.playersGroup.traverse((child) => { if (child.userData.kind === "heldItem") held = child; });
+    const heldMats = meshes(held!).map((m) => m.material as MeshStandardMaterial);
+    expect(heldMats.length).toBeGreaterThan(0);
+    for (const m of heldMats) expect(m.emissiveIntensity).toBeCloseTo(HELD_SHINE);
+    const looseMats = train.itemsGroup.children.flatMap((item) => meshes(item).map((m) => m.material as MeshStandardMaterial));
+    for (const m of looseMats) {
+      expect(heldMats).not.toContain(m);
+      expect(m.emissive.getHex() === 0 || m.emissiveIntensity !== HELD_SHINE).toBe(true);
+    }
   });
 });

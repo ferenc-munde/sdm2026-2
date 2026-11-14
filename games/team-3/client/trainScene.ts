@@ -20,6 +20,7 @@ import {
   Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
+  PointLight,
   SRGBColorSpace,
   Scene,
   SphereGeometry,
@@ -33,6 +34,8 @@ import type { ActionHighlight } from "./actionHighlight.ts";
 import {
   advanceWalk,
   crewPose,
+  easeAngle,
+  headingFor,
   smoothSpeed,
   speedBetween,
   wheelAngle,
@@ -46,7 +49,7 @@ import { applyCrewPose, buildCrewFigure, HOLD_POINT } from "./crewModel.ts";
 /** The crew are drawn a little larger than their collision circle so they read from the camera. */
 const CREW_SCALE = 1.35;
 import { buildBreachModel, buildFlame, buildItemModel, buildStationModel, FLAME_SCALE } from "./propModels.ts";
-import { PALETTE, mat, ownMat } from "./style.ts";
+import { LIGHTING, PALETTE, mat, ownMat } from "./style.ts";
 import { buildTrainBody, END_WALL_HEIGHT, FAR_WALL_HEIGHT, LOCOMOTIVE_LENGTH, NEAR_WALL_HEIGHT } from "./trainModel.ts";
 
 /** One distinct colour per seat, in the order the players joined. */
@@ -75,6 +78,14 @@ const DOOR_THICKNESS = 2;
 const LABEL_HEIGHT = 70;
 const HAZARD_BAR_HEIGHT = 46;
 const HAZARD_BAR_WIDTH = 44;
+
+/** Fire lights (#356): small, warm and few, so a run with several fires stays fast. */
+const MAX_FIRE_LIGHTS = 3;
+const FIRE_LIGHT_DISTANCE = 120;
+const FIRE_LIGHT_INTENSITY = 2.2;
+const FIRE_LIGHT_HEIGHT = 26;
+/** Breach steam puffs: enough that one is always rising, staggered around the plume. */
+const STEAM_PUFFS = 8;
 
 const FLOOR_COLOR = "#2a2a33";
 const WALL_COLOR = "#71717f";
@@ -281,6 +292,37 @@ export function createNameLabel(name: string): Object3D {
   return sprite;
 }
 
+/** One shared disc for every loose item's floor shadow (#357). */
+const ITEM_SHADOW_GEOMETRY = new CylinderGeometry(9, 9, 0.4, 16);
+/** Height of an item shadow above the floor, so it doesn't flicker into the planks. */
+const ITEM_SHADOW_Y = 0.5;
+/** How much brighter a tool looks while held (#357). */
+export const HELD_SHINE = 0.2;
+
+/** Adds a soft dark disc under a loose item; the bob in updateEffects keeps it on the floor. */
+function withFloorShadow(mesh: Mesh): Mesh {
+  const shadow = new Mesh(ITEM_SHADOW_GEOMETRY, ownMat(0x000000, { opacity: 0.28 }));
+  shadow.name = "itemShadow";
+  shadow.userData = { kind: "itemShadow" };
+  mesh.add(shadow);
+  return mesh;
+}
+
+/**
+ * Makes a held item glow faintly. Item materials are shared (`mat()`), so the held copy gets its
+ * own clones first; loose items and every other object keep their colours.
+ */
+function withShine(mesh: Mesh): Mesh {
+  mesh.traverse((part) => {
+    if (!(part instanceof Mesh) || !(part.material instanceof MeshStandardMaterial)) return;
+    const own = part.material.clone();
+    own.emissive.copy(own.color);
+    own.emissiveIntensity = HELD_SHINE;
+    part.material = own;
+  });
+  return mesh;
+}
+
 function buildItemMesh(item: RenderItem, scale = 1): Mesh {
   const mesh = buildItemModel(item.kind, scale);
   mesh.name = `item-${item.id}`;
@@ -314,7 +356,7 @@ function buildPlayerGroup(
   // A held item is drawn next to its player, not on the floor.
   const held = heldItems.find((item) => item.heldBy === player.id);
   if (held) {
-    const mesh = buildItemMesh(held, 0.7);
+    const mesh = withShine(buildItemMesh(held, 0.7));
     mesh.name = `held-${held.id}`;
     mesh.position.set(HOLD_POINT.x * CREW_SCALE, HOLD_POINT.y * CREW_SCALE, HOLD_POINT.z);
     mesh.userData = { ...mesh.userData, kind: "heldItem", heldBy: player.id, baseY: mesh.position.y };
@@ -322,6 +364,7 @@ function buildPlayerGroup(
   }
 
   placePlayer(group, player);
+  group.rotation.y = headingFor(player.facing); // snap on spawn; later turns ease
   // Walk-cycle state (#294), kept on the group so a rebuilt figure starts fresh.
   group.userData.motion = { lastX: player.position.x, lastZ: player.position.y, speed: 0, phase: 0, seconds: 0 };
   return group;
@@ -346,12 +389,14 @@ function poseFigure(group: Object3D, pose: CrewPose): void {
   }
 }
 
-/** Moves a player figure to its position and turns it to face its walking direction. */
+/**
+ * Moves a player figure to its position and stores the heading it should turn toward. The turn is
+ * eased in `updateMotion` (#355); a newly built figure snaps to it so it never spins on spawn.
+ */
 function placePlayer(group: Object3D, player: RenderPlayer): void {
   group.position.set(player.position.x, 0, player.position.y);
   // Local +x points along `facing`; a player with no direction faces +x, as a newly built one does.
-  const facing = player.facing;
-  group.rotation.y = facing && (facing.dx !== 0 || facing.dy !== 0) ? -Math.atan2(facing.dy, facing.dx) : 0;
+  group.userData.targetHeading = headingFor(player.facing);
 }
 
 function buildHazardGroup(hazard: RenderHazard): Group {
@@ -368,6 +413,15 @@ function buildHazardGroup(hazard: RenderHazard): Group {
     flame.name = "fire";
     flame.userData = { kind: "hazardShape", hazardKind: hazard.kind };
     group.add(flame);
+
+    // A small warm light so the fire lights the floor and walls around it (#356). `updateEffects`
+    // flickers it and keeps only the first few fires lit.
+    const light = new PointLight(PALETTE.fire, FIRE_LIGHT_INTENSITY, FIRE_LIGHT_DISTANCE);
+    light.name = "fireLight";
+    light.position.y = FIRE_LIGHT_HEIGHT;
+    light.castShadow = false;
+    light.userData = { kind: "fireLight" };
+    group.add(light);
   } else if (hazard.kind === "breach") {
     const mark = buildBreachModel();
     mark.name = "breach";
@@ -381,16 +435,21 @@ function buildHazardGroup(hazard: RenderHazard): Group {
     group.add(mark);
   }
 
-  // Steam puffs on a breach (#217), animated by `updateEffects`.
+  // Steam puffs on a breach (#217), animated by `updateEffects`. A fuller plume (#356): twice the
+  // puffs, staggered so one is always rising, each drifting a little to the side as it climbs.
   if (hazard.kind === "breach") {
-    for (let index = 0; index < 4; index += 1) {
-      const puff = new Mesh(
-        new SphereGeometry(5, 8, 6),
-        new MeshStandardMaterial({ color: 0xd7e2f0, transparent: true, opacity: 0.5, depthWrite: false }),
-      );
+    const puffGeometry = new SphereGeometry(5, 8, 6);
+    for (let index = 0; index < STEAM_PUFFS; index += 1) {
+      const puff = new Mesh(puffGeometry, ownMat(PALETTE.steam, { opacity: 0.5 }));
       puff.name = "steam";
       puff.position.y = 4;
-      puff.userData = { kind: "steam", phase: index / 4 };
+      const angle = (index / STEAM_PUFFS) * Math.PI * 2;
+      puff.userData = {
+        kind: "steam",
+        phase: index / STEAM_PUFFS,
+        driftX: Math.cos(angle) * 16,
+        driftZ: Math.sin(angle) * 10,
+      };
       group.add(puff);
     }
   }
@@ -527,10 +586,10 @@ export function buildTrainScene(
 
   // Evening light: a cool sky above, warm bounce from the ground, and a low warm sun that casts
   // shadows so the crew, props and walls sit on the floor instead of floating.
-  scene.add(new AmbientLight(0xffffff, 0.35));
-  scene.add(new HemisphereLight("#9fb6e0", "#4a3a26", 1.1));
-  const sun = new DirectionalLight("#ffe2b8", 2.6);
-  sun.position.set(mapCentreX(map) - 500, 900, 600);
+  scene.add(new AmbientLight(0xffffff, LIGHTING.ambient));
+  scene.add(new HemisphereLight(LIGHTING.skyColor, LIGHTING.groundColor, LIGHTING.hemisphere));
+  const sun = new DirectionalLight(LIGHTING.sunColor, LIGHTING.sunIntensity);
+  sun.position.set(mapCentreX(map) + LIGHTING.sunOffset.x, LIGHTING.sunOffset.y, LIGHTING.sunOffset.z);
   sun.target.position.set(mapCentreX(map) - (LOCOMOTIVE_LENGTH + 50) / 2, 0, 0);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -623,7 +682,7 @@ export function buildTrainScene(
         .map((item) => ({
           id: item.id,
           key: item.kind,
-          build: () => buildItemMesh(item),
+          build: () => withFloorShadow(buildItemMesh(item)),
           place: (mesh: Mesh) => {
             mesh.position.set(item.position.x, 10, item.position.y);
           },
@@ -663,15 +722,31 @@ export function buildTrainScene(
     for (const item of itemsGroup.children) {
       item.position.y = 10 + Math.sin(seconds * 3 + item.id) * 1.5;
       item.rotation.y = seconds * 0.8 + item.id;
+      // The shadow stays on the floor while the item bobs (#357).
+      const shadow = item.getObjectByName("itemShadow");
+      if (shadow) shadow.position.y = (ITEM_SHADOW_Y - item.position.y) / (item.scale.y || 1);
     }
 
     // The firebox glows in time with the engine.
     const glow = mapGroup.getObjectByName("fireboxGlow");
     if (glow instanceof Mesh) (glow.material as MeshStandardMaterial).emissiveIntensity = 1.2 + 0.5 * Math.sin(seconds * 7);
 
+    let fireLights = 0;
     for (const group of hazardsGroup.children) {
       const kind = group.userData.hazardKind;
       if (kind === "fire") {
+        // The fire's own light (#356): it flickers with the flame, and only the first few fires
+        // get one, so a run with many fires stays fast.
+        const light = group.children.find((child) => child.name === "fireLight");
+        if (light instanceof PointLight) {
+          const lit = fireLights < MAX_FIRE_LIGHTS;
+          light.visible = lit;
+          if (lit) {
+            fireLights += 1;
+            light.intensity = FIRE_LIGHT_INTENSITY * (0.85 + 0.15 * Math.sin(seconds * 13 + group.id));
+          }
+        }
+
         const flame = group.children.find((child) => child.name === "fire");
         if (flame instanceof Mesh) {
           for (const lick of flame.children) {
@@ -692,6 +767,9 @@ export function buildTrainScene(
           const phase = Number(puff.userData.phase) || 0;
           const rise = (seconds * 0.6 + phase) % 1;
           puff.position.y = 4 + rise * 40;
+          // A slight sideways drift, so the plume bends as it rises instead of standing still.
+          puff.position.x = (Number(puff.userData.driftX) || 0) * rise;
+          puff.position.z = (Number(puff.userData.driftZ) || 0) * rise;
           puff.scale.setScalar(0.7 + rise * 1.1);
           const material = puff.material;
           if (material instanceof MeshStandardMaterial) material.opacity = 0.55 * (1 - rise);
@@ -714,6 +792,11 @@ export function buildTrainScene(
       motion.lastZ = group.position.z;
       motion.phase = advanceWalk(motion.phase, motion.speed, dt);
       if (Number.isFinite(dt) && dt > 0) motion.seconds += dt;
+
+      // Turn toward the latest facing the short way round (#355).
+      const targetHeading =
+        typeof group.userData.targetHeading === "number" ? group.userData.targetHeading : group.rotation.y;
+      group.rotation.y = easeAngle(group.rotation.y, targetHeading, dt);
 
       const carrying = group.children.some((child) => child.userData.kind === "heldItem");
       const interacting = interactingPlayerId !== undefined && interactingPlayerId === group.userData.playerId;

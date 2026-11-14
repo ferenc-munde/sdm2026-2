@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { COURSE_IMPULSE_SPEED } from "../constants.ts";
 import { applyCourseFailure, courseImpulseDirection, startCourse, stepCourses } from "./course.ts";
 import { makeState } from "../run/testState.ts";
 import type { Station } from "../types.ts";
@@ -12,7 +13,7 @@ describe("course warning", () => {
     state.items.held = { id: "held", kind: "wrench", position: { x: 0, y: 0 }, heldBy: "p1", velocity: { x: 0, y: 0 } };
     state.players.p1!.heldItem = "held";
     const next = stepCourses(state, {}, 5, console);
-    expect(Math.abs(next.players.p1!.velocity!.y)).toBe(450);
+    expect(Math.abs(next.players.p1!.velocity!.y)).toBe(COURSE_IMPULSE_SPEED);
     expect(next.players.p1!.velocity!.x).toBe(0);
     expect(next.items.loose!.velocity).toEqual(next.players.p1!.velocity);
     expect(next.items.held!.velocity).toEqual({ x: 0, y: 0 });

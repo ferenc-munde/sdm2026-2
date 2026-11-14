@@ -63,6 +63,35 @@ export function mountTrainScene(
   const sharedPlayerGeometries = new Set<THREE.BufferGeometry>([playerGeometry, headGeometry, facingGeometry]);
   const playerMeshes = new Map<string, THREE.Group>();
   const movingPlayers = new Set<string>();
+  const itemMeshes = new Map<string, THREE.Mesh>();
+
+  function updateLabel(group: THREE.Group, text: string): void {
+    if (group.userData.labelText === text) return;
+    group.userData.labelText = text;
+    const old = group.getObjectByName("player-label") as THREE.Sprite | undefined;
+    if (old) {
+      group.remove(old);
+      old.material.map?.dispose();
+      old.material.dispose();
+    }
+    const canvas = window.document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 128;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    context.fillStyle = "rgba(10, 20, 25, 0.85)";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "#fff";
+    context.font = "bold 38px sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(text, 256, 64, 490);
+    const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false }));
+    label.name = "player-label";
+    label.position.set(0, 2.15, 0);
+    label.scale.set(3.2, 0.8, 1);
+    group.add(label);
+  }
 
   function createPlayer(color: string): THREE.Group {
     const group = new THREE.Group();
@@ -88,6 +117,10 @@ export function mountTrainScene(
     const geometries = new Set<THREE.BufferGeometry>();
     const materials = new Set<THREE.Material>();
     group.traverse((object) => {
+      if (object instanceof THREE.Sprite) {
+        object.material.map?.dispose();
+        object.material.dispose();
+      }
       if (!(object instanceof THREE.Mesh)) return;
       if (!sharedPlayerGeometries.has(object.geometry)) geometries.add(object.geometry);
       const objectMaterials = Array.isArray(object.material) ? object.material : [object.material];
@@ -167,6 +200,7 @@ export function mountTrainScene(
           group.userData.targetPosition = new THREE.Vector3(targetX, 0, targetZ);
         }
         group.visible = true;
+        updateLabel(group, player.signal ? `${player.name} · ${player.signal}` : player.name);
         if (player.isMoving) movingPlayers.add(player.id);
         else movingPlayers.delete(player.id);
         const facing = group.children[3];
@@ -179,6 +213,26 @@ export function mountTrainScene(
         material.transparent = !player.connected;
         material.opacity = player.connected ? 1 : 0.38;
       }
+      const items = snapshot.previewMechanics?.items ?? [];
+      const itemIds = new Set(items.map((item) => item.id));
+      for (const [id, mesh] of itemMeshes) {
+        if (itemIds.has(id)) continue;
+        trainRoot.remove(mesh);
+        mesh.geometry.dispose();
+        (mesh.material as THREE.Material).dispose();
+        itemMeshes.delete(id);
+      }
+      for (const item of items) {
+        let mesh = itemMeshes.get(item.id);
+        if (!mesh) {
+          mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.25), new THREE.MeshStandardMaterial({ color: "#f6d773", emissive: "#68520a" }));
+          mesh.name = `item-${item.id}`;
+          itemMeshes.set(item.id, mesh);
+          trainRoot.add(mesh);
+        }
+        mesh.position.set(-TRAIN_LAYOUT.length / 2 + PLAYER_INSET.length + item.x * (TRAIN_LAYOUT.length - PLAYER_INSET.length * 2), 0.4,
+          -TRAIN_LAYOUT.width / 2 + PLAYER_INSET.width + item.z * (TRAIN_LAYOUT.width - PLAYER_INSET.width * 2));
+      }
       renderer.render(scene, camera);
     },
     dispose() {
@@ -190,6 +244,7 @@ export function mountTrainScene(
       }
       playerMeshes.clear();
       movingPlayers.clear();
+      itemMeshes.clear();
 
       const geometries = new Set<THREE.BufferGeometry>();
       const materials = new Set<THREE.Material>();

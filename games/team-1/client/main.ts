@@ -336,6 +336,9 @@ function openGameplay(state: GameStateAdapter): void {
     roomCode,
     onExit: returnToCrew,
     onPreviewAction: applyPreviewAction,
+    onRemoveItem: (id) => {
+      if (localPlayer instanceof PlayerPreviewController) localPlayer.removeItem(id);
+    },
     live: Boolean(live),
 
     // Brake calibration actions are sent to the authoritative room.
@@ -394,6 +397,10 @@ function applyPreviewAction(action: PreviewAction): void {
 
   if (action === "reset") {
     gameplayAdapter.publish(createPreviewSnapshot(crew));
+    if (localPlayer instanceof PlayerPreviewController && crew.some((player) => player.id === ownId)) {
+      localPlayer.dispose();
+      localPlayer = new PlayerPreviewController(ownId, gameplayAdapter);
+    }
   } else if (action === "advance-time") {
     gameplayAdapter.publish({
       ...state,
