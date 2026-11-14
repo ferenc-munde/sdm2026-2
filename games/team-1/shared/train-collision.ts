@@ -27,6 +27,9 @@ for (const x of [9.05, 11.75]) {
   box(x, 3.25, 0.625, 0.85);
 }
 box(10.4, 0, 0.42, 0.42);
+for (const [x, z] of [[-10.4, 1.05], [-5.2, 1.15], [0, -1.45], [5.2, 1.05], [10.4, -1.45]]) {
+  box(x, z, 1.21, 0.71);
+}
 
 /** Coordinates are world units measured from the front/north edge of the walkable area. */
 export function isTrainWalkable(x: number, z: number): boolean {

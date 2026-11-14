@@ -397,6 +397,10 @@ function applyPreviewAction(action: PreviewAction): void {
 
   if (action === "reset") {
     gameplayAdapter.publish(createPreviewSnapshot(crew));
+    if (localPlayer instanceof PlayerPreviewController && crew.some((player) => player.id === ownId)) {
+      localPlayer.dispose();
+      localPlayer = new PlayerPreviewController(ownId, gameplayAdapter);
+    }
   } else if (action === "advance-time") {
     gameplayAdapter.publish({
       ...state,
