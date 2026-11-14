@@ -31,6 +31,10 @@ export const PALETTE = {
   hill: "#2c3f2a",
   grassDark: "#36502a",
   fence: "#6b5038",
+  flowerWhite: "#f1ece0",
+  flowerYellow: "#f2c94c",
+  flowerPink: "#e58fa8",
+  milepost: "#e9e4d8",
   sky: "#2a3550",
   fog: "#3a4560",
   // Props
@@ -58,6 +62,10 @@ export const LIGHTING = {
   sunIntensity: 3.1,
   /** Sun offset from the scene centre: low and to the side, so shadows stretch across the floor. */
   sunOffset: { x: -650, y: 720, z: 560 },
+  /** One soft warm light per carriage, under its far-wall lamps: no shadows, short reach. */
+  carLamp: { color: "#ffcf8a", intensity: 2600, distance: 330, height: 46 },
+  /** The locomotive's headlamp glow, just in front of the lamp. */
+  headlamp: { color: "#ffd99a", intensity: 3500, distance: 260 },
 } as const;
 
 const cache = new Map<string, MeshStandardMaterial>();
