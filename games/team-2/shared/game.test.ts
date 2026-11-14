@@ -84,21 +84,23 @@ describe("lastTrain game definition", () => {
 		expect(state.items.get("i1")?.y).toBeCloseTo(-2);
 	});
 
-	it("step applies progress inputs and leaves the tick to the room", () => {
+	it("progress clamps per input, then completes and erases at the target", () => {
 		const game = createLastTrain();
 		const state = game.createState(config);
 		const ctx = newCtx();
 		game.init(state, ctx);
 		const task = new Task();
 		task.title = "Secure loose cargo crates";
-		task.target = 2;
+		task.target = 4;
 		state.tasks.set("secure_cargo", task);
 
-		game.step(state, [ev("s1", { type: "progress", taskId: "secure_cargo", amount: 4 })], ctx);
-		game.step(state, [ev("s1", { type: "progress", taskId: "secure_cargo", amount: 1 })], ctx);
-
-		expect(state.tick).toBe(0);
+		game.step(state, [ev("s1", { type: "progress", taskId: "secure_cargo", amount: 2 })], ctx);
 		expect(state.tasks.get("secure_cargo")?.current).toBe(2);
+
+		game.step(state, [ev("s1", { type: "progress", taskId: "secure_cargo", amount: 99 })], ctx);
+		expect(state.tasks.has("secure_cargo")).toBe(false);
+		expect(state.completedCount).toBe(1);
+		expect(state.tick).toBe(0);
 	});
 
 	it("routes pickup and drop inputs to the items module", () => {

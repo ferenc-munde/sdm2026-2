@@ -11,12 +11,15 @@ describe("local adapter to map/HUD integration", () => {
     const task = new Task(); task.title = "Repair panel"; task.current = 1; task.target = 2;
     s.tasks.set("panel", task);
     const view = localStateToHud(s, 20);
-    expect(view.tasks).toEqual([{ id: "panel", title: "Repair panel", current: 1, target: 2 }]);
+    // The director's initial wave is present alongside the seeded task.
+    expect(view.tasks.length).toBeGreaterThanOrEqual(2);
+    const panelRow = view.tasks.find(row => row.id === "panel")!;
+    expect(panelRow).toEqual({ id: "panel", title: "Repair panel", current: 1, target: 2, type: "POWER" });
     expect(view.gauges).toEqual({ power: 42, pressure: 76 });
     expect(view.journey.remainingSeconds).toBe(298);
     expect(view.speed).toBe(0.7);
     expect(view.journey.speed).toBe(0.7);
-    view.tasks[0]!.current = 2;
+    panelRow.current = 2;
     expect(s.tasks.get("panel")!.current).toBe(1);
     expect(s.tick).toBe(140);
   });

@@ -211,6 +211,7 @@ export class Task extends Schema {
 	@type("uint8") target: number = 1;
 	@type("string") type: string = "POWER";
 	@type("string") minigame: string = "wires"; // wires | valves | slider | hold | keypad | taps
+	@type("string") stationId: string = ""; // station in client/train-map.ts the minigame opens at
 	@type("uint8") stepCount: number = 1;
 	@type("uint8") stepIndex: number = 0;
 }
@@ -245,6 +246,7 @@ export class LastTrainState extends BaseState {
 	@type("float32") power: number = 100;
 	@type("float32") pressure: number = 0;
 	@type("boolean") endgameUnlocked: boolean = false;
+	@type("uint16") completedCount: number = 0; // tasks erased by the director, ever
 	@type({ map: Player }) players = new MapSchema<Player>();
 	@type({ map: Task }) tasks = new MapSchema<Task>();
 	@type({ map: Hazard }) hazards = new MapSchema<Hazard>();
@@ -447,6 +449,26 @@ export class TaskDirector {
 	//   erase task, completedCount++ (schema sync is automatic)
 }
 ```
+
+### Minigames, station interaction and ambient audio (landed with #65/#76)
+
+- `client/minigames/` — one module per minigame, registered by id in
+  `client/minigames/registry.ts`; `shared/tasks.ts` catalog ids and the
+  registry are kept in lockstep by a shared test.
+- Each task spawns at a `stationId` (a `client/train-map.ts` station). The
+  client shows an `E — <task>` prompt when the local player is within range;
+  E opens the modal, `Esc`/close sends nothing — an unfinished minigame never
+  counts (issue #76 rule).
+- A finished minigame sends exactly one `progress` input per step; the
+  director clamps 1–4, erases the task at `target` and bumps
+  `completedCount`. New tasks ping (toast + beep) on schema add.
+- `client/audio.ts` — placeholder ambient loops synthesized per type
+  (POWER/PRESSURE/FIRE/NAVIGATION/CARGO + hazard aliases); real recordings
+  swap in via the `KINDS[kind].asset` slot without touching callers.
+- Finding work is visual: every station holding an active task pulses a
+  type-coloured light column and floor ring (`scene.ts` `setTaskMarkers`,
+  colours from `train-map.ts` `TASK_TYPE_COLORS`), and each HUD task row
+  carries a chip in the same colour.
 
 ### DOM task checklist (client, keyed rows — no rebuild race)
 
