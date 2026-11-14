@@ -164,22 +164,18 @@
 	font-weight: 700;
 	white-space: nowrap;
 }
-#last-train-lobby-root .lobby-countdown {
-	display: flex;
-	align-items: center;
-	gap: 14px;
-	margin-bottom: 17px;
-	padding: 13px 16px;
+#last-train-lobby-root .lobby-start-condition {
+	display: grid;
+	gap: 5px;
+	margin-bottom: 16px;
+	padding: 12px 14px;
 	border: 1px solid #66573a;
 	border-radius: 10px;
 	background: linear-gradient(90deg, #40351f, #211e17);
 	color: #f4d17a;
 }
-#last-train-lobby-root .countdown-icon { font-size: 32px; line-height: 1; }
-#last-train-lobby-root .lobby-countdown small,
-#last-train-lobby-root .lobby-countdown strong { display: block; }
-#last-train-lobby-root .lobby-countdown small { color: #c5b487; font-size: 9px; letter-spacing: .16em; }
-#last-train-lobby-root .lobby-countdown strong { margin-top: 2px; font-size: 25px; letter-spacing: .08em; }
+#last-train-lobby-root .lobby-start-condition strong { font-size: 15px; }
+#last-train-lobby-root .lobby-start-condition small { color: #c5b487; font: 11px/1.45 system-ui, sans-serif; }
 #last-train-lobby-root .lobby-slots { display: grid; gap: 9px; }
 #last-train-lobby-root .lobby-slot {
 	display: flex;

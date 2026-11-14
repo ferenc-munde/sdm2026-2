@@ -10,10 +10,12 @@ The game has two modes (see [README.md](README.md)), and the player classes play
 
 | Mode | Who moves the player | What uses the classes here |
 |---|---|---|
-| **Live** (default): the game is a room on the platform | The **server**. `shared/game.ts` applies movement every tick from `move` inputs, at `playerSpeed` from `config/game.json`. | Only `InputHandler`: `client/room-input-controller.ts` reads the keys and sends `move` and `repair` inputs. It never moves the player itself. |
+| **Live** (default): the game is a room on the platform | The **server**. `shared/game.ts` applies movement every tick from `move` inputs, at `playerSpeed` from `config/game.json`. | `InputHandler` and `client/room-input-controller.ts` send movement, repair and signal inputs. They never move the player locally. |
 | **Mock** (`?mock` in the address): everything in the page | The **client**. `client/player-preview-controller.ts` creates one `Player`, updates it every frame and publishes its position into the mock snapshot. | The whole `Player` with `Movement`, `Collision`, `Animator`, `Inventory` and `InteractionSystem`. |
 
-So in live play the position on screen comes from the synced room state, not from `Player`. Collision, inventory and interactions as described below exist on the client only; none of them is a server rule yet. Moving them into `shared/` is listed in [NEXT_STEPS.md](NEXT_STEPS.md).
+In live play positions and signals come from synced room state. Both modes use `shared/train-collision.ts` for train boundaries, partitions and major equipment. Inventory and item pickups are local to the mock preview; live repairs remain section-based server rules.
+
+Controls: WASD or arrows move, E interacts, and 1/2/3 toggle Ready/Help!/On my way above the player. In mock mode, approach the gold items and press E to collect them; use the inventory's Remove button to discard one. Repair stations can also be interacted with in the mock, with local-only progress.
 
 The live room adapter derives facing from the synchronized movement vector and walking from changes in the authoritative position. It keeps the last observed facing while idle, including when movement is blocked. Facing is tracked locally: a player already idle when a client joins initially faces down until that client observes a direction.
 
@@ -189,42 +191,40 @@ interface CollisionMap {
 
 ### Train environment
 
-The collision map is the link to the train layout. Today the only map is `PreviewCollisionMap` in `client/player-preview-controller.ts`: a 20 × 10 grid whose border is the only obstacle. The real layout (five sections, partitions with doorways) is in `client/environment/TrainEnvironment.ts` and `shared/train-layout.ts`, and nothing turns it into a `CollisionMap` yet. In live mode the server keeps players inside the outer rectangle only.
+The collision map is the link to the train layout. `PreviewCollisionMap` delegates to the same world-space collision rules used by the server. The collision rectangles approximate the partitions, doorways and major furniture in `client/environment/TrainEnvironment.ts`; update both when the layout changes.
 
 ### Tasks and repairs
 
-In live mode a repair is a server rule: **E** sends a `repair` input and `shared/game.ts` advances the open task in the section the player stands in. The `InteractionSystem` is not part of that path. It is the place to hook client-side reactions (prompts, highlights, opening a repair mini-game) once targets are registered for the repair spots.
+In live mode a repair is a server rule: **E** sends a `repair` input and `shared/game.ts` advances the open task in the section the player stands in. In mock mode the interaction system checks distance to registered stations and items and displays the nearest prompt.
 
 ### Multiplayer
 
-The synced state is `TrainState` in `shared/game.ts`; a player there has `name`, `seat`, `color`, `connected`, normalized `x` and `z`, and the walking direction. `Player.getState()` (`id`, `x`, `y`, `direction`, `isMoving`, `inventory`) is a client-side shape and is not sent anywhere. See [PLATFORM.md](PLATFORM.md) for the inputs and the adapters.
+The synced state is `TrainState` in `shared/game.ts`; a player there has `name`, `seat`, `color`, `connected`, normalized `x` and `z`, movement input and signal. `Player.getState()` (`id`, `x`, `y`, `direction`, `isMoving`, `inventory`) is a client-side shape and is not sent anywhere. See [PLATFORM.md](PLATFORM.md) for the inputs and the adapters.
 
 ## Configuration
 
 `config/game.json` holds the server's tuning values; for the player that is `playerSpeed` (world units per second, the train is 26 units long), used by the server in live mode.
 
-The `Player` class takes its own options in its constructor. The mock preview passes fixed values: `speed: 5`, `maxInventorySlots: 8`, `interactionRange: 2`.
+The `Player` class takes its own options in its constructor. The mock preview passes fixed values: `speed: 5`, `maxInventorySlots: 8`, `interactionRange: 1.5`.
 
 ## Known gaps
 
-- `InteractionSystem.attemptInteraction()` returns `false` when called without a position, and the E-key handler calls it that way, so pressing E in mock mode does nothing. `Player.interact()` is not called from anywhere, and no targets are registered.
-- `Inventory.addItem()` works out how much does not fit in a stack and then drops that amount instead of returning it.
-- Inventory and the animator have no effect on the game yet: nothing can be picked up and no sprite is drawn.
-- Collision is client-only and only against the preview grid's border (see above).
+- Live repair range is the whole section, not proximity to the visible station; the brake puzzle uses its existing dedicated controls.
+- Items and inventory are mock-only, not synchronized or persisted between players; removing an item discards it rather than dropping it back into the world.
+- Collision uses hand-maintained rectangular approximations rather than every decorative mesh, and does not block other players.
+- The scene animates simple 3D figures rather than drawing the animator's sprite frames.
+- Mock station repairs are a simple progress preview, not the live brake puzzle or authoritative game rules.
 
 ## Future work
 
-- [ ] Build a `CollisionMap` from the train layout and apply the same walls on the server
-- [ ] Register interaction targets for the repair spots and show a prompt when one is in range
 - [ ] Sprite sheets and animated players, or animated 3D figures
 - [ ] Items in the world: pick up, carry, drop, as server rules
 - [ ] Sound for movement and interactions
-- [ ] Interpolation between server updates
 - [ ] Sprint, stamina, equipment: only if the game design asks for them
 
 ## Testing
 
-The classes can be tested without a network or a browser window:
+The classes can be tested with a browser-like window and without a network:
 
 ```ts
 const player = new Player("test", 5, 5, mockCollisionMap, config);

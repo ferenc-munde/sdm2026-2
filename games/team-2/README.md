@@ -35,9 +35,9 @@ pnpm run preview     # serve the client build
 Open two browser tabs at `http://127.0.0.1:5173/`. In the first tab, enter a
 name, choose a crew size, and select **Create Room**. Share the displayed room
 code with the other players; they enter their names and that code, then select
-**Join Room**. Rooms support up to four players. The host can skip the
-30-second lobby countdown and depart with the current crew, including one
-player. When the timer expires, the game starts with whoever joined.
+**Join Room**. Rooms support up to four players. The lobby waits without a
+timer, shows the joined-player count, and starts automatically when the chosen
+crew size is reached. The host can start early with the players already there.
 
 After departure every player sits in the **same game room on the server**:
 the lobby host's browser creates it and the others join it by its code. Each

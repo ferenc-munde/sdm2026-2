@@ -132,8 +132,13 @@ describe("the gateway itself", () => {
     const gateway = await startGateway({ "team-1": one.url }, ["team-4"]);
     expect(await (await fetch(`${gateway.url}/health`)).json()).toEqual({ ok: true });
     const index = await (await fetch(gateway.url)).text();
-    expect(index).toContain('<a href="/team-1/">team-1</a>');
-    expect(index).toContain("team-4 <em>(not released yet)</em>");
+    expect(index).toContain("<title>SDM Game Network - Choose Your Departure</title>");
+    expect(index).toContain('<a class="route-card" href="/team-1/"');
+    expect(index).toContain("TEAM 01");
+    expect(index).toContain("COMING SOON");
+    expect(index).toContain("Team 4");
+    expect(index).toContain('aria-label="Team 4, coming soon"');
+    expect(index).not.toContain('href="/team-4/"');
   });
 
   it("redirects /<game> to /<game>/ and answers 404 for anything else", async () => {

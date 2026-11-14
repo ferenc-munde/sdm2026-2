@@ -24,27 +24,21 @@ export class Inventory {
    * Add an item to inventory
    */
   addItem(item: InventoryItem): boolean {
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0) return false;
     const existing = this.items.get(item.id);
 
     if (existing) {
       // Item already exists, try to stack
       const maxStack = existing.maxStack || 1;
-      if (existing.quantity < maxStack) {
+      if (existing.quantity + item.quantity <= maxStack) {
         existing.quantity += item.quantity;
-        if (existing.quantity > maxStack) {
-          // Overflow
-          const overflow = existing.quantity - maxStack;
-          existing.quantity = maxStack;
-          // Return overflow amount (would need to be handled by caller)
-          return false;
-        }
         return true;
       }
       return false;
     }
 
     // New item
-    if (this.slotsUsed >= this.maxSlots) {
+    if (this.slotsUsed >= this.maxSlots || item.quantity > (item.maxStack || 1)) {
       return false; // Inventory full
     }
 
@@ -58,7 +52,7 @@ export class Inventory {
    */
   removeItem(itemId: string, quantity: number = 1): boolean {
     const item = this.items.get(itemId);
-    if (!item) return false;
+    if (!item || !Number.isInteger(quantity) || quantity <= 0 || quantity > item.quantity) return false;
 
     item.quantity -= quantity;
     if (item.quantity <= 0) {

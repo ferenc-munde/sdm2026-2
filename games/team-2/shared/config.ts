@@ -14,6 +14,11 @@ export const gameConfigSchema = RoomSettingsSchema.extend({
 	/** Walking and running speed in map units per second (see shared/map.ts). */
 	walkSpeed: z.number().positive().max(1000).default(120),
 	runSpeed: z.number().positive().max(1000).default(200),
+	/** Journey tuning: speed is a fraction of the full route per second. */
+	cruiseTravelSeconds: z.number().positive().max(1200).default(200),
+	taskSpeedDrag: z.number().min(0).max(0.5).default(0.2),
+	hazardSpeedDrag: z.number().min(0).max(0.5).default(0.08),
+	maxSpeedDrag: z.number().min(0).max(0.95).default(0.85),
 })
 	.passthrough()
 	.refine(

@@ -3,6 +3,16 @@
 import { carBounds, PASSAGE_WIDTH, PASSAGE_X } from "../shared/map.ts";
 export { CAR_HEIGHT, CAR_SPACING, CAR_START_Y, CAR_WIDTH, CAR_X } from "../shared/map.ts";
 
+/** Beacon colour per task type: scene light columns and HUD chips share it. */
+export const TASK_TYPE_COLORS: Record<string, string> = {
+  POWER: "#e4b552",
+  PRESSURE: "#62cdd3",
+  FIRE: "#e46c63",
+  NAVIGATION: "#6f9bea",
+  CARGO: "#cc8c45",
+};
+export const taskColor = (type: string): string => TASK_TYPE_COLORS[type] ?? "#fff1ca";
+
 export interface MapStation {
   id: string;
   label: string;

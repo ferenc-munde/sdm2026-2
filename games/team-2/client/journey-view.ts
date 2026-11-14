@@ -10,7 +10,7 @@ export function journeyView(values: HudJourney) {
   const required = total > 0 ? 1 - remaining / total : 0;
   return {
     distance,
-    urgent: values.phase === "running" && remaining <= 120,
+    urgent: values.phase === "running" && remaining <= 90,
     distanceText: `${(distance * 100).toFixed(1)}% travelled · ${((1 - distance) * 100).toFixed(1)}% left`,
     timeText: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`,
     // SPEC: normalized route distance advances by speed * dt; no invented km/h.

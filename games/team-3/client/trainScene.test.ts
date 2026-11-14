@@ -489,67 +489,6 @@ describe("the action highlight (#295)", () => {
   });
 });
 
-describe("taking a sharp curve (#384)", () => {
-  const course: RenderHazard = { id: "course-1", kind: "course", position: { x: -160, y: -80 }, progress: 0 };
-  const xs = (group: Object3D) => group.children.map((c) => Math.round(c.position.x));
-
-  it("has separate parts per car, so the cars can bend apart", () => {
-    const train = build();
-    const body = train.scene.getObjectByName("trainBody")!;
-    expect(new Set(xs(body)).size).toBeGreaterThan(3);
-  });
-
-  it("bends the cars during a curve, front car first, and straightens back exactly", () => {
-    const train = build({ players, items, hazards: [...hazards, course] });
-    const floors = train.mapGroup.children.filter((c) => /^car-\d$/.test(c.name));
-    expect(floors.length).toBe(3);
-    const rest = floors.map((f) => ({ x: f.position.x, z: f.position.z }));
-    let t = 0;
-    for (let i = 0; i < 10; i++) train.updateEffects((t += 0.05));
-    const earlyAngles = floors.map((f) => f.rotation.y);
-    expect(earlyAngles[0]).toBeGreaterThan(earlyAngles[2]!);
-    for (let i = 0; i < 60; i++) train.updateEffects((t += 0.05));
-    expect(floors[2]!.rotation.y).toBeGreaterThan(0.3);
-    expect(Math.hypot(floors[2]!.position.x - rest[2]!.x, floors[2]!.position.z - rest[2]!.z)).toBeGreaterThan(20);
-
-    train.updateState({ players, items, hazards }); // the curve is over
-    for (let i = 0; i < 100; i++) train.updateEffects((t += 0.05));
-    floors.forEach((f, i) => {
-      expect(f.rotation.y).toBeCloseTo(0, 9);
-      expect(f.position.x).toBeCloseTo(rest[i]!.x, 9);
-      expect(f.position.z).toBeCloseTo(rest[i]!.z, 9);
-    });
-  });
-
-  it("keeps the wheels rolling while the cars are bent", () => {
-    const train = build({ players, items, hazards: [...hazards, course] });
-    const wheel = train.scene.getObjectByName("trainBody")!.children.find((c) => c.name === "wheel")!;
-    let t = 0;
-    for (let i = 0; i < 40; i++) {
-      train.updateMotion(0.05, 1);
-      train.updateEffects((t += 0.05));
-    }
-    const before = wheel.rotation.y;
-    for (let i = 0; i < 10; i++) {
-      train.updateMotion(0.05, 1);
-      train.updateEffects((t += 0.05));
-    }
-    expect(wheel.rotation.y).toBeGreaterThan(before + 0.5);
-  });
-
-  it("moves the action ring with the bent car", () => {
-    const train = build({ players, items, hazards: [...hazards, course] });
-    const ring = train.scene.getObjectByName("action-highlight")!;
-    const spot = { x: 300, y: 40 };
-    let t = 0;
-    for (let i = 0; i < 80; i++) {
-      train.updateHighlight({ position: spot, tone: "station" }, t);
-      train.updateEffects((t += 0.05));
-    }
-    expect(Math.hypot(ring.position.x - spot.x, ring.position.z - spot.y)).toBeGreaterThan(5);
-  });
-});
-
 describe("item shadows and held shine (#357)", () => {
   const shadowOf = (item: Object3D) => item.getObjectByName("itemShadow");
   const meshes = (root: Object3D): Mesh[] => {

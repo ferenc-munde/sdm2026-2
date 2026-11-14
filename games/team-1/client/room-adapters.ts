@@ -89,6 +89,7 @@ export function toSnapshot(state: TrainState | undefined, connectionState: Conne
       connected: player.connected,
       position: { x: player.x, z: player.z },
       color: player.color,
+      ...(player.signal && { signal: player.signal }),
       section: sectionAt(player.x),
       seat: player.seat,
     });
