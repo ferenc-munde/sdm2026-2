@@ -15,6 +15,8 @@ The game has two modes (see [README.md](README.md)), and the player classes play
 
 So in live play the position on screen comes from the synced room state, not from `Player`. Collision, inventory and interactions as described below exist on the client only; none of them is a server rule yet. Moving them into `shared/` is listed in [NEXT_STEPS.md](NEXT_STEPS.md).
 
+The live room adapter derives facing from the synchronized movement vector and walking from changes in the authoritative position. It keeps the last observed facing while idle, including when movement is blocked. Facing is tracked locally: a player already idle when a client joins initially faces down until that client observes a direction.
+
 ## Files
 
 ```

@@ -56,8 +56,10 @@ export function mountTrainScene(
 
   const playerGeometry = new THREE.CylinderGeometry(0.28, 0.34, 0.9, 12);
   const headGeometry = new THREE.SphereGeometry(0.25, 14, 10);
-  const sharedPlayerGeometries = new Set<THREE.BufferGeometry>([playerGeometry, headGeometry]);
+  const facingGeometry = new THREE.SphereGeometry(0.11, 10, 8);
+  const sharedPlayerGeometries = new Set<THREE.BufferGeometry>([playerGeometry, headGeometry, facingGeometry]);
   const playerMeshes = new Map<string, THREE.Group>();
+  const movingPlayers = new Set<string>();
 
   function createPlayer(color: string): THREE.Group {
     const group = new THREE.Group();
@@ -73,7 +75,9 @@ export function mountTrainScene(
     );
     marker.rotation.x = -Math.PI / 2;
     marker.position.y = 0.04;
-    group.add(body, head, marker);
+    const facing = new THREE.Mesh(facingGeometry, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    facing.position.set(0, 1.38, 0.2);
+    group.add(body, head, marker, facing);
     return group;
   }
 
@@ -116,9 +120,13 @@ export function mountTrainScene(
     lastFrameAt = now;
     const smoothing = 1 - Math.exp(-14 * elapsedSeconds);
     advanceTrainMotion(railway, trainRoot, elapsedSeconds);
-    for (const group of playerMeshes.values()) {
+    for (const [id, group] of playerMeshes) {
       const target = group.userData.targetPosition as THREE.Vector3 | undefined;
       if (target) group.position.lerp(target, smoothing);
+      const bounce = movingPlayers.has(id) ? Math.abs(Math.sin(now / 120)) * 0.12 : 0;
+      group.children[0].position.y = 0.54 + bounce;
+      group.children[1].position.y = 1.15 + bounce;
+      group.children[3].position.y = 1.38 + bounce;
     }
     renderer.render(scene, camera);
     frame = requestAnimationFrame(draw);
@@ -134,6 +142,7 @@ export function mountTrainScene(
           trainRoot.remove(group);
           disposePlayerResources(group);
           playerMeshes.delete(id);
+          movingPlayers.delete(id);
         }
       }
       for (const player of players) {
@@ -152,6 +161,11 @@ export function mountTrainScene(
           group.userData.targetPosition = new THREE.Vector3(targetX, 0, targetZ);
         }
         group.visible = true;
+        if (player.isMoving) movingPlayers.add(player.id);
+        else movingPlayers.delete(player.id);
+        const facing = group.children[3];
+        facing.position.x = player.direction === "left" ? -0.2 : player.direction === "right" ? 0.2 : 0;
+        facing.position.z = player.direction === "up" ? -0.2 : player.direction === "left" || player.direction === "right" ? 0 : 0.2;
         const material = (group.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial;
         material.color.set(player.color);
         const markerMaterial = (group.children[2] as THREE.Mesh).material as THREE.MeshBasicMaterial;
@@ -165,10 +179,11 @@ export function mountTrainScene(
       cancelAnimationFrame(frame);
       observer.disconnect();
       for (const group of playerMeshes.values()) {
-        scene.remove(group);
+        trainRoot.remove(group);
         disposePlayerResources(group);
       }
       playerMeshes.clear();
+      movingPlayers.clear();
 
       const geometries = new Set<THREE.BufferGeometry>();
       const materials = new Set<THREE.Material>();

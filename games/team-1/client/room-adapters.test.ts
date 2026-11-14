@@ -5,7 +5,7 @@ import { JoinError } from "@sdm/core/client";
 import { SeededRandom } from "@sdm/core/shared";
 import rawConfig from "../config/game.json";
 import { ConfigSchema, lastTrain } from "../shared/game";
-import { createRoomAdapters, toSessionError, toSnapshot } from "./room-adapters";
+import { createRoomAdapters, PlayerMotionTracker, toSessionError, toSnapshot } from "./room-adapters";
 import { SessionError } from "./session-adapter.mjs";
 
 function playingState() {
@@ -67,6 +67,53 @@ describe("toSessionError", () => {
     expect(toSessionError(new Error("anything else")).code).toBe("CONNECTION_FAILED");
     const own = new SessionError("Enter a crew name to continue.", "INVALID_NAME");
     expect(toSessionError(own)).toBe(own);
+  });
+});
+
+describe("live player motion", () => {
+  it("uses actual displacement for walking and retains facing while idle or blocked", () => {
+    const { state, ctx } = playingState();
+    const tracker = new PlayerMotionTracker();
+    const player = state.players.get("first");
+    if (!player) throw new Error("player is missing");
+    tracker.update(state);
+    lastTrain.step(state, [{ playerId: "first", input: { type: "start" } }], ctx);
+    tracker.update(state);
+    lastTrain.step(state, [{ playerId: "first", input: { type: "move", x: 1, z: 0 } }], ctx);
+    tracker.update(state);
+    expect(tracker.get("first")).toMatchObject({ direction: "right", isMoving: true });
+
+    lastTrain.step(state, [{ playerId: "first", input: { type: "move", x: 0, z: 0 } }], ctx);
+    tracker.update(state);
+    expect(tracker.get("first")).toMatchObject({ direction: "right", isMoving: false });
+
+    player.x = 1;
+    tracker.update(state);
+    lastTrain.step(state, [{ playerId: "first", input: { type: "move", x: 1, z: 0 } }], ctx);
+    tracker.update(state);
+    expect(tracker.get("first")).toMatchObject({ direction: "right", isMoving: false });
+
+    lastTrain.step(state, [{ playerId: "first", input: { type: "move", x: 0, z: -1 } }], ctx);
+    tracker.update(state);
+    expect(tracker.get("first")).toMatchObject({ direction: "up", isMoving: true });
+    lastTrain.disconnect?.(state, "first", ctx);
+    tracker.update(state);
+    expect(tracker.get("first")).toMatchObject({ direction: "up", isMoving: false });
+  });
+
+  it("does not animate a spawn or a reconnect position jump", () => {
+    const { state, ctx } = playingState();
+    const tracker = new PlayerMotionTracker();
+    tracker.update(state);
+    lastTrain.step(state, [{ playerId: "first", input: { type: "start" } }], ctx);
+    tracker.update(state);
+    tracker.suspend();
+    lastTrain.step(state, [{ playerId: "first", input: { type: "move", x: -1, z: 0 } }], ctx);
+    tracker.update(state);
+    expect(tracker.get("first")).toMatchObject({ direction: "left", isMoving: false });
+    lastTrain.step(state, [], ctx);
+    tracker.update(state);
+    expect(tracker.get("first")).toMatchObject({ direction: "left", isMoving: true });
   });
 });
 
