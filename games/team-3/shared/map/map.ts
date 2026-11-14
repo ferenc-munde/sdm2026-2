@@ -14,7 +14,7 @@
 // carAt() returns null in a doorway on purpose: a player crossing a door is still on
 // the train. Movement (#7) uses the walls, not carAt(), so doorways never block anyone.
 
-import { CAR_COUNT, PLAYER_RADIUS } from "../constants.ts";
+import { CAR_COUNT, INTERACT_RANGE, PLAYER_RADIUS } from "../constants.ts";
 import type { HazardSpot } from "../run/director.ts";
 import type { ItemKind, Station, StationKind, Vec2 } from "../types.ts";
 
@@ -239,6 +239,14 @@ export function validateMap(map: TrainMap): string[] {
     if (!map.stations.some((station) => station.kind === kind)) problems.push(`station ${kind} is missing`);
   }
   for (const station of map.stations) checkPlace(`station ${station.kind}`, station.car, station.position);
+  map.stations.forEach((station, i) => {
+    if (map.walls.some((wall) => insideBox(wall, station.position))) problems.push(`station ${station.kind} is inside a wall`);
+    // Standing at one station must not reach another, or one key press could use either.
+    map.stations.slice(i + 1).forEach((other) => {
+      const apart = Math.hypot(station.position.x - other.position.x, station.position.y - other.position.y);
+      if (apart <= INTERACT_RANGE) problems.push(`stations ${station.kind} and ${other.kind} are within reach of each other`);
+    });
+  });
 
   const spotIds = new Set<string>();
   for (const spot of map.hazardSpots) {
