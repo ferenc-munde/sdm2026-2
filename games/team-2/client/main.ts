@@ -9,7 +9,7 @@ import { createInputAdapter } from "./input.ts";
 import { mountLobby } from "./lobby";
 import { mountGameRules } from "./rules";
 import { openTaskModal, closeTaskModal, showStationPrompt, showTaskToast, type OpenTask } from "./task-modal";
-import { playAmbient, playButtonInteraction, playPuzzleSuccess, playTrainAmbience, playWarning, stopAmbient, stopTrainAmbience, taskSpawnPing, unlockAudio } from "./audio";
+import { getAudioSettings, playAmbient, playButtonInteraction, playLobbyMusic, playPuzzleSuccess, playTrainAmbience, playWarning, setAudioVolume, stopAmbient, stopLobbyMusic, stopTrainAmbience, taskSpawnPing, toggleAudioMute, unlockAudio } from "./audio";
 import "./hud.css";
 import "./styles.css";
 
@@ -199,6 +199,7 @@ mode.addEventListener("change", () => {
   if (mode.value === "preview") {
     lobby?.destroy();
     lobby = undefined;
+    stopLobbyMusic();
   } else {
     mountLobbyIfNetworked();
   }
@@ -218,8 +219,44 @@ document.addEventListener("click", (event) => {
   const clickedButton = target.closest<HTMLButtonElement>("button");
   if (!clickedButton || clickedButton.disabled) return;
   unlockAudio();
+  if (clickedButton.closest(".sound-controls")) return;
   playButtonInteraction();
 }, true);
+
+const soundControls = document.createElement("section");
+soundControls.className = "sound-controls";
+soundControls.setAttribute("aria-label", "Sound controls");
+soundControls.innerHTML = `
+  <button type="button" data-volume-down aria-label="Decrease sound">−</button>
+  <output data-volume-level aria-live="polite"></output>
+  <button type="button" data-volume-up aria-label="Increase sound">+</button>
+  <button type="button" data-mute aria-pressed="false">Mute</button>
+`;
+const volumeLevel = soundControls.querySelector<HTMLOutputElement>("[data-volume-level]")!;
+const muteButton = soundControls.querySelector<HTMLButtonElement>("[data-mute]")!;
+function updateSoundControls(): void {
+  const settings = getAudioSettings();
+  volumeLevel.value = `${Math.round(settings.volume * 100)}%`;
+  volumeLevel.textContent = volumeLevel.value;
+  muteButton.textContent = settings.muted ? "Unmute" : "Mute";
+  muteButton.setAttribute("aria-pressed", String(settings.muted));
+}
+soundControls.querySelector<HTMLButtonElement>("[data-volume-down]")!.addEventListener("click", () => {
+  const settings = getAudioSettings();
+  setAudioVolume(settings.volume - 0.1);
+  updateSoundControls();
+});
+soundControls.querySelector<HTMLButtonElement>("[data-volume-up]")!.addEventListener("click", () => {
+  const settings = getAudioSettings();
+  setAudioVolume(settings.volume + 0.1);
+  updateSoundControls();
+});
+muteButton.addEventListener("click", () => {
+  toggleAudioMute();
+  updateSoundControls();
+});
+updateSoundControls();
+document.body.append(soundControls);
 
 // E is contextual: a task station in range opens its minigame, otherwise pick up.
 // Separate from the input adapter because it drives the modal, not a room input.
@@ -281,6 +318,7 @@ function mountLobbyIfNetworked(): void {
 	// Lobby creation/joining remains behind player entry and only connects on form submission.
 	// The host creates the game room and shares its code; the rest of the crew joins that room.
 	lobby = mountLobby(document.body, (match) => {
+		stopLobbyMusic();
 		void enterGameRoom(async () => {
 			if (match.isHost) {
 				const hosted = await hostGame(server, match.name);
@@ -291,6 +329,7 @@ function mountLobbyIfNetworked(): void {
 			return joinGame(server, code, match.name);
 		}).finally(() => match.leaveLobby());
 	}, server.http);
+	playLobbyMusic();
 }
 function enterPlayerFlow(): void {
 	if (offline) {
@@ -311,6 +350,8 @@ window.addEventListener("pagehide", () => {
   cleanupInput();
   session.stop(); local.stop();
   closeTaskModal(); stopAmbient(); stopTrainAmbience(); showStationPrompt(null);
+	stopLobbyMusic();
+	soundControls.remove();
   lobby?.destroy(); trainScene?.destroy(); hud.destroy();
   gameRules.destroy();
 });
