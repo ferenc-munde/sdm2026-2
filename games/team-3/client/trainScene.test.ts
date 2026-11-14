@@ -266,6 +266,7 @@ describe("updateState keeps what did not change", () => {
     const first = train.playersGroup.children[0]!;
     expect(first.position.x).toBe(15);
     expect(first.position.z).toBe(7);
+    for (let frame = 0; frame < 40; frame += 1) train.updateMotion(0.1, 1);
     expect(first.rotation.y).toBeCloseTo(-Math.PI);
     expect(train.itemsGroup.children[0]!.position.x).toBe(103);
     const fill = train.hazardsGroup.children[0]!.children
@@ -274,12 +275,18 @@ describe("updateState keeps what did not change", () => {
     expect(fill.scale.x).toBeCloseTo(0.75);
   });
 
-  it("faces +x again when a player stops having a direction", () => {
+  it("faces +x again when a player stops having a direction, easing the turn (#355)", () => {
     const { train } = counting();
-    train.updateState({ players: [{ ...players[0]!, facing: { dx: 0, dy: 1 } }], items: [], hazards: [] });
-    expect(train.playersGroup.children[0]!.rotation.y).toBeCloseTo(-Math.PI / 2);
-    train.updateState({ players: [{ ...players[0]!, facing: { dx: 0, dy: 0 } }], items: [], hazards: [] });
-    expect(train.playersGroup.children[0]!.rotation.y).toBe(0);
+    // Keep the held item so the figure is moved, not rebuilt: this is about the turn.
+    train.updateState({ players: [{ ...players[0]!, facing: { dx: 0, dy: 1 } }], items, hazards: [] });
+    const figure = train.playersGroup.children[0]!;
+    expect(figure.rotation.y).toBe(0); // still facing +x on the frame the facing changed
+    for (let frame = 0; frame < 40; frame += 1) train.updateMotion(0.1, 1);
+    expect(figure.rotation.y).toBeCloseTo(-Math.PI / 2);
+
+    train.updateState({ players: [{ ...players[0]!, facing: { dx: 0, dy: 0 } }], items, hazards: [] });
+    for (let frame = 0; frame < 40; frame += 1) train.updateMotion(0.1, 1);
+    expect(figure.rotation.y).toBeCloseTo(0);
   });
 
   it("rebuilds only the player whose name, seat or held item changed", () => {
@@ -391,6 +398,44 @@ describe("crew and wheel animation (#294)", () => {
 
     train.updateMotion(0.5, 0);
     expect(first.rotation.y).toBe(rolling);
+  });
+});
+
+describe("carriage details and smooth turning (#355)", () => {
+  it("gives every car a rug, warm far-wall lamps and a number plate", () => {
+    const train = build({ players: [], items: [], hazards: [] });
+    const details: Object3D[] = [];
+    train.hullGroup.traverse((object) => {
+      if (object.userData.carDetail) details.push(object);
+    });
+    const of = (kind: string): Object3D[] => details.filter((object) => object.userData.carDetail === kind);
+    expect(of("rug")).toHaveLength(train.map.cars.length);
+    expect(of("plate")).toHaveLength(train.map.cars.length);
+    expect(of("lamp")).toHaveLength(train.map.cars.length * 3);
+    for (const rug of of("rug")) {
+      expect(rug.position.y).toBeLessThan(2);
+      expect(rug.castShadow).toBe(false);
+    }
+  });
+
+  it("eases a change of facing instead of snapping", () => {
+    const world = (facing: NonNullable<RenderPlayer["facing"]>): RenderWorld => ({
+      players: [{ id: "a", name: "Ada", position: { x: 0, y: 0 }, facing }],
+      items: [],
+      hazards: [],
+    });
+    const train = build(world({ dx: 1, dy: 0 }));
+    const figure = train.playersGroup.children[0]!;
+    expect(figure.rotation.y).toBe(0);
+
+    train.updateState(world({ dx: 0, dy: 1 }));
+    expect(figure.rotation.y).toBe(0); // not snapped on the state frame
+    train.updateMotion(0.05, 1);
+    expect(figure.rotation.y).toBeLessThan(0);
+    expect(figure.rotation.y).toBeGreaterThan(-Math.PI / 2);
+
+    for (let frame = 0; frame < 60; frame += 1) train.updateMotion(0.1, 1);
+    expect(figure.rotation.y).toBeCloseTo(-Math.PI / 2);
   });
 });
 

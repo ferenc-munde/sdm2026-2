@@ -3,6 +3,8 @@ import {
   advanceWalk,
   CARRY_ARM_LIFT,
   crewPose,
+  easeAngle,
+  headingFor,
   IDLE_BOB,
   INTERACT_ARM_LIFT,
   MAX_LEG_SWING,
@@ -85,5 +87,47 @@ describe("wheels", () => {
     expect(wheelAngle(1, 1, 0.1)).toBeGreaterThan(wheelAngle(1, 0.5, 0.1));
     expect(wheelAngle(1, 1, 0)).toBe(1);
     expect(wheelAngle(1, Number.NaN, 0.1)).toBe(1);
+  });
+});
+
+describe("heading and smooth turning (#355)", () => {
+  it("rests at +x, and turns the same way placePlayer did", () => {
+    expect(headingFor()).toBe(0);
+    expect(headingFor({ dx: 0, dy: 0 })).toBe(0);
+    expect(headingFor({ dx: 1, dy: 0 })).toBe(0);
+    expect(headingFor({ dx: 0, dy: 1 })).toBeCloseTo(-Math.PI / 2);
+    expect(headingFor({ dx: 0, dy: -1 })).toBeCloseTo(Math.PI / 2);
+    expect(Math.abs(headingFor({ dx: -1, dy: 0 }))).toBeCloseTo(Math.PI);
+  });
+
+  it("eases toward the target without overshooting", () => {
+    let angle = 0;
+    const target = Math.PI / 2;
+    for (let frame = 0; frame < 120; frame += 1) {
+      const next = easeAngle(angle, target, 1 / 60);
+      expect(next).toBeGreaterThanOrEqual(angle);
+      expect(next).toBeLessThanOrEqual(target + 1e-9);
+      angle = next;
+    }
+    expect(angle).toBeCloseTo(target, 6);
+    expect(easeAngle(1, 2, 0)).toBe(1);
+  });
+
+  it("takes the short way across the -pi/pi wrap", () => {
+    // 3.0 -> -3.0 is +0.283 radians across the wrap, not -6 radians the long way.
+    const step = easeAngle(3, -3, 0.1);
+    expect(step).toBeGreaterThan(3);
+    expect(step).toBeLessThan(3.3);
+
+    let angle = 3;
+    for (let frame = 0; frame < 60; frame += 1) angle = easeAngle(angle, -3, 1 / 60);
+    expect(Math.cos(angle - -3)).toBeGreaterThan(0.999999);
+  });
+
+  it("handles exactly opposite headings without NaN", () => {
+    const step = easeAngle(0, Math.PI, 0.1);
+    expect(Number.isFinite(step)).toBe(true);
+    expect(step).toBeGreaterThan(0);
+    expect(step).toBeLessThan(Math.PI);
   });
 });
