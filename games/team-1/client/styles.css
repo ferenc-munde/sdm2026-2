@@ -12,3 +12,4 @@
 @media(max-width:520px){.game-heading{align-items:flex-start}.game-heading-actions{flex-direction:column;align-items:flex-end;gap:8px}.game-heading h2{font-size:22px}.game-room-code{font-size:8px}.train-canvas{height:290px}.scene-fallback{height:290px}.hud-panel{grid-template-columns:1fr}.hud-block:nth-child(n){border-right:0;border-bottom:1px solid #344044}.hud-block:last-child{border-bottom:0}.mock-controls summary{font-size:7px}.mock-warning{font-size:7px}}
 /* Rules such as .lobby-grid{display:grid} would otherwise override the hidden attribute. */
 [hidden]{display:none!important}
+.repair-hint{margin:5px 0 8px;padding:7px 8px;border-left:2px solid #d6ac68;background:#202726;color:#d7c393;font:7px var(--mono);letter-spacing:.04em;line-height:1.5}.repair-hint[data-mode="ready"]{border-color:#9fc7a6;color:#b7d4b6}.repair-hint[data-mode="complete"]{border-color:#718c79;color:#9fc7a6}
