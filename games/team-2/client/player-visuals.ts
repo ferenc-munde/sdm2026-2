@@ -5,6 +5,7 @@ import type { Player } from "../shared/state.ts";
 const PLAYER_COLORS = ["#62cdd3", "#e46c63", "#e0bc4e", "#6f9bea"] as const;
 const SKIN_COLORS = ["#d8a178", "#c98c5b", "#e2b78f", "#a66c4e"] as const;
 const LOCAL_SHIRT_TINT = new THREE.Color("#ffffff");
+const HAIRSTYLES = ["short", "spiky", "curly", "long"] as const;
 
 type AnimationState = "idle" | "walk" | "run";
 type FacingDirection = "up" | "down" | "left" | "right";
@@ -49,18 +50,18 @@ function facingFromDelta(dx: number, dy: number): FacingDirection | undefined {
 function applyFacing(visual: PlayerVisual, facing: FacingDirection): void {
 	visual.facing = facing;
 	visual.character.userData.facing = facing;
-	visual.hair.visible = facing === "down";
-	visual.eyes[0].visible = facing === "up" || facing === "left";
-	visual.eyes[1].visible = facing === "up" || facing === "right";
-	visual.nose.visible = facing !== "down";
+	visual.hair.visible = facing === "up";
+	visual.eyes[0].visible = facing === "down" || facing === "left";
+	visual.eyes[1].visible = facing === "down" || facing === "right";
+	visual.nose.visible = facing !== "up";
 
 	switch (facing) {
 		case "up":
-		visual.eyes[0].position.set(-0.75, 6, 0.35);
-		visual.eyes[1].position.set(0.75, 6, 0.35);
-		visual.nose.position.set(0, 6.85, 0.2);
 			break;
 		case "down":
+			visual.eyes[0].position.set(-0.75, 5, 0.35);
+			visual.eyes[1].position.set(0.75, 5, 0.35);
+			visual.nose.position.set(0, 4.65, 0.2);
 			break;
 		case "left":
 			visual.eyes[0].position.set(-1.2, 5.65, 0.35);
@@ -94,7 +95,11 @@ export function createPlayerVisuals(group: THREE.Group) {
 	const footGeometry = new THREE.BoxGeometry(1.55, 1.8, 0.75);
 	const eyeGeometry = new THREE.SphereGeometry(0.24, 8, 6);
 	const noseGeometry = new THREE.SphereGeometry(0.38, 8, 6);
-	const hairGeometry = new THREE.SphereGeometry(1.25, 8, 6);
+	const backHairGeometry = new THREE.SphereGeometry(2, 12, 8);
+	const hairCapGeometry = new THREE.SphereGeometry(2.5, 16, 10);
+	const spikeGeometry = new THREE.ConeGeometry(0.38, 1.15, 6);
+	const curlGeometry = new THREE.SphereGeometry(0.62, 10, 8);
+	const longLockGeometry = new THREE.CapsuleGeometry(0.4, 2.7, 4, 8);
 	const lighting = new THREE.Group();
 	lighting.name = "crew-lighting";
 	const ambientLight = new THREE.AmbientLight("#ffffff", 0.9);
@@ -160,6 +165,59 @@ export function createPlayerVisuals(group: THREE.Group) {
 		head.scale.z = 0.19;
 		character.add(head);
 
+		const hairGroup = new THREE.Group();
+		hairGroup.name = "hairstyle";
+		hairGroup.position.set(0, 5.5, 0.05);
+		hairGroup.userData.style = HAIRSTYLES[seat % HAIRSTYLES.length];
+		character.add(hairGroup);
+
+		const hairCap = new THREE.Mesh(hairCapGeometry, hairMaterial);
+		hairCap.name = "hair-cap";
+		hairCap.position.set(0, 0.65, -0.05);
+		hairCap.scale.set(1.2, 1.2, 0.18);
+		hairGroup.add(hairCap);
+
+		switch (HAIRSTYLES[seat % HAIRSTYLES.length]) {
+			case "short":
+				break;
+			case "spiky":
+				for (let index = 0; index < 9; index++) {
+					const angle = (index / 9) * Math.PI * 2;
+					const x = Math.cos(angle) * 2.15;
+					const y = Math.sin(angle) * 2.15;
+					const spike = new THREE.Mesh(spikeGeometry, hairMaterial);
+					spike.name = "hair-spike";
+					spike.position.set(x, y, 0.3);
+					spike.rotation.z = Math.atan2(-x, y);
+					spike.scale.z = 0.45;
+					hairGroup.add(spike);
+				}
+				break;
+			case "curly":
+				for (let index = 0; index < 12; index++) {
+					const angle = (index / 12) * Math.PI * 2;
+					const curl = new THREE.Mesh(curlGeometry, hairMaterial);
+					curl.name = "hair-curl";
+					curl.position.set(
+						Math.cos(angle) * 2.15,
+						Math.sin(angle) * 2.15,
+						0.1,
+					);
+					curl.scale.z = 0.45;
+					hairGroup.add(curl);
+				}
+				break;
+			case "long":
+				for (const side of [-1, 1]) {
+					const lock = new THREE.Mesh(longLockGeometry, hairMaterial);
+					lock.name = "long-hair-lock";
+					lock.position.set(side * 2.2, -0.2, 0.28);
+					lock.scale.z = 0.45;
+					hairGroup.add(lock);
+				}
+				break;
+		}
+
 		const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
 		leftEye.name = "left-eye";
 		leftEye.position.set(-0.75, 6, 0.35);
@@ -174,12 +232,12 @@ export function createPlayerVisuals(group: THREE.Group) {
 		nose.position.set(0, 6.85, 0.2);
 		character.add(nose);
 
-		const hair = new THREE.Mesh(hairGeometry, hairMaterial);
+		const hair = new THREE.Mesh(backHairGeometry, hairMaterial);
 		hair.name = "back-hair";
-		hair.position.set(0, 4.2, 0.35);
-		hair.scale.z = 0.19;
+		hair.position.set(0, -0.8, 0.25);
+		hair.scale.set(1.1, 0.95, 0.18);
 		hair.visible = false;
-		character.add(hair);
+		hairGroup.add(hair);
 
 		const leftArm = new THREE.Group();
 		leftArm.name = "left-arm-pivot";
@@ -311,7 +369,11 @@ export function createPlayerVisuals(group: THREE.Group) {
 			footGeometry.dispose();
 			eyeGeometry.dispose();
 			noseGeometry.dispose();
-			hairGeometry.dispose();
+			backHairGeometry.dispose();
+			hairCapGeometry.dispose();
+			spikeGeometry.dispose();
+			curlGeometry.dispose();
+			longLockGeometry.dispose();
 		},
 	};
 }
