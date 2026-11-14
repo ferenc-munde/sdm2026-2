@@ -4,12 +4,16 @@ import type { Journey } from "../shared/types.ts";
 import {
   BAR_COLORS,
   FUEL_YELLOW_AT,
+  HULL_CRITICAL_AT,
+  HULL_DANGER_AT,
   barFraction,
   fuelColor,
   fuelIsLow,
+  hullDrainPerSecond,
   hullFraction,
   hudView,
   journeyFraction,
+  shouldWarnHull,
 } from "./hudModel.ts";
 
 const journey = (overrides: Partial<Journey> = {}): Journey => ({
@@ -89,5 +93,30 @@ describe("hudView", () => {
     const view = hudView(journey({ hull: 79.6, fuel: 24.4, distance: 123.7 }));
     expect([view.hull, view.fuel, view.distance]).toEqual([80, 24, 124]);
     expect(view.distanceText).toBe(`124 / ${WIN_DISTANCE}`);
+  });
+});
+
+describe("hull information (#421)", () => {
+  it("adds up what is draining the hull", () => {
+    expect(hullDrainPerSecond([])).toBe(0);
+    expect(hullDrainPerSecond([{ kind: "breach" }])).toBe(2.5);
+    expect(hullDrainPerSecond([{ kind: "fire" }])).toBe(1.5);
+    expect(hullDrainPerSecond([{ kind: "breach" }, { kind: "fire" }, { kind: "course" }])).toBe(4);
+  });
+
+  it("exposes the drain and the critical threshold", () => {
+    expect(hudView(journey({ hull: 80 })).hullDrain).toBe(0);
+    expect(hudView(journey({ hull: 80 }), [{ kind: "breach" }]).hullDrain).toBe(2.5);
+    expect(hudView(journey({ hull: HULL_CRITICAL_AT })).hullCritical).toBe(false);
+    expect(hudView(journey({ hull: HULL_CRITICAL_AT - 1 })).hullCritical).toBe(true);
+    expect(hudView(journey({ hull: HULL_DANGER_AT })).hullCritical).toBe(true);
+    expect(HULL_DANGER_AT).toBe(15);
+  });
+
+  it("warns the first time the hull drops below 15", () => {
+    expect(shouldWarnHull(HULL_DANGER_AT, false)).toBe(false);
+    expect(shouldWarnHull(HULL_DANGER_AT - 1, false)).toBe(true);
+    expect(shouldWarnHull(5, true)).toBe(false);
+    expect(shouldWarnHull(Number.NaN, false)).toBe(false);
   });
 });
