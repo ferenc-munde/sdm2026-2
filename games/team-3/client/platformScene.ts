@@ -23,7 +23,7 @@ import type { ActionHighlight } from "./actionHighlight.ts";
 import { applyCrewPose, buildCrewFigure } from "./crewModel.ts";
 import { buildBreachModel, buildStationModel } from "./propModels.ts";
 import { LIGHTING, PALETTE, mat } from "./style.ts";
-import { advanceWalk, crewPose, smoothSpeed, speedBetween } from "./crewPose.ts";
+import { advanceWalk, crewPose, easeAngle, headingFor, smoothSpeed, speedBetween } from "./crewPose.ts";
 import { createHighlightRing } from "./highlightRing.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import {
@@ -222,8 +222,8 @@ function buildPlayerGroup(player: RenderPlayer, seat: number, labelFactory: Labe
   group.add(label);
 
   group.position.set(player.position.x, 0, player.position.y);
-  const facing = player.facing;
-  group.rotation.y = facing && (facing.dx !== 0 || facing.dy !== 0) ? -Math.atan2(facing.dy, facing.dx) : 0;
+  group.rotation.y = headingFor(player.facing); // snap on spawn; later turns ease (#355)
+  group.userData.targetHeading = group.rotation.y;
   group.userData.motion = { lastX: player.position.x, lastZ: player.position.y, speed: 0, phase: 0, seconds: 0 };
   return group;
 }
@@ -287,6 +287,7 @@ export function buildPlatformScene(
         build: () => buildPlayerGroup(player, seat, labelFactory),
         place: (group: Group) => {
           group.position.set(player.position.x, 0, player.position.y);
+          group.userData.targetHeading = headingFor(player.facing);
         },
       })),
       disposeObject,
@@ -310,6 +311,10 @@ export function buildPlatformScene(
       motion.lastZ = group.position.z;
       motion.phase = advanceWalk(motion.phase, motion.speed, dt);
       if (Number.isFinite(dt) && dt > 0) motion.seconds += dt;
+
+      const targetHeading =
+        typeof group.userData.targetHeading === "number" ? group.userData.targetHeading : group.rotation.y;
+      group.rotation.y = easeAngle(group.rotation.y, targetHeading, dt);
 
       const pose = crewPose({
         speed: motion.speed,
