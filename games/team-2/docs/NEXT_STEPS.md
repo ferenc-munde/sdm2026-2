@@ -40,7 +40,6 @@ The game was moved onto the shared platform.
 - **Smooth movement.** No interpolation or prediction: remote and local players move in 20 steps per second. Interpolate positions in `client/scene.ts`.
 - **Player names in the scene.** Markers have no label; the name is in `state.players`.
 - **Camera follows the local player** (SPEC §8.5); today the camera shows the whole train or one chosen carriage.
-- **Lobby matchmaking filter.** `configureMatchmaking()` in `room/index.ts` sets the crew-size filter after the server starts, because the platform's room registration takes no filter. Ask the platform team for a proper way (`platform` issue).
 - **Debug commands.** `commands` is empty; SPEC §8.4 suggests spawn task, set power, skip phase.
 - **Replay test.** The rules are written to be deterministic; there is no replay test that proves it for a whole run.
 - **`SPEC.md` is older than the code in places**: it describes a horizontal train, Three.js "world units" and an `InputEvent` type. The vertical 1600 × 1000 map and `docs/PLATFORM.md` describe what is built.

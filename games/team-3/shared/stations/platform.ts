@@ -122,9 +122,9 @@ export function useDepartureLever<T>(
 export const PLATFORM_GUIDE = [
   "Work together to reach the station before the hull reaches zero.",
   "Move: WASD or arrow keys. Hold interact: Space or E. Use the action control to pick up or drop items.",
-  "Take coal to the engine to add 35 fuel. Hold a wrench at a breach for 3 seconds to repair it.",
+  "Take coal to the engine to add 35 fuel. Hold a wrench at a broken steam pipe for 3 seconds to repair it.",
   "Hold an extinguisher at a fire for 2.5 seconds. An engine fire stops the train.",
-  "Hold the steering console during the final two seconds of a course warning.",
+  "Sharp curve ahead: hold the brake lever during the final two seconds.",
   "Practise here while waiting. Only the host can depart when the crew is complete.",
 ] as const;
 

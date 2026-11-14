@@ -16,6 +16,7 @@ Browser code for **The Last Train**. What is in this folder today:
 | `platformScene.ts` | Three.js platform for the waiting room: floor, walls, objects and crew | #146 |
 | `waitingRoomModel.ts` | Waiting room logic: crew, host, crew-size options, departure (pure, tested) | #146 |
 | `waitingRoom.ts` | Waiting room screen: crew list, crew size, ticket with copy link, Depart | #146 |
+| `courseFx.ts` | Course-failure feedback: detect the failed event, camera shake and hull tilt (pure, tested) | #219 |
 | `screens.ts` | Win and lose screens, shown from `state.phase`, with "play again" | #21 |
 | `scenery.ts` | Ground and sleepers that scroll past the train at `journey.speedFactor` | #25 |
 | `sound.ts` | Event → sound mapping (hazard, repair, low fuel, win, lose), Web Audio player and mute button | #31 |

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { conditionBand, formatCountdown, toOutcomeViewModel, toTaskViewModels } from "../client/presentation-model.mjs";
+import { conditionBand, formatCountdown, toOutcomeViewModel, toRepairHint, toTaskViewModels } from "../client/presentation-model.mjs";
 
 let passed = 0;
 const failures = [];
@@ -37,6 +37,23 @@ await test("maps task progress and readable status labels", () => {
     { id: "brake", label: "Inspect brakes", status: "complete", progress: 100 },
   ]);
   assert.deepEqual(tasks.map((task) => [task.statusLabel, task.progress]), [["IN PROGRESS", 55], ["DONE", 100]]);
+});
+
+await test("shows where to go and when the local player can repair", () => {
+  const snapshot = {
+    localPlayerId: "p1",
+    players: [{ id: "p1", section: "control" }],
+    tasks: [
+      { id: "wiring", label: "Reconnect the signal wires (Electrical Room)", section: "electrical", status: "available" },
+      { id: "instruments", label: "Restore the control cabin instruments (Control Cabin)", section: "control", status: "in-progress" },
+    ],
+  };
+  assert.deepEqual(toRepairHint(snapshot), {
+    mode: "ready",
+    text: "Restore the control cabin instruments (Control Cabin) · PRESS E TO REPAIR",
+  });
+  snapshot.players[0].section = "engine";
+  assert.match(toRepairHint(snapshot).text, /^MOVE TO ELECTRICAL/);
 });
 
 await test("maps terminal snapshots to victory and failure result content", () => {

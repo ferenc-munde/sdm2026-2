@@ -1,5 +1,6 @@
 import { Color, Mesh, MeshStandardMaterial, Object3D, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
+import { IDLE_BOB } from "./crewPose.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import { buildPlatformScene, fitCameraToPlatform } from "./platformScene.ts";
 import { PLAYER_COLORS } from "./trainScene.ts";
@@ -67,7 +68,8 @@ describe("the platform scene", () => {
     expect(platform.playersGroup.children).toHaveLength(2);
 
     const colours = platform.playersGroup.children.map((group) => {
-      const body = group.children.find((child) => child.userData.kind === "playerBody");
+      let body: Object3D | undefined;
+      group.traverse((child) => { if (child.userData.kind === "playerBody") body = child; });
       expect(body).toBeInstanceOf(Mesh);
       return new Color(((body as Mesh).material as MeshStandardMaterial).color).getHexString();
     });
@@ -90,5 +92,66 @@ describe("the platform scene", () => {
     platform.updatePlayers([]);
     expect(platform.playersGroup.children).toHaveLength(0);
     expect(() => platform.dispose()).not.toThrow();
+  });
+});
+
+describe("updatePlayers keeps what did not change", () => {
+  it("moves the same figures and draws no new label when only positions change", () => {
+    let labels = 0;
+    const platform = buildPlatformScene(players, {
+      labelFactory: (name) => {
+        labels += 1;
+        return labelFactory(name);
+      },
+    });
+    const before = [...platform.playersGroup.children];
+
+    platform.updatePlayers(players.map((player) => ({ ...player, position: { x: player.position.x + 9, y: 3 } })));
+
+    platform.playersGroup.children.forEach((group, index) => expect(group).toBe(before[index]));
+    expect(platform.playersGroup.children[0]!.position.x).toBe(-51);
+    expect(platform.playersGroup.children[0]!.position.z).toBe(3);
+    expect(labels).toBe(players.length);
+  });
+
+  it("rebuilds a figure when its name changes", () => {
+    const platform = build();
+    const [ada, bela] = platform.playersGroup.children;
+    platform.updatePlayers([players[0] as RenderPlayer, { ...(players[1] as RenderPlayer), name: "Bella" }]);
+    expect(platform.playersGroup.children[0]).toBe(ada);
+    expect(platform.playersGroup.children[1]).not.toBe(bela);
+  });
+});
+
+describe("waiting crew animation (#294)", () => {
+  it("breathes while standing still and never leaves the floor", () => {
+    const platform = build();
+    // The crew figure (visual pass) bobs at the hips; it is drawn 1.35x, so compare in world units.
+    const hips = platform.playersGroup.children[0]!.getObjectByName("hips")!;
+    const base = hips.position.y;
+    const lift = () => (hips.position.y - base) * 1.35;
+
+    platform.updateMotion(0.5);
+    expect(hips.position.y).not.toBe(base);
+    expect(Math.abs(lift())).toBeLessThanOrEqual(IDLE_BOB + 1e-6);
+
+    platform.updateMotion(0.5);
+    expect(Math.abs(lift())).toBeLessThanOrEqual(IDLE_BOB + 1e-6);
+  });
+});
+
+describe("the action highlight (#295)", () => {
+  it("rings the departure lever and hides it again", () => {
+    const platform = build();
+    const ring = platform.scene.getObjectByName("action-highlight");
+    expect(ring?.visible).toBe(false);
+
+    platform.updateHighlight({ position: { x: 12, y: -8 }, tone: "lever" }, 0);
+    expect(ring?.visible).toBe(true);
+    expect(ring?.position.x).toBe(12);
+    expect(ring?.position.z).toBe(-8);
+
+    platform.updateHighlight(null, 0);
+    expect(ring?.visible).toBe(false);
   });
 });

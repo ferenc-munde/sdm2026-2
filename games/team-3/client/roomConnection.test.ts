@@ -13,20 +13,33 @@ import {
 } from "./roomConnection.ts";
 
 describe("serverAddress", () => {
-  it("defaults to port 2567 next to the page, over the same protocol", () => {
-    expect(serverAddress({ protocol: "http:", hostname: "localhost" })).toEqual({
+  const page = (url: string) => {
+    const u = new URL(url);
+    return { protocol: u.protocol, hostname: u.hostname, host: u.host, pathname: u.pathname };
+  };
+
+  it("on the dev server, uses port 2567 next to the page", () => {
+    expect(serverAddress(page("http://localhost:5173/?room=K7QF"), undefined, true)).toEqual({
       http: "http://localhost:2567",
       ws: "ws://localhost:2567",
     });
-    expect(serverAddress({ protocol: "https:", hostname: "game.example" }).ws).toBe("wss://game.example:2567");
+  });
+
+  it("when the game server served the page, uses the page's own origin and folder", () => {
+    expect(serverAddress(page("https://team3.up.railway.app/"))).toEqual({
+      http: "https://team3.up.railway.app",
+      ws: "wss://team3.up.railway.app",
+    });
+    expect(serverAddress(page("https://games.example/team-3/index.html")).ws).toBe("wss://games.example/team-3");
+    expect(serverAddress(page("http://localhost:2567/")).http).toBe("http://localhost:2567");
   });
 
   it("uses a configured address and drops a trailing slash", () => {
-    expect(serverAddress({ protocol: "http:", hostname: "localhost" }, "https://rooms.example/team-3/")).toEqual({
+    expect(serverAddress(page("http://localhost:5173/"), "https://rooms.example/team-3/", true)).toEqual({
       http: "https://rooms.example/team-3",
       ws: "wss://rooms.example/team-3",
     });
-    expect(serverAddress({ protocol: "http:", hostname: "x" }, "  ").http).toBe("http://x:2567");
+    expect(serverAddress(page("http://x:5173/"), "  ", true).http).toBe("http://x:2567");
   });
 });
 
