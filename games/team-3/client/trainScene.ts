@@ -29,6 +29,7 @@ import {
 } from "three";
 import { createTrainMap, type TrainMap } from "../shared/map/map.ts";
 import type { Hazard, Item, ItemKind, StationKind } from "../shared/types.ts";
+import type { ActionHighlight } from "./actionHighlight.ts";
 import {
   advanceWalk,
   crewPose,
@@ -37,6 +38,8 @@ import {
   wheelAngle,
   type CrewPose,
 } from "./crewPose.ts";
+import type { StationStatuses } from "../shared/stations/status.ts";
+import { createHighlightRing } from "./highlightRing.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import { applyCrewPose, buildCrewFigure, HOLD_POINT } from "./crewModel.ts";
 
@@ -63,6 +66,7 @@ export interface RenderWorld {
   players?: readonly RenderPlayer[];
   items?: readonly RenderItem[];
   hazards?: readonly RenderHazard[];
+  stationStatuses?: StationStatuses;
 }
 
 const FLOOR_THICKNESS = 8;
@@ -127,6 +131,8 @@ export interface TrainScene {
    * local player while the interact key is held; other players' input is not synced.
    */
   updateMotion(dt: number, speedFactor: number, interactingPlayerId?: string): void;
+  /** Rings the object the local player's action key would use (#295); null hides the ring. */
+  updateHighlight(highlight: ActionHighlight | null, seconds: number): void;
   dispose(): void;
 }
 
@@ -183,7 +189,8 @@ function buildStation(kind: StationKind, position: { x: number; y: number }): Gr
 
   // A low base in the station's colour keeps stations easy to tell apart; the model on it shows
   // what the station is (visual pass).
-  const base = new Mesh(new BoxGeometry(46, 2, 46), mat(STATION_COLORS[kind], { roughness: 0.7 }));
+  // Its own material, so the status tint (#296) lights this pad only.
+  const base = new Mesh(new BoxGeometry(46, 2, 46), ownMat(STATION_COLORS[kind], { roughness: 0.7 }));
   base.position.y = 1;
   base.receiveShadow = true;
   base.userData = { kind: "stationPad", stationKind: kind };
@@ -565,6 +572,11 @@ export function buildTrainScene(
   playersGroup.name = "players";
   hullGroup.add(playersGroup);
 
+  // On the floor under the action target (#295), outside the hull group so the course roll does
+  // not tilt it.
+  const actionRing = createHighlightRing();
+  scene.add(actionRing.group);
+
   const drawnPlayers = new Map<string, Drawn<Group>>();
   const drawnItems = new Map<string, Drawn<Mesh>>();
   const drawnHazards = new Map<string, Drawn<Group>>();
@@ -575,6 +587,18 @@ export function buildTrainScene(
     const players = next.players ?? [];
     const items = next.items ?? [];
     const hazards = next.hazards ?? [];
+
+    if (next.stationStatuses) {
+      // Only the station's own pad is tinted: the models share cached materials with the train.
+      for (const station of mapGroup.children.filter((child) => child.userData.kind === "station")) {
+        const status = next.stationStatuses[station.userData.stationKind as StationKind];
+        station.userData.status = status;
+        const pad = station.children.find((child) => child.userData.kind === "stationPad");
+        if (!(pad instanceof Mesh) || !(pad.material instanceof MeshStandardMaterial)) continue;
+        pad.material.emissive.set(status === "disabledByFire" ? "#ff1f1f" : status === "inUse" ? "#ffd166" : "#000000");
+        pad.material.emissiveIntensity = status === "usable" ? 0 : 0.9;
+      }
+    }
 
     reconcile(
       playersGroup,
@@ -716,6 +740,7 @@ export function buildTrainScene(
     updateState,
     updateEffects,
     updateMotion,
+    updateHighlight: (highlight, seconds) => actionRing.show(highlight, seconds),
     dispose: () => {
       drawnPlayers.clear();
       drawnItems.clear();

@@ -29,10 +29,13 @@ import { waitingView } from "./waitingRoomModel.ts";
 import { platformSpawn } from "../shared/map/platform.ts";
 import { errorText } from "./lobbyModel.ts";
 import { createActionKeys } from "./actionKeys.ts";
+import { localActionHighlight } from "./actionHighlight.ts";
 import { createSmoother, withPositions } from "./smoothing.ts";
 import { createRoom, joinRoomByCode, serverAddress, type RoomConnection } from "./roomConnection.ts";
 import { joinErrorText } from "./roomLinks.ts";
 import { createSharedLinkJoin } from "./sharedLinkJoin.ts";
+import { stationStatus } from "../shared/stations/status.ts";
+import { fixedHazardsBetween } from "../shared/hazards/feedback.ts";
 
 /** `?demo` opens the hand-check page; otherwise the page plays a real room. */
 const demo = new URLSearchParams(window.location.search).has("demo");
@@ -438,6 +441,7 @@ function drawLive(delta: number, time: number): void {
     showToast(notice.message ?? errorText(notice.error));
   }
   if (!state || !state.players[live.me]) {
+    platformScene.updateHighlight(null, 0);
     renderer.render(platformScene.scene, platformScene.camera);
     return;
   }
@@ -452,6 +456,10 @@ function drawLive(delta: number, time: number): void {
     }
     platformScene.updatePlayers(withPositions(state.players, playerSmoother.step(positionsOf(state.players), delta)));
     platformScene.updateMotion(delta);
+    platformScene.updateHighlight(
+      localActionHighlight(state, live.me, { train: train.map, platform: platformScene.map }),
+      time / 1000,
+    );
     waiting.update(waitingView(state, live.me));
     platformBoard.update(state, live.me, platformScene.map.objects);
     liveState = state;
@@ -471,16 +479,22 @@ function drawLive(delta: number, time: number): void {
     players: withPositions(state.players, playerSmoother.step(positionsOf(state.players), delta)),
     items: withPositions(state.items, itemSmoother.step(positionsOf(state.items), delta)),
     hazards: Object.values(state.hazards),
+    stationStatuses: stationStatus(state, train.map),
   });
   train.updateMotion(
     delta,
     state.phase === "playing" ? state.journey.speedFactor : 0,
     keyboard.current().interacting ? live.me : undefined,
   );
+  train.updateHighlight(
+    localActionHighlight(state, live.me, { train: train.map, platform: platformScene.map }),
+    time / 1000,
+  );
   hud.update(hudView(state.journey));
   scenery.update(delta, state.phase === "playing" ? state.journey.speedFactor : 0);
   if (liveState && liveState.phase !== "lobby") {
     for (const name of eventsBetween(liveState, state)) sound.play(name);
+    if (fixedHazardsBetween(liveState, state).length > 0) showToast("Fixed!");
   }
   courseWarning.update(state);
   conductor.update(state);
@@ -509,6 +523,7 @@ const walk = (time: number): void => {
   }
   if (!demo) {
     // The main menu: show the empty platform behind it.
+    platformScene.updateHighlight(null, 0);
     renderer.render(platformScene.scene, platformScene.camera);
     requestAnimationFrame(walk);
     return;
@@ -518,6 +533,7 @@ const walk = (time: number): void => {
   if (waitingMode) {
     if (mockState) platformBoard.update(mockState, me, platformScene.map.objects);
     platformScene.updateMotion(delta);
+    platformScene.updateHighlight(null, 0);
     renderer.render(platformScene.scene, platformScene.camera);
     requestAnimationFrame(walk);
     return;
@@ -595,6 +611,7 @@ const walk = (time: number): void => {
 
 
   if (demoPhase !== "playing") train.updateMotion(delta, 0);
+  train.updateHighlight(null, 0);
   train.updateEffects(time / 1000);
   applyCourseFx(time);
   renderer.render(train.scene, train.camera);
