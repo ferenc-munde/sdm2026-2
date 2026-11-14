@@ -52,6 +52,11 @@ let demoPaused = false;
 const isPreview = () => developerTools && mode.value === "preview";
 
 mapSelect.addEventListener("change", () => {
+  if (mapSelect.value === "follow") {
+    trainScene?.followPlayer();
+    document.getElementById("map-description")!.textContent = "Following your player · nearby carriages and passages stay visible.";
+    return;
+  }
   const car = mapSelect.value === "all" ? null : Number(mapSelect.value);
   trainScene?.focusCar(car);
   document.getElementById("map-description")!.textContent = car === null
