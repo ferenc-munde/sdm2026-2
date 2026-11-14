@@ -10,7 +10,7 @@
 import { LOW_FUEL_THRESHOLD } from "../shared/constants.ts";
 import type { GameState } from "../shared/types.ts";
 
-export type SoundName = "hazard" | "repairDone" | "lowFuel" | "depart" | "win" | "lose";
+export type SoundName = "hazard" | "repairDone" | "coal" | "depart" | "lowFuel" | "win" | "lose";
 
 /** One beep: a frequency and how long it lasts. */
 export interface Note {
@@ -41,6 +41,14 @@ export const SOUNDS: Record<SoundName, SoundSpec> = {
     notes: [
       { frequency: 660, seconds: 0.1 },
       { frequency: 880, seconds: 0.14 },
+    ],
+  },
+  coal: {
+    type: "sine",
+    volume: 0.16,
+    notes: [
+      { frequency: 523, seconds: 0.08 },
+      { frequency: 784, seconds: 0.1 },
     ],
   },
   lowFuel: {
@@ -98,6 +106,11 @@ export function eventsBetween(previous: GameState, next: GameState): SoundName[]
   const sounds: SoundName[] = [];
   if ([...after].some((id) => !before.has(id))) sounds.push("hazard");
   if ([...before].some((id) => !after.has(id))) sounds.push("repairDone");
+
+  // Delivering coal is the main positive action; the tank only rises while the run is playing.
+  const deliveredCoal =
+    previous.phase === "playing" && next.phase === "playing" && next.journey.fuel > previous.journey.fuel + 0.01;
+  if (deliveredCoal) sounds.push("coal");
 
   const crossedLowFuel =
     previous.journey.fuel > LOW_FUEL_THRESHOLD && next.journey.fuel <= LOW_FUEL_THRESHOLD;
