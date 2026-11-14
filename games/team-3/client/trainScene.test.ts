@@ -393,3 +393,19 @@ describe("crew and wheel animation (#294)", () => {
     expect(first.rotation.y).toBe(rolling);
   });
 });
+
+describe("the action highlight (#295)", () => {
+  it("rings the target on the floor and hides it again", () => {
+    const train = build({ players: [], items: [], hazards: [] });
+    const ring = train.scene.getObjectByName("action-highlight");
+    expect(ring?.visible).toBe(false);
+
+    train.updateHighlight({ position: { x: 40, y: -20 }, tone: "item" }, 0);
+    expect(ring?.visible).toBe(true);
+    expect(ring?.position.x).toBe(40);
+    expect(ring?.position.z).toBe(-20);
+
+    train.updateHighlight(null, 0);
+    expect(ring?.visible).toBe(false);
+  });
+});

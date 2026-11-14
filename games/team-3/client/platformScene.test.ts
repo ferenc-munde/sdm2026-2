@@ -139,3 +139,19 @@ describe("waiting crew animation (#294)", () => {
     expect(Math.abs(lift())).toBeLessThanOrEqual(IDLE_BOB + 1e-6);
   });
 });
+
+describe("the action highlight (#295)", () => {
+  it("rings the departure lever and hides it again", () => {
+    const platform = build();
+    const ring = platform.scene.getObjectByName("action-highlight");
+    expect(ring?.visible).toBe(false);
+
+    platform.updateHighlight({ position: { x: 12, y: -8 }, tone: "lever" }, 0);
+    expect(ring?.visible).toBe(true);
+    expect(ring?.position.x).toBe(12);
+    expect(ring?.position.z).toBe(-8);
+
+    platform.updateHighlight(null, 0);
+    expect(ring?.visible).toBe(false);
+  });
+});
