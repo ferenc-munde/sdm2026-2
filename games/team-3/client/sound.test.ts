@@ -55,6 +55,11 @@ describe("eventsBetween", () => {
     expect(eventsBetween(state({ phase: "won" }), state({ phase: "lobby" }))).toEqual([]);
   });
 
+  it("whistles once when the lobby departs (#401)", () => {
+    expect(eventsBetween(state({ phase: "lobby" }), state({ phase: "playing" }))).toEqual(["depart"]);
+    expect(eventsBetween(state({ phase: "playing" }), state({ phase: "playing" }))).toEqual([]);
+  });
+
   it("stays quiet when nothing changed", () => {
     expect(eventsBetween(state(), state())).toEqual([]);
     expect(eventsBetween(state({ hazards: { h1: hazard("h1") } }), state({ hazards: { h1: hazard("h1") } }))).toEqual(
@@ -65,7 +70,7 @@ describe("eventsBetween", () => {
 
 describe("sound specs", () => {
   it("has a short sound for every event", () => {
-    const names: SoundName[] = ["hazard", "repairDone", "lowFuel", "win", "lose"];
+    const names: SoundName[] = ["hazard", "repairDone", "lowFuel", "depart", "win", "lose"];
     for (const name of names) {
       const spec = SOUNDS[name];
       expect(spec.notes.length).toBeGreaterThan(0);
