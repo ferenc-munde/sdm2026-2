@@ -7,6 +7,7 @@ export const HOW_TO_PLAY = [
   "Hold a wrench near a broken steam pipe and interact for 3 seconds. Letting go resets repair progress.",
   "Hold an extinguisher near a fire and interact for 2.5 seconds. Put out engine fires to get moving again.",
   "For a sharp curve, hold the brake lever during the final 2 seconds. Watch hull, fuel and distance.",
+  "The hull is the train's health. It never refills: every open hazard drains it, so fix them fast.",
 ] as const;
 export const CONTROL_HINTS = "Move: WASD / arrows · Tap E: pick up / drop · Hold E: interact · Shift / F: throw";
 
