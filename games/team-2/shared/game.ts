@@ -54,6 +54,8 @@ export function createLastTrain(overrides: Partial<ModuleFactories> = {}): LastT
 			player.name = options?.name ?? `Crew ${state.players.size + 1}`;
 			placeAtSpawn(player, state.players.size);
 			state.players.set(playerId, player);
+			// The separate waiting room has already departed before creating/joining this room.
+			if (state.phase === "lobby" && state.players.size === 1) state.phase = "running";
 		},
 
 		leave: (state, playerId) => {

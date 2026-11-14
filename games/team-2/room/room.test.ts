@@ -100,6 +100,25 @@ describe("team-2 rooms on the platform host", () => {
 		await waitFor(() => adaSeenByGuest.y < adaStart.y - 10);
 	});
 
+	it("starts the journey and synchronizes speed and progress to both players", async () => {
+		const server = await boot();
+		const host = track(await hostGame(server, "Ada"));
+		const guest = track(await joinGame(server, host.code, "Bo"));
+		await waitFor(() => host.state.journeyDistance > 0 && guest.state.journeyDistance > 0);
+		for (const session of [host, guest]) {
+			expect(session.state.phase).toBe("running");
+			expect(session.state.speed).toBeGreaterThan(0);
+		}
+		expect(host.state.speed).toBeCloseTo(guest.state.speed);
+		const before = guest.state.journeyDistance;
+		const speedBefore = host.state.speed;
+		const [id, task] = Array.from(host.state.tasks)[0]!;
+		host.send({ type: "progress", taskId: id, amount: task.target });
+		await waitFor(() => host.state.speed > speedBefore && guest.state.speed > speedBefore);
+		expect(guest.state.journeyDistance).toBeGreaterThan(before);
+		expect(host.state.speed).toBeCloseTo(guest.state.speed);
+	});
+
 	it("removes a player from the state when they leave", async () => {
 		const server = await boot();
 		const host = track(await hostGame(server, "Ada"));
