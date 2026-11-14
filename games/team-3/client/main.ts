@@ -35,6 +35,9 @@ import { createSharedLinkJoin } from "./sharedLinkJoin.ts";
 
 /** `?demo` opens the hand-check page; otherwise the page plays a real room. */
 const demo = new URLSearchParams(window.location.search).has("demo");
+// The page caption names the hand-check page; the real game has the HUD and hints there instead.
+const caption = document.querySelector<HTMLElement>(".title");
+if (caption && !demo) caption.hidden = true;
 const server = serverAddress(window.location, import.meta.env?.VITE_SERVER_URL as string | undefined, import.meta.env?.DEV === true);
 import { createPlatformBoard } from "./platformBoard.ts";
 
@@ -468,6 +471,7 @@ function drawLive(delta: number, time: number): void {
     triggerCourseFx(failureDirection(liveState, state));
   }
   liveState = state;
+  train.updateEffects(time / 1000);
   applyCourseFx(time);
   renderer.render(train.scene, train.camera);
 }
@@ -571,6 +575,7 @@ const walk = (time: number): void => {
   }
 
 
+  train.updateEffects(time / 1000);
   applyCourseFx(time);
   renderer.render(train.scene, train.camera);
   requestAnimationFrame(walk);

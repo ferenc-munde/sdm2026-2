@@ -190,8 +190,125 @@ describe("updateState", () => {
     expect(train.hazardsGroup.children).toHaveLength(0);
   });
 
+  it("gives a breach rising steam and flickers a fire (#217)", () => {
+    const train = build({
+      hazards: [
+        { id: "b", kind: "breach", position: { x: 0, y: 0 }, progress: 0 },
+        { id: "f", kind: "fire", position: { x: 100, y: 0 }, progress: 0 },
+      ],
+    });
+
+    const breach = train.hazardsGroup.children.find((group) => group.userData.hazardId === "b");
+    const steam = breach?.children.filter((child) => child.userData.kind === "steam") ?? [];
+    expect(steam).toHaveLength(4);
+
+    train.updateEffects(0.1);
+    const early = steam[0]?.position.y;
+    train.updateEffects(0.9);
+    expect(steam[0]?.position.y).not.toBe(early);
+
+    const fire = train.hazardsGroup.children.find((group) => group.userData.hazardId === "f");
+    const flame = fire?.children.find((child) => child.name === "fire");
+    train.updateEffects(0.2);
+    const firstScale = flame?.scale.x;
+    train.updateEffects(0.5);
+    expect(flame?.scale.x).not.toBe(firstScale);
+  });
+
   it("can be disposed without throwing", () => {
     const train = build();
     expect(() => train.dispose()).not.toThrow();
+  });
+  it("draws each crew member with a head and turns them to face where they walk (#217)", () => {
+    const train = build({ players: [{ id: "a", name: "Ada", position: { x: 0, y: 0 }, facing: { dx: 0, dy: 1 } }] });
+    const group = train.playersGroup.children[0]!;
+    expect(group.children.some((child) => child.name === "head")).toBe(true);
+    expect(group.children.some((child) => child.name === "facing")).toBe(true);
+    expect(group.rotation.y).toBeCloseTo(-Math.PI / 2);
+  });
+});
+
+describe("updateState keeps what did not change", () => {
+  const counting = () => {
+    let labels = 0;
+    const factory = (name: string): Object3D => {
+      labels += 1;
+      return labelFactory(name);
+    };
+    const train = buildTrainScene({ players, items, hazards }, { labelFactory: factory });
+    return { train, labels: () => labels };
+  };
+
+  it("moves the same objects when only positions, facing and progress change", () => {
+    const { train, labels } = counting();
+    const before = {
+      players: [...train.playersGroup.children],
+      items: [...train.itemsGroup.children],
+      hazards: [...train.hazardsGroup.children],
+    };
+
+    train.updateState({
+      players: players.map((player) => ({ ...player, position: { x: player.position.x + 5, y: 7 }, facing: { dx: -1, dy: 0 } })),
+      items: items.map((item) => ({ ...item, position: { x: item.position.x + 3, y: 4 } })),
+      hazards: hazards.map((hazard) => ({ ...hazard, progress: 0.75 })),
+    });
+
+    expect(train.playersGroup.children).toEqual(before.players);
+    expect(train.itemsGroup.children).toEqual(before.items);
+    expect(train.hazardsGroup.children).toEqual(before.hazards);
+    train.playersGroup.children.forEach((group, index) => expect(group).toBe(before.players[index]));
+    expect(labels()).toBe(players.length); // no name label was drawn again
+
+    const first = train.playersGroup.children[0]!;
+    expect(first.position.x).toBe(15);
+    expect(first.position.z).toBe(7);
+    expect(first.rotation.y).toBeCloseTo(-Math.PI);
+    expect(train.itemsGroup.children[0]!.position.x).toBe(103);
+    const fill = train.hazardsGroup.children[0]!.children
+      .find((child) => child.name === "progress")!
+      .children.find((child) => child.name === "progressFill")!;
+    expect(fill.scale.x).toBeCloseTo(0.75);
+  });
+
+  it("faces +x again when a player stops having a direction", () => {
+    const { train } = counting();
+    train.updateState({ players: [{ ...players[0]!, facing: { dx: 0, dy: 1 } }], items: [], hazards: [] });
+    expect(train.playersGroup.children[0]!.rotation.y).toBeCloseTo(-Math.PI / 2);
+    train.updateState({ players: [{ ...players[0]!, facing: { dx: 0, dy: 0 } }], items: [], hazards: [] });
+    expect(train.playersGroup.children[0]!.rotation.y).toBe(0);
+  });
+
+  it("rebuilds only the player whose name, seat or held item changed", () => {
+    const { train, labels } = counting();
+    const [ada, bela] = train.playersGroup.children;
+
+    // Bela is renamed: one new figure and one new label; Ada is untouched.
+    train.updateState({ players: [players[0]!, { ...players[1]!, name: "Bella" }], items, hazards });
+    expect(train.playersGroup.children[0]).toBe(ada);
+    expect(train.playersGroup.children[1]).not.toBe(bela);
+    expect(train.playersGroup.children[1]!.userData.name).toBe("Bella");
+    expect(labels()).toBe(players.length + 1);
+
+    // Ada drops the extinguisher: her figure is rebuilt without the held item, and it is on the floor.
+    const dropped = items.map((item) => (item.id === "ext-1" ? { ...item, heldBy: null } : item));
+    train.updateState({ players: [players[0]!, { ...players[1]!, name: "Bella" }], items: dropped, hazards });
+    expect(train.playersGroup.children[0]).not.toBe(ada);
+    expect(train.playersGroup.children[0]!.children.some((child) => child.userData.kind === "heldItem")).toBe(false);
+    expect(train.itemsGroup.children.some((child) => child.userData.itemId === "ext-1")).toBe(true);
+  });
+
+  it("keeps the figures in seat order when the crew changes, and removes who left", () => {
+    const { train } = counting();
+    const bela = train.playersGroup.children[1];
+    const cy: RenderPlayer = { id: "c", name: "Cy", position: { x: 0, y: 0 } };
+
+    train.updateState({ players: [...players, cy], items: [], hazards: [] });
+    expect(train.playersGroup.children.map((group) => group.userData.playerId)).toEqual(["a", "b", "c"]);
+    expect(train.playersGroup.children[1]).toBe(bela);
+
+    // Ada leaves: Bela moves up to seat 0, so the colour changes and the figure is rebuilt.
+    train.updateState({ players: [players[1]!, cy], items: [], hazards: [] });
+    expect(train.playersGroup.children.map((group) => group.userData.playerId)).toEqual(["b", "c"]);
+    expect(train.playersGroup.children[0]).not.toBe(bela);
   });
 });

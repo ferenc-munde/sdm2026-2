@@ -14,6 +14,7 @@ import { fireSystem } from "../hazards/fire.ts";
 import { fireSpreadSystem } from "../hazards/spread.ts";
 import { pickUpOrDrop } from "../items/items.ts";
 import { createThrowSystem, throwItem } from "../items/throw.ts";
+import { createDashSystem, startDash } from "../movement/dash.ts";
 import { createTrainMap, type TrainMap } from "../map/map.ts";
 import { createPlatformMap, platformSpawn, type PlatformMap } from "../map/platform.ts";
 import type { ClientMessage, ErrorCode } from "../messages.ts";
@@ -79,6 +80,7 @@ export function createRunSystems(train: TrainMap, steeringConsole: Station): Ste
   const movement: StepSystem = (state, dt, frame) => stepMovement(state, inputDirections(frame.inputs), dt, train);
   return [
     movement,
+    createDashSystem(train),
     createThrowSystem(train),
     journeySystem,
     breachSystem,
@@ -274,7 +276,9 @@ function applyMessage(room: Room, playerId: PlayerId, message: ClientMessage, wo
 
     case "throw": {
       if (phase !== "playing") return refuse(room, "invalidMessage");
-      const state = throwItem(session.state, playerId);
+      // Holding something throws it (#29); empty hands dash (#228).
+      const holding = session.state.players[playerId]?.heldItem != null;
+      const state = holding ? throwItem(session.state, playerId) : startDash(session.state, playerId);
       return { ok: true, room: withSession(room, { ...session, state }) };
     }
 
