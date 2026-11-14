@@ -50,10 +50,9 @@ From `games/team-2/`, run `pnpm dev`. The dev script starts Vite with
 room) on port 2567. `pnpm dev:server` and `pnpm dev:client` start one of the
 two. The server runs through `vite-node`.
 Use two browser tabs, choose the same team size, and join with distinct player
-names. The server-owned countdown is two minutes; its final 30 seconds turn red.
-The host can skip it to start with the current crew, including one player.
-When time expires, the game starts with whoever joined, and everybody lands
-in one game room.
+names. The lobby waits indefinitely and starts when the selected crew size is
+filled; the host can start early with the current crew, including one player.
+Everybody lands in the same running game room.
 
 ## Rules for code in `shared/`
 

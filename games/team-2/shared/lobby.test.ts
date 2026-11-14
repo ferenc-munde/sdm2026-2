@@ -1,25 +1,8 @@
 import { describe, expect, it } from "vitest";
-import {
-	addLobbyPlayer,
-	advanceLobbyCountdown,
-	createLobbyState,
-	LOBBY_COUNTDOWN_SECONDS,
-	LOBBY_COUNTDOWN_URGENT_SECONDS,
-	isLobbyCountdownUrgent,
-	removeLobbyPlayer,
-	startLobby,
-} from "./lobby.ts";
+import { addLobbyPlayer, createLobbyState, removeLobbyPlayer, startLobby } from "./lobby.ts";
 
 describe("multiplayer lobby rules", () => {
-	it("uses a two-minute wait and marks the final 30 seconds urgent", () => {
-		expect(LOBBY_COUNTDOWN_SECONDS).toBe(120);
-		expect(LOBBY_COUNTDOWN_URGENT_SECONDS).toBe(30);
-		expect(isLobbyCountdownUrgent(31)).toBe(false);
-		expect(isLobbyCountdownUrgent(30)).toBe(true);
-		expect(isLobbyCountdownUrgent(1)).toBe(true);
-	});
-
-	it("assigns the first player as host and tracks open slots", () => {
+	it("assigns the first player as host and tracks the crew without a countdown", () => {
 		const state = createLobbyState(4);
 
 		expect(addLobbyPlayer(state, "a", " Rawan ")).toBe(true);
@@ -28,19 +11,21 @@ describe("multiplayer lobby rules", () => {
 		expect(state.players.get("a")?.isHost).toBe(true);
 		expect(state.players.get("b")?.isHost).toBe(false);
 		expect(state.playerCount).toBe(2);
-		expect(state.secondsRemaining).toBe(LOBBY_COUNTDOWN_SECONDS);
+		expect("secondsRemaining" in state).toBe(false);
+		expect(state.status).toBe("waiting");
 	});
 
-	it("starts as soon as the selected team size joins and rejects late joins", () => {
-		const state = createLobbyState(2);
+	it.each([2, 3, 4] as const)("starts automatically when all %i crew seats fill", (teamSize) => {
+		const state = createLobbyState(teamSize);
+		for (let index = 0; index < teamSize - 1; index++) {
+			expect(addLobbyPlayer(state, `p${index}`, `Player ${index + 1}`)).toBe(true);
+			expect(state.status).toBe("waiting");
+		}
 
-		addLobbyPlayer(state, "a", "A");
-		addLobbyPlayer(state, "b", "B");
-
+		expect(addLobbyPlayer(state, `p${teamSize - 1}`, `Player ${teamSize}`)).toBe(true);
 		expect(state.status).toBe("running");
-		expect(state.startedPlayerCount).toBe(2);
-		expect(addLobbyPlayer(state, "c", "C")).toBe(false);
-		expect(startLobby(state)).toBe(false);
+		expect(state.startedPlayerCount).toBe(teamSize);
+		expect(addLobbyPlayer(state, "late", "Late player")).toBe(false);
 	});
 
 	it("lets the host start early with the current crew, including one player", () => {
@@ -57,41 +42,13 @@ describe("multiplayer lobby rules", () => {
 		expect(crew.startedPlayerCount).toBe(2);
 	});
 
-	it("starts solo after the countdown expires", () => {
-		const state = createLobbyState(4);
-		addLobbyPlayer(state, "a", "A");
-
-		for (let second = 0; second < LOBBY_COUNTDOWN_SECONDS - 1; second++) {
-			expect(advanceLobbyCountdown(state)).toBe(false);
-		}
-		expect(state.secondsRemaining).toBe(1);
-		expect(state.status).toBe("waiting");
-
-		expect(advanceLobbyCountdown(state)).toBe(true);
-		expect(state.status).toBe("running");
-		expect(state.startedPlayerCount).toBe(1);
-	});
-
-	it("starts with all joined players when the countdown expires with a crew", () => {
-		const state = createLobbyState(4);
-		addLobbyPlayer(state, "a", "A");
-		addLobbyPlayer(state, "b", "B");
-
-		for (let second = 0; second < LOBBY_COUNTDOWN_SECONDS; second++) advanceLobbyCountdown(state);
-		expect(state.status).toBe("running");
-		expect(state.startedPlayerCount).toBe(2);
-	});
-
-	it("does not start when the room has no players", () => {
+	it("does not start an empty lobby", () => {
 		const state = createLobbyState(2);
-		for (let second = 0; second < LOBBY_COUNTDOWN_SECONDS + 1; second++) {
-			expect(advanceLobbyCountdown(state)).toBe(false);
-		}
 		expect(startLobby(state)).toBe(false);
 		expect(state.status).toBe("waiting");
 	});
 
-	it("reassigns the host when they leave and resets an empty waiting room", () => {
+	it("reassigns the host when they leave and clears an empty waiting room", () => {
 		const state = createLobbyState(4);
 		addLobbyPlayer(state, "a", "A");
 		addLobbyPlayer(state, "b", "B");
@@ -106,6 +63,5 @@ describe("multiplayer lobby rules", () => {
 		removeLobbyPlayer(state, "c");
 		expect(state.playerCount).toBe(0);
 		expect(state.hostSessionId).toBe("");
-		expect(state.secondsRemaining).toBe(LOBBY_COUNTDOWN_SECONDS);
 	});
 });

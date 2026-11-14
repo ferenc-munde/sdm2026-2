@@ -1,7 +1,6 @@
 import { Client as ColyseusClient, type Room } from "@colyseus/sdk";
 import {
 	GAME_ROOM_MESSAGE,
-	isLobbyCountdownUrgent,
 	LOBBY_ROOM_NAME,
 	type GameRoomMessage,
 } from "../shared/lobby.ts";
@@ -18,10 +17,10 @@ interface LobbyRoomView {
 	teamSize: number;
 	playerCount: number;
 	startedPlayerCount: number;
-	secondsRemaining: number;
 	status: string;
 	hostSessionId: string;
 	roomCode: string;
+	gameRoomCode: string;
 	cancellationReason: string;
 	players: Map<string, LobbyPlayerView>;
 }
@@ -55,7 +54,7 @@ export function mountLobby(
 	parent: HTMLElement,
 	onMatchStart: (match: LobbyDeparture) => void,
 	serverUrl: string = lobbyServerUrl(),
-): { destroy: () => void } {
+): { destroy: () => void; showTransitionError: (message: string) => void } {
 	const root = document.createElement("div");
 	root.id = "last-train-lobby-root";
 	root.className = "last-train-lobby";
@@ -113,9 +112,9 @@ export function mountLobby(
 						<span>SHARE THIS ROOM CODE</span>
 						<strong data-room-code aria-label="Room code"></strong>
 					</div>
-					<div class="lobby-countdown" aria-live="polite">
-						<span class="countdown-icon" aria-hidden="true">◷</span>
-						<div><small>TRAIN DEPARTS IN</small><strong data-countdown>02:00</strong></div>
+					<div class="lobby-start-condition" aria-live="polite">
+						<strong data-start-condition>Waiting for players: 0 / 4</strong>
+						<small data-start-details>The game starts automatically when every seat is filled.</small>
 					</div>
 					<div class="lobby-slots" data-player-slots></div>
 					<p class="lobby-wait-message" data-wait-message aria-live="polite">
@@ -130,8 +129,8 @@ export function mountLobby(
 				</section>
 				<section class="lobby-cancelled" aria-live="polite" hidden>
 					<div class="lobby-cancel-icon" aria-hidden="true">!</div>
-					<p class="lobby-kicker">DEPARTURE CANCELLED</p>
-					<h2>More crew required</h2>
+					<p class="lobby-kicker" data-cancel-kicker>DEPARTURE CANCELLED</p>
+					<h2 data-cancel-title>More crew required</h2>
 					<p class="lobby-cancel-copy" data-cancel-reason></p>
 					<button class="lobby-primary" type="button" data-return>Return to station</button>
 				</section>
@@ -158,8 +157,8 @@ export function mountLobby(
 	const roomCodePanel = root.querySelector<HTMLElement>("[data-room-code-panel]")!;
 	const roomCodeLabel = root.querySelector<HTMLElement>("[data-room-code]")!;
 	const count = root.querySelector<HTMLElement>("[data-player-count]")!;
-	const countdown = root.querySelector<HTMLElement>("[data-countdown]")!;
-	const countdownPanel = root.querySelector<HTMLElement>(".lobby-countdown")!;
+	const startCondition = root.querySelector<HTMLElement>("[data-start-condition]")!;
+	const startDetails = root.querySelector<HTMLElement>("[data-start-details]")!;
 	const slots = root.querySelector<HTMLElement>("[data-player-slots]")!;
 	const waitMessage = root.querySelector<HTMLElement>("[data-wait-message]")!;
 	const roomError = root.querySelector<HTMLElement>("[data-room-error]")!;
@@ -168,6 +167,9 @@ export function mountLobby(
 	const hostHint = root.querySelector<HTMLElement>("[data-host-hint]")!;
 	const cancelledPanel = root.querySelector<HTMLElement>(".lobby-cancelled")!;
 	const cancelReason = root.querySelector<HTMLElement>("[data-cancel-reason]")!;
+	const cancelTitle = root.querySelector<HTMLElement>("[data-cancel-title]")!;
+	const cancelKicker = root.querySelector<HTMLElement>("[data-cancel-kicker]")!;
+	const returnButton = root.querySelector<HTMLButtonElement>("[data-return]")!;
 
 	let room: Room<any, LobbyRoomView> | undefined;
 	let connecting = false;
@@ -188,7 +190,7 @@ export function mountLobby(
 	});
 	leaveButton.addEventListener("click", () => void leaveLobby());
 	startNowButton.addEventListener("click", () => room?.send("start-now"));
-	root.querySelector<HTMLButtonElement>("[data-return]")!.addEventListener("click", () => void leaveLobby());
+	returnButton.addEventListener("click", () => void leaveLobby());
 
 	async function connect(mode: "create" | "join"): Promise<void> {
 		const name = nameInput.value.trim();
@@ -264,6 +266,7 @@ export function mountLobby(
 		// The SDK decodes the room state asynchronously: the join can resolve before the first
 		// snapshot lands, so skip empty states — onStateChange re-runs sync with the real one.
 		if (!state?.players) return;
+		if (state.gameRoomCode) resolveGameCode(state.gameRoomCode);
 		if (!matchStarted) {
 			setup.hidden = true;
 			waiting.hidden = false;
@@ -275,8 +278,12 @@ export function mountLobby(
 			.map(([sessionId, player]) => ({ sessionId, ...player }))
 			.sort((a, b) => a.slot - b.slot);
 		count.textContent = state.playerCount + " / " + state.teamSize + " PLAYERS";
-		countdown.textContent = formatTime(state.secondsRemaining);
-		countdownPanel.classList.toggle("is-urgent", isLobbyCountdownUrgent(state.secondsRemaining));
+		startCondition.textContent = state.playerCount >= state.teamSize
+			? "Crew complete — starting the game…"
+			: `Waiting for players: ${state.playerCount} / ${state.teamSize}`;
+		startDetails.textContent = state.playerCount >= state.teamSize
+			? "All seats are filled. Connecting the crew to the game now."
+			: "The game starts automatically when every seat is filled.";
 		const isHost = state.hostSessionId === room?.sessionId;
 		roomCodePanel.hidden = !isHost;
 		if (isHost) roomCodeLabel.textContent = state.roomCode || room?.roomId || "Connecting…";
@@ -299,14 +306,10 @@ export function mountLobby(
 				: "Waiting for other players to join your crew…"
 			: "The crew is aboard. Starting the journey…";
 		startNowButton.hidden = !isHost;
-		startNowButton.textContent = "SKIP THE TIMER";
+		startNowButton.textContent = "START NOW · CURRENT CREW";
 		hostHint.textContent = isHost
-			? state.playerCount === 1
-				? "You can depart solo now or wait for more crew."
-				: "Skip the countdown and depart with everyone aboard."
-			: state.playerCount === 1
-				? "The host can start solo or wait for more crew."
-				: "Only the crew host can choose departure.";
+			? "You can start now with the players who have joined."
+			: "The host can start early; otherwise the game starts when the crew is full.";
 
 		if (state.status === "running" && !matchStarted) {
 			startMatch({
@@ -390,6 +393,7 @@ export function mountLobby(
 		room = undefined;
 		if (activeRoom) await activeRoom.leave();
 		waiting.hidden = true;
+		cancelledPanel.hidden = true;
 		setup.hidden = false;
 		showSetupStep("choices");
 		error.textContent = "You left the lobby. Join again when ready.";
@@ -400,6 +404,16 @@ export function mountLobby(
 			void room?.leave();
 			root.remove();
 		},
+		showTransitionError(message: string) {
+			root.hidden = false;
+			setup.hidden = true;
+			waiting.hidden = true;
+			cancelledPanel.hidden = false;
+			cancelKicker.textContent = "CONNECTION ISSUE";
+			cancelTitle.textContent = "The game could not start";
+			cancelReason.textContent = message;
+			returnButton.textContent = "Back to player entry";
+		},
 	};
 }
 
@@ -407,10 +421,4 @@ function lobbyServerUrl(): string {
 	const override = new URLSearchParams(window.location.search).get("lobby");
 	if (override) return override;
 	return window.location.protocol + "//" + (window.location.hostname || "127.0.0.1") + ":2567";
-}
-
-function formatTime(seconds: number): string {
-	const safeSeconds = Math.max(0, seconds);
-	return String(Math.floor(safeSeconds / 60)).padStart(2, "0")
-		+ ":" + String(safeSeconds % 60).padStart(2, "0");
 }
