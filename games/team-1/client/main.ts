@@ -1,6 +1,7 @@
 
 import { MockSessionAdapter, SessionError, type LobbyPlayer, type SessionAdapter, type SessionEvent } from "./session-adapter.mjs";
 import { createPreviewSnapshot, MockGameStateAdapter, reconcilePreviewPlayers, type GameClientSnapshot, type GameStateAdapter } from "./game-state-adapter.mjs";
+import { AmbientMusicController } from "./ambient-music";
 import { mountGameplayView, type PreviewAction } from "./gameplay-view";
 import { PlayerPreviewController } from "./player-preview-controller";
 import { serverAddress } from "@sdm/core/client";
@@ -14,6 +15,7 @@ function getAppRoot(): HTMLDivElement {
 }
 
 const app = getAppRoot();
+const ambientMusic = new AmbientMusicController();
 
 // The game runs on the platform room by default. `?mock` in the URL keeps the old in-memory
 // preview (no server needed); the DOM tests use it too.
@@ -39,10 +41,16 @@ app.innerHTML = `
       <span class="wordmark-mark">LT</span>
       <span>THE LAST TRAIN</span>
     </a>
-    <span class="chapter">
-      <span class="live-dot"></span> DEPARTURE BOARD
-      <span class="chapter-line"></span> 01 / 04
-    </span>
+    <div class="topbar-controls">
+      <button id="music-toggle" class="music-toggle" type="button" aria-label="Background music" aria-pressed="false">
+        Music off
+      </button>
+      <span id="music-status" class="visually-hidden" role="status" aria-live="polite"></span>
+      <span class="chapter">
+        <span class="live-dot"></span> DEPARTURE BOARD
+        <span class="chapter-line"></span> 01 / 04
+      </span>
+    </div>
   </header>
 
   <section class="hero" aria-labelledby="page-title">
@@ -153,6 +161,9 @@ const playerList = app.querySelector<HTMLUListElement>("#player-list")!;
 const createButton = app.querySelector<HTMLButtonElement>("#create-session")!;
 const joinButton = app.querySelector<HTMLButtonElement>("#join-session")!;
 const gameScreen = app.querySelector<HTMLElement>("#game-screen")!;
+const musicButton = app.querySelector<HTMLButtonElement>("#music-toggle")!;
+const musicStatus = app.querySelector<HTMLElement>("#music-status")!;
+let musicTogglePending = false;
 
 /** The state source of the open game view; undefined while the lobby is shown. */
 let gameplayAdapter: GameStateAdapter | undefined;
@@ -176,6 +187,7 @@ createButton.addEventListener("click", () => void connect("create"));
 joinButton.addEventListener("click", () => void connect("join"));
 app.querySelector<HTMLButtonElement>("#leave-session")!.addEventListener("click", () => void disconnect());
 app.querySelector<HTMLButtonElement>("#board-train")!.addEventListener("click", boardTrain);
+musicButton.addEventListener("click", () => void toggleAmbientMusic());
 
 app.querySelector<HTMLInputElement>("#room-code")!.addEventListener("input", (event) => {
   const input = event.currentTarget as HTMLInputElement;
@@ -197,8 +209,33 @@ window.addEventListener("pagehide", () => {
   disposeGameplay?.();
   disposeGameplay = undefined;
 
+  void ambientMusic.dispose().catch((error) => {
+    console.error("Could not stop background music:", error);
+  });
+
   void adapter.leaveSession();
 }, { once: true });
+
+async function toggleAmbientMusic(): Promise<void> {
+  if (musicTogglePending) return;
+
+  musicTogglePending = true;
+  musicButton.disabled = true;
+
+  try {
+    const enabled = await ambientMusic.toggle();
+    musicButton.setAttribute("aria-pressed", String(enabled));
+    musicButton.textContent = enabled ? "Music on" : "Music off";
+    musicStatus.textContent = enabled ? "Background music enabled." : "Background music muted.";
+  } catch (error) {
+    musicStatus.textContent = error instanceof Error
+      ? `Background music unavailable: ${error.message}`
+      : "Background music could not start.";
+  } finally {
+    musicTogglePending = false;
+    musicButton.disabled = false;
+  }
+}
 
 async function connect(mode: "create" | "join"): Promise<void> {
   if (pending) return;
