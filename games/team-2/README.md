@@ -32,10 +32,12 @@ pnpm run build       # typecheck + client build to client/dist/ (Vite root is cl
 pnpm run preview     # serve the client build
 ```
 
-Open two browser tabs at `http://127.0.0.1:5173/`, choose the same crew size, and join with distinct names.
-The host can skip the 30-second lobby countdown and depart with the current
-crew, including one player. When the timer expires, the game starts with
-whoever joined.
+Open two browser tabs at `http://127.0.0.1:5173/`. In the first tab, enter a
+name, choose a crew size, and select **Create Room**. Share the displayed room
+code with the other players; they enter their names and that code, then select
+**Join Room**. Rooms support up to four players. The host can skip the
+30-second lobby countdown and depart with the current crew, including one
+player. When the timer expires, the game starts with whoever joined.
 
 After departure every player sits in the **same game room on the server**:
 the lobby host's browser creates it and the others join it by its code. Each
@@ -46,7 +48,8 @@ tasks, hazards, items and the journey are not simulated yet
 
 Add `?local` to the address for the offline demo: no server and no lobby, the
 same rules run in the browser with one player (`client/stateModel.ts`).
-`?room=CODE` joins a game room directly by its code.
+`?room=CODE` joins a game room directly by its code. The lobby code is distinct
+from this gameplay room code and is used only to gather the crew before departure.
 
 The map is flat 2D, displayed by Three.js with five vertical carriages, 20
 station locations, four passages, scrolling scenery and a carriage inspector.

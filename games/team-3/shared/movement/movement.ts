@@ -87,9 +87,9 @@ function advanceImpulse(map: Walled, position: Vec2, velocity: Vec2, dt: number)
 }
 
 /** Where a player at `position` ends up after moving in `direction` for `dt` seconds. */
-export function movePosition(map: Walled, position: Vec2, direction: Direction, dt: number): Vec2 {
+export function movePosition(map: Walled, position: Vec2, direction: Direction, dt: number, speed = PLAYER_SPEED): Vec2 {
   if (dt <= 0 || isStill(direction)) return position;
-  const velocity = velocityFor(direction);
+  const velocity = velocityFor(direction, speed);
   const afterX = moveAxis(map, position, "x", velocity.x * dt);
   return moveAxis(map, afterX, "y", velocity.y * dt);
 }
@@ -122,6 +122,8 @@ export function stepMovement(
       };
       continue;
     }
+    // A dashing player is moved by the dash (dash.ts), not by their keys.
+    if ((player.dashSeconds ?? 0) > 0) continue;
     if (!direction || isStill(direction)) {
       if ((player.stunnedSeconds ?? 0) > 0 || (player.velocity && (player.velocity.x !== 0 || player.velocity.y !== 0))) {
         players ??= { ...state.players };

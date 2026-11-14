@@ -1,14 +1,9 @@
 import * as THREE from "three";
 import { MAP_HEIGHT, MAP_WIDTH, PLAYER_RADIUS } from "../shared/map.ts";
+import type { Item, Player } from "../shared/state.ts";
+import { createPlayerVisuals } from "./player-visuals";
+import { createItemVisuals } from "./item-visuals";
 import { TRAIN_CARS, TRAIN_PASSAGES } from "./train-map";
-
-/** What the scene needs to draw one crew member; positions are map units (shared/map.ts). */
-export interface ScenePlayer {
-  id: string;
-  x: number;
-  y: number;
-  eliminated?: boolean;
-}
 
 /** One colour per seat, in the order players joined (same order as the lobby avatars). */
 export const PLAYER_COLORS = ["#62cdd3", "#e46c63", "#e0bc4e", "#6f9bea"] as const;
@@ -97,44 +92,75 @@ export function createTrainScene(container: HTMLElement) {
   const texture = new THREE.CanvasTexture(art);
   texture.magFilter = THREE.NearestFilter; texture.minFilter = THREE.NearestFilter;
   texture.colorSpace = THREE.SRGBColorSpace;
-  const scene = new THREE.Scene(); scene.background = new THREE.Color("#292e20");
+  const scene = new THREE.Scene();
+  const backgroundScene = new THREE.Scene();
+  backgroundScene.background = new THREE.Color("#292e20");
+  const backgroundCamera = new THREE.OrthographicCamera(-800, 800, 500, -500, 0.1, 10);
+  backgroundCamera.position.z = 2;
   const camera = new THREE.OrthographicCamera(-800, 800, 500, -500, 0.1, 10);
   camera.position.z = 2;
   const geometry = new THREE.PlaneGeometry(1600, 1000);
   const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
   const landscapeTexture = new THREE.CanvasTexture(landscape);
   landscapeTexture.wrapT = THREE.RepeatWrapping;
+  landscapeTexture.wrapS = THREE.RepeatWrapping;
   landscapeTexture.magFilter = THREE.NearestFilter;
   landscapeTexture.minFilter = THREE.NearestFilter;
   landscapeTexture.colorSpace = THREE.SRGBColorSpace;
   const landscapeMaterial = new THREE.MeshBasicMaterial({ map: landscapeTexture });
   const landscapeMesh = new THREE.Mesh(geometry, landscapeMaterial);
   landscapeMesh.position.z = -0.1;
-  scene.add(landscapeMesh);
+  backgroundScene.add(landscapeMesh);
   scene.add(new THREE.Mesh(geometry, material));
-  // One disc per player, created and removed as the players map changes.
-  const playerGeometry = new THREE.CircleGeometry(PLAYER_RADIUS, 24);
-  const outlineGeometry = new THREE.CircleGeometry(PLAYER_RADIUS + 3, 24);
-  const outlineMaterial = new THREE.MeshBasicMaterial({ color: "#10161a" });
-  const selfOutlineMaterial = new THREE.MeshBasicMaterial({ color: "#ffffff" });
-  const playerMarkers = new Map<string, { group: THREE.Group; outline: THREE.Mesh; material: THREE.MeshBasicMaterial }>();
-  function removeMarker(id: string) {
-    const marker = playerMarkers.get(id);
-    if (!marker) return;
-    scene.remove(marker.group); marker.material.dispose(); playerMarkers.delete(id);
-  }
+  // Layers for player and item visuals, added to the scene so the modules
+  // can manage their own children without touching the rest of the scene graph.
+  const playerLayer = new THREE.Group();
+  const itemLayer = new THREE.Group();
+  scene.add(playerLayer);
+  scene.add(itemLayer);
+  const playerVisuals = createPlayerVisuals(playerLayer);
+  const itemVisuals = createItemVisuals(itemLayer, (id) => playerVisuals.getCarryAnchor(id));
   const renderer = new THREE.WebGLRenderer({ antialias: false });
+  renderer.autoClear = false;
   renderer.domElement.setAttribute("aria-label", "2D top-down train with five carriages and forest tracks");
   container.append(renderer.domElement);
   let focusedCar: number | null = null;
+  let viewportWidth = 1, viewportHeight = 1, playHeight = 1;
+  function render() {
+    // Draw one continuous moving landscape across the entire page.
+    renderer.setViewport(0, 0, viewportWidth, viewportHeight);
+    renderer.clear();
+    renderer.render(backgroundScene, backgroundCamera);
+    // Only train/players reserve the HUD area, so the first car stays visible.
+    renderer.clearDepth();
+    renderer.setViewport(0, 0, viewportWidth, playHeight);
+    renderer.render(scene, camera);
+  }
   function resize() {
-    const w = container.clientWidth, h = Math.max(1, container.clientHeight), ratio = w / h;
+    const w = Math.max(1, container.clientWidth), h = Math.max(1, container.clientHeight);
+    const hudTop = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--hud-safe-top")) || 140;
+    viewportWidth = w; viewportHeight = h;
+    playHeight = Math.max(1, h - Math.min(hudTop, h - 1));
+    const ratio = w / playHeight;
     const height = focusedCar === null ? Math.max(1000, 1600 / ratio) : Math.max(400, 560 / ratio);
     camera.left = -height * ratio / 2; camera.right = height * ratio / 2;
     camera.top = height / 2; camera.bottom = -height / 2;
     camera.position.y = focusedCar === null ? 0 : 500 - (TRAIN_CARS[focusedCar]!.bounds.y + 79);
-    camera.updateProjectionMatrix(); renderer.setSize(w, h); renderer.render(scene, camera);
+    camera.updateProjectionMatrix();
+    const fullHeight = height * h / playHeight;
+    const fullWidth = height * ratio;
+    backgroundCamera.left = -fullWidth / 2; backgroundCamera.right = fullWidth / 2;
+    backgroundCamera.top = fullHeight / 2; backgroundCamera.bottom = -fullHeight / 2;
+    backgroundCamera.updateProjectionMatrix();
+    landscapeMesh.scale.set(fullWidth / 1600, fullHeight / 1000, 1);
+    landscapeTexture.repeat.set(fullWidth / 1600, fullHeight / 1000);
+    landscapeTexture.offset.x = (1 - fullWidth / 1600) / 2;
+    renderer.setSize(w, h); render();
   }
+  const viewportObserver = new ResizeObserver(resize);
+  viewportObserver.observe(container);
+  const hudObserver = new MutationObserver(resize);
+  hudObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
   window.addEventListener("resize", resize); resize();
   let speed = 1;
   let paused = false;
@@ -146,7 +172,7 @@ export function createTrainScene(container: HTMLElement) {
     if (!paused && !document.hidden) {
       landscapeTexture.offset.y = (landscapeTexture.offset.y + dt * speed * 0.12) % 1;
     }
-    renderer.render(scene, camera);
+    render();
   });
   return {
     /** Inspect approximately two cars; null restores the full map overview. */
@@ -157,36 +183,20 @@ export function createTrainScene(container: HTMLElement) {
     /** Visual multiplier, not a gameplay speed formula. Zero stops the scenery. */
     setSpeed(value: number) { speed = Number.isFinite(value) ? Math.max(0, value) : 0; },
     setPaused(value: boolean) { paused = value; },
-    /** Draw the crew: adds a marker for a new player, moves existing ones, removes those who left. */
-    setPlayers(players: Iterable<ScenePlayer>, localId?: string) {
-      const seen = new Set<string>();
-      let seat = 0;
-      for (const player of players) {
-        seen.add(player.id);
-        let marker = playerMarkers.get(player.id);
-        if (!marker) {
-          const material = new THREE.MeshBasicMaterial({ color: PLAYER_COLORS[seat % PLAYER_COLORS.length], transparent: true });
-          const outline = new THREE.Mesh(outlineGeometry, outlineMaterial);
-          const disc = new THREE.Mesh(playerGeometry, material);
-          disc.position.z = 0.1;
-          const group = new THREE.Group();
-          group.add(outline, disc);
-          marker = { group, outline, material };
-          playerMarkers.set(player.id, marker);
-          scene.add(group);
-        }
-        // Map units have y pointing down from the top-left corner; the camera looks at the map centre.
-        marker.group.position.set(player.x - MAP_WIDTH / 2, MAP_HEIGHT / 2 - player.y, 0.2);
-        marker.outline.material = player.id === localId ? selfOutlineMaterial : outlineMaterial;
-        marker.material.opacity = player.eliminated ? 0.35 : 1;
-        seat += 1;
-      }
-      for (const id of [...playerMarkers.keys()]) if (!seen.has(id)) removeMarker(id);
+    /** Draw the crew from the game state, delegated to the player-visuals module. */
+    setPlayers(players: Iterable<[string, Player]>, localId?: string) {
+      playerVisuals.update(players, localId);
+    },
+    /** Draw items from the game state, delegated to the item-visuals module. */
+    setItems(items: Iterable<[string, Item]>) {
+      itemVisuals.update(items);
     },
     destroy() {
     renderer.setAnimationLoop(null);
-    for (const id of [...playerMarkers.keys()]) removeMarker(id);
-    playerGeometry.dispose(); outlineGeometry.dispose(); outlineMaterial.dispose(); selfOutlineMaterial.dispose();
+    viewportObserver.disconnect();
+    hudObserver.disconnect();
+    playerVisuals.destroy();
+    itemVisuals.destroy();
     window.removeEventListener("resize", resize); geometry.dispose(); material.dispose();
     landscapeTexture.dispose(); landscapeMaterial.dispose();
     texture.dispose(); renderer.dispose(); renderer.domElement.remove();

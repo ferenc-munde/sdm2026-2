@@ -18,7 +18,7 @@ What has been done so far:
 | `@sdm/core` | Done: contract (`shared`), simulation contract (`sim`), `Simulation` with replays that re-run to the same state hash (`server`), connection helpers for the browser (`client`). Not built: prediction, interpolation and debug tools in the client core |
 | `@sdm/host` | Done: `startGameServer()`, `createGameRoom()`, `/health`, join by code, replays, bug reports, stats, structured logs, input limits, serving the built client. Not built: storage that survives a restart (replays and bug reports are kept in memory), access control for `/api/stats` and the replay routes |
 | `@sdm/template` | Not built: only the README exists |
-| `@sdm/gateway`, Railway environments | The gateway is not built. `railway.json` starts the game chosen by the `GAME` service variable; the Railway project and its services are set up by the platform team and not recorded here |
+| `@sdm/gateway`, Railway environments | Done in the repository: `@sdm/gateway` serves every game under `/<game>/` on one address (HTTP and WebSocket). `railway.json` builds all clients with `--base=./` and starts the gateway with every game of the monorepo as its own process, so one Railway service and one domain serve `/team-1/`, `/team-2/`, `/team-3/` from `main`. The Railway project and its service are set up by the platform team and not recorded here |
 | Game teams | Building: Team 1, Team 2 and Team 3 each start their game on the platform host with a `server.ts` and a room in `room/` |
 
 All three games already run on `@sdm/core` and `@sdm/host`. `@sdm/template` is the part the teams still wait for (Team 2 asked for it in issue #73). The build order is in [README.md](README.md#build-order).

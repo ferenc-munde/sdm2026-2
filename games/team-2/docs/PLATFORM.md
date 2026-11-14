@@ -38,6 +38,7 @@ The rule modules live in a `WeakMap` keyed by the state object. They hold nothin
 | `phase` | string: `lobby`, `running`, `won`, `lost` | No. Stays `lobby` in the game room |
 | `journeyDistance`, `speed`, `power`, `pressure`, `endgameUnlocked` | numbers, boolean | No (defaults) |
 | `timeLimitTicks` | uint16 | Yes, in `init` |
+| `runTicks` | uint32 | Yes, in `step`: ticks played in the current run. Rises while `phase` is `running`, restarts at 0 with a new run. The HUD reads the run clock from here; clients never count ticks |
 | `players` | map of `Player`, keyed by player id (the session id) | Yes |
 | `tasks`, `hazards`, `items`, `doors` | maps | No. Nothing creates entries yet |
 
@@ -86,7 +87,7 @@ export const rooms = {
 };
 ```
 
-`server.ts` calls `startGameServer({ gameId: "team-2", config, rooms })` and then `configureMatchmaking()`. That second call is needed: the host registers rooms without matchmaking filters, and the lobby must only match players who chose the same crew size (`filterBy(["teamSize"])`). A test or script that starts the server another way must call it too. If the platform later accepts filters in room registration, move it there (that needs a `platform` issue).
+`server.ts` calls `startGameServer({ gameId: "team-2", config, rooms })`. The lobby uses private room creation and direct joins by Colyseus room ID, so it does not use matchmaking filters.
 
 The host also serves `GET /health` and `POST /api/rooms/join` (turns a room code into a room id).
 
@@ -94,11 +95,11 @@ The host also serves `GET /health` and `POST /api/rooms/join` (turns a room code
 
 The lobby and the game are two different rooms, and the platform has no lobby of its own. The flow:
 
-1. Players join `train_lobby` with a name and a crew size (unchanged).
-2. The lobby departs (full crew, countdown, or the host skips) and sends `match-started` (unchanged).
-3. The **lobby host's** browser creates the game room (`hostGame`, which calls the platform's `hostRoom`) and sends the lobby the message `game-room` with `{ code }`.
-4. The lobby room checks that the sender is the host and the lobby is running, then sends `game-room` to everybody.
-5. The **other** browsers join the game room by that code (`joinGame`, which calls `joinRoomByCode`), with their lobby name.
+1. The host creates a private `train_lobby` with their name and a crew size from two to four. Colyseus generates a unique room ID; the server stores it as that lobby's room code.
+2. The host shares the lobby code. Friends join that same `train_lobby` by its code with their names; Colyseus rejects unknown, locked, and full rooms.
+3. When the lobby departs (full crew, countdown, or host skip), it sends `match-started`.
+4. The **lobby host's** browser creates the gameplay room (`hostGame`, which calls the platform's `hostRoom`) and sends the gameplay room code to the lobby with `game-room`.
+5. The **other** browsers join the gameplay room by that code (`joinGame`, which calls `joinRoomByCode`), with their lobby name.
 6. Everybody leaves the lobby room.
 
 Known limits: if the host closes the tab between steps 2 and 3, the others wait 15 seconds and see an error; they must reload. A player who reloads during the game does not come back automatically (the platform keeps the seat for `reconnectSeconds`, but the client does not reconnect yet). Anybody who knows the code can join with `?room=CODE` while a seat is free.

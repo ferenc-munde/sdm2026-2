@@ -1,7 +1,7 @@
 import { MapSchema, Schema, type } from "@colyseus/schema";
 import { z } from "zod";
 
-/** Colyseus room name of the waiting room (the game room is the platform's GAME_ROOM_NAME). */
+/** Colyseus room name for private waiting rooms (the game room is the platform's GAME_ROOM_NAME). */
 export const LOBBY_ROOM_NAME = "train_lobby";
 /** Lobby message, both ways: the host tells the lobby its game room code, the lobby tells the crew. */
 export const GAME_ROOM_MESSAGE = "game-room";
@@ -17,10 +17,8 @@ export type LobbyStatus = "waiting" | "running" | "cancelled";
 const teamSizeSchema = z.union([z.literal(2), z.literal(3), z.literal(4)]);
 const playerNameSchema = z.string().trim().min(1).max(16);
 
-export const lobbyJoinOptionsSchema = z.object({
-	name: playerNameSchema,
-	teamSize: teamSizeSchema,
-});
+export const lobbyJoinOptionsSchema = z.object({ name: playerNameSchema });
+export const lobbyCreateOptionsSchema = z.object({ teamSize: teamSizeSchema, name: playerNameSchema });
 
 export type LobbyJoinOptions = z.infer<typeof lobbyJoinOptionsSchema>;
 
@@ -40,6 +38,7 @@ export class LobbyState extends Schema {
 	@type("string") status: LobbyStatus = "waiting";
 	@type("string") hostSessionId = "";
 	@type("string") cancellationReason = "";
+	@type("string") roomCode = "";
 	@type({ map: LobbyPlayer }) players = new MapSchema<LobbyPlayer>();
 }
 
@@ -47,9 +46,10 @@ export function isTeamSize(value: unknown): value is TeamSize {
 	return teamSizeSchema.safeParse(value).success;
 }
 
-export function createLobbyState(teamSize: TeamSize): LobbyState {
+export function createLobbyState(teamSize: TeamSize, roomCode = ""): LobbyState {
 	const state = new LobbyState();
 	state.teamSize = teamSize;
+	state.roomCode = roomCode;
 	return state;
 }
 

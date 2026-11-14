@@ -324,6 +324,112 @@ intervals, drain rates) — validated by the config schema in `shared/`:
 - `input.ts` — keyboard → throttled input sends (~10 Hz move, events for
   interact/pickup/drop).
 
+#### Player and item visual modules
+
+The current renderer is `client/scene.ts`, the implementation of Person A's
+renderer ownership described in `WORKFLOW.md`. Its `createTrainScene()` owns
+the Three.js scene, orthographic camera, renderer, train artwork, player
+marker groups, and render loop. Person A's `setPlayers()` already creates
+markers, updates their positions, removes markers for absent players,
+highlights the local player, and fades eliminated players. `main.ts` owns the
+session update and supplies player positions to that renderer. There are no
+item visuals or item layer yet.
+
+**PROPOSED — PENDING PERSON A APPROVAL:** Keep the visual logic in separate
+`client/player-visuals.ts` and `client/item-visuals.ts` modules. They add
+presentation objects to renderer-owned `THREE.Group` layers, passed in when
+the modules are created. The modules do not create or own the scene, camera,
+WebGL renderer, DOM canvas, resize handling, or render loop. Their proposed
+module API shapes are:
+
+```ts
+import type * as THREE from "three";
+import type { Item, Player } from "../shared/state.ts";
+
+// PROPOSED — PENDING PERSON A APPROVAL
+export function createPlayerVisuals(group: THREE.Group): {
+	update(players: Iterable<[string, Player]>, localPlayerId?: string): void;
+	getCarryAnchor(playerId: string): THREE.Object3D | undefined;
+	destroy(): void;
+};
+
+// PROPOSED — PENDING PERSON A APPROVAL
+export function createItemVisuals(
+	group: THREE.Group,
+	getCarryAnchor: (playerId: string) => THREE.Object3D | undefined,
+): {
+	update(items: Iterable<[string, Item]>): void;
+	destroy(): void;
+};
+```
+
+The player API above is only a replacement/delegation option for the current
+marker lifecycle. If Person A chooses to expose hooks that augment existing
+markers instead, the player API must be revised to use those hooks and must
+not create parallel player markers.
+
+`MapSchema<Player>` and `MapSchema<Item>` in `shared/state.ts` implement
+`Map<K, V>` and iterate as `[key, value]` entries. The proposed
+`Iterable<[string, Player]>` and `Iterable<[string, Item]>` inputs therefore
+accept `state.players` and `state.items` directly; this matches the installed
+`@colyseus/schema` types.
+
+**PROPOSED — PENDING PERSON A APPROVAL (renderer integration and ownership):**
+The existing `setPlayers()` marker implementation is Person A-owned and must
+remain the single player-marker system. Person A must decide whether to expose
+new player/item visual hooks, with any player module augmenting the existing
+markers without creating duplicates, or to refactor `setPlayers()` to
+delegate its player-marker creation, updates, and removal to
+`player-visuals.ts`. In either approach, preserve its current position
+updates, local-player highlight, and eliminated-player opacity. Person A also
+decides how `item-visuals.ts` receives its renderer-owned group and the player
+carry-anchor lookup.
+
+**PROPOSED — PENDING PERSON A APPROVAL (lifecycle):** The renderer creates
+and attaches the needed groups to its existing scene and creates each visual
+module once. `main.ts` supplies `state.players`, `state.items`, and
+`session.playerId` through renderer-owned update hooks; it does not construct
+Three.js objects or call the visual modules directly. On each update, visuals
+are created for new map entries, updated from current state, and removed for
+entries no longer present. On scene destruction, the renderer calls each
+module's `destroy()` before disposing its own scene and renderer. Each module
+removes its own objects and disposes resources it created. The modules neither
+subscribe to the network nor mutate state.
+
+**PROPOSED — PENDING PERSON A APPROVAL (state-to-visual mapping):**
+
+- Player IDs come from `state.players` map keys. Read the existing `name`,
+  `carIndex`, `x`, `y`, `anim`, `holdingItemId`, and `eliminated` fields
+  directly; add no visual-only state fields to the shared schema.
+- Draw players in the existing flat, top-down Three.js overlay. `x` and `y`
+  are map coordinates (rightward and downward); use the existing transform
+  exactly: `x - MAP_WIDTH / 2`, `MAP_HEIGHT / 2 - y`. `carIndex` remains
+  state metadata and must not override position. `name` may label an avatar.
+  The existing eliminated-player opacity is described above.
+- `anim` currently receives `idle`, `walk`, or `run` from the movement rules.
+  Use those values for idle/movement presentation; the contract does not carry
+  a facing direction, so do not invent one or add a state field. Movement
+  transforms come from authoritative `x` and `y`; prediction or interpolation
+  remains outside these visual modules.
+- A non-empty `holdingItemId` may select a carrying pose. The item visual is
+  attached once using the matching item's `holderId` and the player's carry
+  anchor; do not create a second item from `holdingItemId`.
+- Item IDs come from `state.items` map keys. Use the existing `type`,
+  `holderId`, `x`, `y`, and `fuel` fields. `type` selects presentation for
+  the item types listed in §8.2; it remains a string in the state contract.
+- An empty `holderId` means render the item on the ground at its `x`/`y`
+  map position. A non-empty `holderId` means attach it to that player's carry
+  anchor rather than rendering it at the item's ground coordinates. `fuel` is
+  read-only presentation data; the client does not drain or refill it.
+- On drop, the shared state clears the holder fields and sets the item's
+  `x`/`y` to the player's current position (§7.1). The next state update
+  renders it on the ground there. There is no toss, flight, or throw arc in v1.
+
+The proposed integration point is the existing `client/scene.ts`, rather than
+an assumption that a separate `render.ts` exists. Person A retains ownership
+of that renderer and any corresponding `main.ts` wiring; this section does not
+authorize edits to those files by the visual-module owner.
+
 ## 9. Reference snippets
 
 ### Task director rules (port target for `shared/tasks.ts`)

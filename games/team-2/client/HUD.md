@@ -1,5 +1,39 @@
 # HUD handoff
 
+## Compact status bar (PR #341)
+
+The countdown is separate from the train-only route strip and turns red at
+two minutes or less during an active run. Schedule status remains a message;
+the internal schedule calculation is not exposed as an unused view field.
+`journeyView.speedText` supplies the final compact unit directly.
+
+The rules/help button has reserved space to the left of the status bar.
+Players and items use the team's visual modules in the foreground viewport;
+the moving landscape fills the whole screen behind it. HUD safe-area cleanup
+checks ownership and its last written value, so removing an older HUD does
+not clear the currently mounted HUD's offset.
+
+Validation: all 77 Team 2 tests, typecheck and production build passed after
+merging the updated base. Browser automation was blocked because the tool
+could not establish the Windows browser URL. Screenshots at 1280px and about
+700px are still required from a reviewer; they were not verified automatically.
+
+## Journey HUD (#78)
+
+The player sees train position, percent distance left, remaining time, current
+speed and the schedule ghost. The read-only presenter uses the active
+GameSession, preserving both the lobby/network session and offline `?local`.
+Speed uses percent of the route per second (SPEC's distance += speed * dt),
+not an invented km/h conversion. The run clock is authoritative: the rules keep
+`runTicks` in the synced state (`shared/state.ts`), counting only ticks of a
+running, unpaused game and starting again with each run. The presenter reads
+it and never counts ticks itself, so a client that joins late or reconnects
+shows the same remaining time as everyone else.
+
+Normal pages hide developer controls. In the dev server only, use `?debug=1`
+(or `?local&debug=1` offline) to inspect fixtures. Production builds do not
+enable them. No controls change the authoritative game state.
+
 Run the independent example from `games/team-2/`:
 
 ```powershell
