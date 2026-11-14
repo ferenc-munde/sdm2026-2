@@ -41,6 +41,10 @@ export interface Player {
   /** Item currently held; a player holds at most one item. */
   heldItem: ItemId | null;
   connected: boolean;
+  /** Course-failure knockback velocity; absent/zero outside an impact. */
+  velocity?: Vec2;
+  /** Remaining time during which movement input is ignored after hitting a wall. */
+  stunnedSeconds?: number;
 }
 
 export type StationKind = "engine" | "coalDispenser" | "wrenchRack" | "extinguisherRack" | "steeringConsole";
@@ -65,6 +69,8 @@ export interface Hazard {
   position: Vec2;
   /** Seconds the hazard has existed (fire spreads after FIRE_SPREAD_SECONDS). */
   age: number;
+  /** Fire spread schedule in lifetime seconds; absent means first spread at 15. */
+  nextSpreadAt?: number;
   /** Repair / extinguish progress from 0 to 1. */
   progress: number;
   /** Course hazard only: seconds left until it hits; null for other kinds. */
@@ -81,9 +87,18 @@ export interface Journey {
 
 export type Phase = "lobby" | "playing" | "won" | "lost";
 
+/** The room's pre-game setup (#148): who hosts it and how many players the crew will have. */
+export interface Lobby {
+  /** The player who can change the setup and start the run; null while the room is empty. */
+  hostId: PlayerId | null;
+  /** How many players the crew will have (MIN_PLAYERS to MAX_PLAYERS). The room fills up to this. */
+  crewSize: number;
+}
+
 export interface GameState {
   roomCode: string;
   phase: Phase;
+  lobby: Lobby;
   /** Seconds since the run started. */
   time: number;
   players: Record<PlayerId, Player>;

@@ -25,6 +25,7 @@ export function makeState(overrides: Partial<GameState> = {}, playerIds: string[
   return {
     roomCode: "TEST",
     phase: "playing",
+    lobby: { hostId: playerIds[0] ?? null, crewSize: Math.max(2, playerIds.length) },
     time: 0,
     players,
     items: {},

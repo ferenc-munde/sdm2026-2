@@ -1,11 +1,13 @@
 import { COAL_FUEL, FUEL_MAX, INTERACT_RANGE } from "../constants.ts";
 import type { GameState, Station } from "../types.ts";
+import { isStationDisabledByFire } from "../hazards/fire.ts";
 
 /** Call once per station-use input, after selecting the target station. */
 export function useCoalStation(state: GameState, playerId: string, station: Station): GameState {
   const player = state.players[playerId];
   if (state.phase !== "playing" || !player?.connected ||
-      Math.hypot(player.position.x - station.position.x, player.position.y - station.position.y) > INTERACT_RANGE) return state;
+      Math.hypot(player.position.x - station.position.x, player.position.y - station.position.y) > INTERACT_RANGE ||
+      isStationDisabledByFire(state, station)) return state;
 
   if (station.kind === "coalDispenser" && player.heldItem === null) {
     let serial = 1;

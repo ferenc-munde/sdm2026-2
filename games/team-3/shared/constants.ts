@@ -42,6 +42,8 @@ export const SPEED_FACTOR_STOPPED = 0; // plan §3 (empty, or engine on fire)
 export const HULL_LOSS_PER_BREACH_PER_SECOND = 2.5; // plan §3
 export const HULL_LOSS_PER_FIRE_PER_SECOND = 1.5; // plan §3
 export const BREACH_REPAIR_SECONDS = 3; // hold time with the wrench, plan §3
+/** Movement multiplier while standing in a breach puddle/vent. */
+export const BREACH_MOVEMENT_FACTOR = 0.6; // 40% slower, idea document §3
 export const FIRE_EXTINGUISH_SECONDS = 2.5; // hold time with the extinguisher, plan §3
 export const FIRE_SPREAD_SECONDS = 15; // plan §2, from #30
 
@@ -66,7 +68,12 @@ export const HAZARD_INTERVAL_BY_PLAYERS: Readonly<Record<number, number>> = {
 export const COURSE_WARNING_SECONDS = 5; // from #28
 export const COURSE_HOLD_WINDOW_SECONDS = 2; // from #28 (hold in the last 2 seconds)
 export const COURSE_HULL_DAMAGE = 12; // from #28
+export const COURSE_IMPULSE_SPEED = 450; // idea document §3
+export const COURSE_STUN_SECONDS = 1.5; // idea document §3
 
 // --- Throwing (stretch, #29) ---
-export const THROW_SPEED = 320; // units per second at release, TO CONFIRM
-export const THROW_FRICTION = 640; // deceleration in units per second², TO CONFIRM
+// A throw flies THROW_SPEED² / (2 × THROW_FRICTION) = 200 units, about half a car, so coal
+// thrown near a door lands in the next car. Tune in the play-test (#27).
+export const THROW_SPEED = 400; // units per second at release
+export const THROW_FRICTION = 400; // deceleration in units per second²
+export const ITEM_RADIUS = 8; // a flying item stops this far from a wall
