@@ -5,7 +5,8 @@
 // low fuel, stopped when the train stalls. Pure presentation: no game state is
 // touched here.
 
-import { BoxGeometry, Group, Mesh, MeshStandardMaterial, type Material } from "three";
+import { BoxGeometry, ConeGeometry, CylinderGeometry, DodecahedronGeometry, Group, Mesh, type Object3D } from "three";
+import { PALETTE, mat, seeded } from "./style.ts";
 
 /**
  * Visual speed of the scenery at full train speed, in world units per second.
@@ -17,10 +18,10 @@ export const SLEEPER_SPACING = 90;
 /** Sleepers are a little wider than the train, so they show on both sides of it. */
 export const SLEEPER_SIZE = { width: 26, height: 6, depth: 360 } as const;
 /** Height of the sleepers below the train floor, so they show beside and between the cars. */
-export const SCENERY_Y = -14;
+export const SCENERY_Y = -45; // low enough for the wheels to stand on the rails (visual pass)
 
 /** Extra ground around the train, so the edge of the world is never in view. */
-const GROUND_MARGIN = 600;
+const GROUND_MARGIN = 2400;
 /** The steel rails' cross-section, in world units. */
 export const RAIL_SIZE = { width: 8, height: 6 } as const;
 /** How far each rail sits from the track centre: just outside the car walls, on the sleepers. */
@@ -72,77 +73,122 @@ function clampFactor(factor: number): number {
   return Math.min(1, Math.max(0, factor));
 }
 
-/** Builds the ground and the sleepers around the train. */
+/** How often the countryside pattern repeats; long enough that the repeat isn't noticed. */
+const COUNTRYSIDE_PERIOD = SLEEPER_SPACING * 20;
+const POLE_PERIOD = SLEEPER_SPACING * POLE_EVERY;
+
+function put(parent: Object3D, mesh: Mesh, x: number, y: number, z: number, kind: string): Mesh {
+  mesh.position.set(x, y, z);
+  mesh.userData = { kind };
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+
+/**
+ * Builds the countryside around the track: ground, ballast, sleepers, rails, telegraph poles,
+ * trees, bushes and rocks. The root group is the sleeper loop (it scrolls and wraps every sleeper
+ * spacing); poles and countryside are child layers with their own, longer loops, so nothing ever
+ * jumps when a loop wraps.
+ */
 export function buildScenery(bounds: SceneryBounds): Scenery {
   const group = new Group();
   group.name = "scenery";
+  const centre = (bounds.left + bounds.right) / 2;
+  const length = bounds.right - bounds.left + GROUND_MARGIN;
 
-  const groundMaterial = new MeshStandardMaterial({ color: 0x2b3424, roughness: 1 });
-  const ground = new Mesh(
-    new BoxGeometry(bounds.right - bounds.left + GROUND_MARGIN, 6, bounds.depth + GROUND_MARGIN),
-    groundMaterial,
-  );
-  ground.position.set((bounds.left + bounds.right) / 2, SCENERY_Y - 5, 0);
+  const ground = put(group, new Mesh(new BoxGeometry(length, 6, GROUND_MARGIN * 1.5), mat(PALETTE.grass, { roughness: 1 })), centre, SCENERY_Y - 8, 0, "ground");
   ground.name = "ground";
-  group.add(ground);
+  put(group, new Mesh(new BoxGeometry(length, 8, SLEEPER_SIZE.depth + 70), mat(PALETTE.ballast, { roughness: 1 })), centre, SCENERY_Y - 4, 0, "ballast");
 
+  const first = bounds.left - SLEEPER_SPACING * 4;
+  const last = bounds.right + SLEEPER_SPACING * 4;
   const sleeperGeometry = new BoxGeometry(SLEEPER_SIZE.width, SLEEPER_SIZE.height, SLEEPER_SIZE.depth);
-  const sleeperMaterial = new MeshStandardMaterial({ color: 0x5b4a3a, roughness: 0.9 });
-
-  const first = bounds.left - SLEEPER_SPACING * 2;
-  const last = bounds.right + SLEEPER_SPACING * 2;
+  const sleeperMaterial = mat(PALETTE.sleeper, { roughness: 0.9 });
   for (let x = first; x <= last; x += SLEEPER_SPACING) {
-    const sleeper = new Mesh(sleeperGeometry, sleeperMaterial);
-    sleeper.position.set(x, SCENERY_Y, 0);
+    const sleeper = put(group, new Mesh(sleeperGeometry, sleeperMaterial), x, SCENERY_Y, 0, "sleeper");
     sleeper.name = "sleeper";
-    sleeper.userData = { kind: "sleeper" };
-    group.add(sleeper);
   }
 
   // Two steel rails along the sleepers (#217), outside the car walls so they show beside the train.
-  const railLength = bounds.right - bounds.left + GROUND_MARGIN;
-  const railGeometry = new BoxGeometry(railLength, RAIL_SIZE.height, RAIL_SIZE.width);
-  const railMaterial = new MeshStandardMaterial({ color: 0xa7b0bf, metalness: 0.6, roughness: 0.35 });
+  const railGeometry = new BoxGeometry(length, RAIL_SIZE.height, RAIL_SIZE.width);
+  const railMaterial = mat(PALETTE.rail, { metalness: 0.7, roughness: 0.3 });
   for (const side of [-1, 1]) {
-    const rail = new Mesh(railGeometry, railMaterial);
-    rail.position.set((bounds.left + bounds.right) / 2, SCENERY_Y + SLEEPER_SIZE.height / 2 + RAIL_SIZE.height / 2, side * railOffset(bounds.depth));
+    const rail = put(group, new Mesh(railGeometry, railMaterial), centre, SCENERY_Y + SLEEPER_SIZE.height / 2 + RAIL_SIZE.height / 2, side * railOffset(bounds.depth), "rail");
     rail.name = "rail";
-    rail.userData = { kind: "rail" };
-    group.add(rail);
   }
 
-  // Telegraph poles behind the train, every few sleepers, so the motion reads at a glance.
-  const poleGeometry = new BoxGeometry(6, POLE_HEIGHT, 6);
-  const armGeometry = new BoxGeometry(6, 4, 40);
-  const poleMaterial = new MeshStandardMaterial({ color: 0x5a4632, roughness: 0.9 });
-  for (let x = first; x <= last; x += SLEEPER_SPACING * POLE_EVERY) {
-    const pole = new Mesh(poleGeometry, poleMaterial);
-    pole.position.set(x, SCENERY_Y + POLE_HEIGHT / 2, -(bounds.depth / 2 + POLE_GAP));
+  // Telegraph poles behind the train, with a wire between them.
+  const poles = new Group();
+  poles.name = "poles";
+  group.add(poles);
+  const wood = mat(PALETTE.trunk, { roughness: 0.9 });
+  const poleZ = -(bounds.depth / 2 + POLE_GAP);
+  for (let x = first - POLE_PERIOD; x <= last + POLE_PERIOD; x += POLE_PERIOD) {
+    const pole = put(poles, new Mesh(new CylinderGeometry(3, 4, POLE_HEIGHT, 6), wood), x, SCENERY_Y + POLE_HEIGHT / 2, poleZ, "pole");
     pole.name = "pole";
-    pole.userData = { kind: "pole" };
-    const arm = new Mesh(armGeometry, poleMaterial);
-    arm.position.set(0, POLE_HEIGHT / 2 - 10, 0);
-    pole.add(arm);
-    group.add(pole);
+    put(pole, new Mesh(new BoxGeometry(5, 4, 40), wood), 0, POLE_HEIGHT / 2 - 10, 0, "poleArm");
+  }
+  put(poles, new Mesh(new BoxGeometry(length, 0.8, 0.8), mat("#22252b")), centre, SCENERY_Y + POLE_HEIGHT - 12, poleZ + 14, "wire");
+
+  // Countryside: one tile of trees, bushes and rocks, repeated along the line so it loops cleanly.
+  const countryside = new Group();
+  countryside.name = "countryside";
+  group.add(countryside);
+  const random = seeded(7);
+  const tile: { dx: number; z: number; kind: "tree" | "bush" | "rock"; size: number }[] = [];
+  for (let n = 0; n < 16; n += 1) {
+    // Far side (behind the train): trees and bushes. Near side (in front of the camera): low bushes and rocks only.
+    const farSide = n < 11;
+    const z = farSide ? -(bounds.depth / 2 + 230 + random() * 700) : bounds.depth / 2 + 190 + random() * 260;
+    const kind = farSide ? (random() < 0.65 ? "tree" : "bush") : random() < 0.6 ? "bush" : "rock";
+    tile.push({ dx: random() * COUNTRYSIDE_PERIOD, z, kind, size: 0.7 + random() * 0.7 });
+  }
+  const leaves = [mat(PALETTE.leaves), mat(PALETTE.leavesLight)];
+  for (let start = first - COUNTRYSIDE_PERIOD; start <= last + COUNTRYSIDE_PERIOD; start += COUNTRYSIDE_PERIOD) {
+    tile.forEach((spot, index) => {
+      const x = start + spot.dx;
+      const foliage = leaves[index % 2]!;
+      if (spot.kind === "tree") {
+        const tree = new Group();
+        tree.position.set(x, SCENERY_Y - 5, spot.z);
+        tree.scale.setScalar(spot.size);
+        tree.userData = { kind: "tree" };
+        put(tree, new Mesh(new CylinderGeometry(5, 7, 40, 6), wood), 0, 20, 0, "trunk");
+        put(tree, new Mesh(new ConeGeometry(34, 60, 7), foliage), 0, 62, 0, "foliage");
+        put(tree, new Mesh(new ConeGeometry(26, 46, 7), foliage), 0, 92, 0, "foliage");
+        countryside.add(tree);
+      } else if (spot.kind === "bush") {
+        put(countryside, new Mesh(new DodecahedronGeometry(16 * spot.size, 0), foliage), x, SCENERY_Y + 4, spot.z, "bush");
+      } else {
+        put(countryside, new Mesh(new DodecahedronGeometry(11 * spot.size, 0), mat(PALETTE.rock)), x, SCENERY_Y, spot.z, "rock");
+      }
+    });
   }
 
   let distance = 0;
+  const place = (): void => {
+    group.position.x = sceneryOffset(distance);
+    // Child layers loop on their own periods: world offset = layer offset, so cancel the root's.
+    poles.position.x = sceneryOffset(distance, POLE_PERIOD) - group.position.x;
+    countryside.position.x = sceneryOffset(distance, COUNTRYSIDE_PERIOD) - group.position.x;
+  };
 
   return {
     group,
     update(deltaSeconds: number, speedFactor: number): void {
       if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return;
       distance += deltaSeconds * clampFactor(speedFactor) * SCENERY_FULL_SPEED;
-      group.position.x = sceneryOffset(distance);
+      place();
     },
     dispose(): void {
+      const geometries = new Set<{ dispose(): void }>();
       group.traverse((child) => {
-        if (child instanceof Mesh) {
-          child.geometry.dispose();
-          const materials: Material[] = Array.isArray(child.material) ? child.material : [child.material];
-          for (const material of materials) material.dispose();
-        }
+        if (child instanceof Mesh) geometries.add(child.geometry);
       });
+      for (const geometry of geometries) geometry.dispose();
+      // Materials are shared through style.ts and stay cached for the next scene.
     },
   };
 }

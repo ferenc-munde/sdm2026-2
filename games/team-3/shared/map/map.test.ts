@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CAR_COUNT, MAX_PLAYERS, PLAYER_RADIUS } from "../constants.ts";
+import { CAR_COUNT, INTERACT_RANGE, MAX_PLAYERS, PLAYER_RADIUS } from "../constants.ts";
 import { freeSpots, type HazardSpot } from "../run/director.ts";
 import {
   CAR_LENGTH,
@@ -150,5 +150,27 @@ describe("validateMap", () => {
 
   it("finds a player start outside the train", () => {
     expect(broken((m) => m.playerSpawns.push({ x: -1000, y: 0 }))).toContain("player start 4 is not inside a car");
+  });
+});
+
+describe("station placement (#316)", () => {
+  it("finds a station inside a wall, and two stations within reach of each other", () => {
+    const m = createTrainMap();
+    const wall = m.walls[0]!;
+    const rack = m.stations.find((s) => s.kind === "wrenchRack")!;
+    rack.position = { x: wall.x, y: wall.y };
+    const engine = m.stations.find((s) => s.kind === "engine")!;
+    const console_ = m.stations.find((s) => s.kind === "steeringConsole")!;
+    console_.position = { x: engine.position.x, y: engine.position.y - 30 };
+    const problems = validateMap(m);
+    expect(problems).toContain("station wrenchRack is inside a wall");
+    expect(problems).toContain("stations engine and steeringConsole are within reach of each other");
+  });
+
+  it("keeps the engine and the steering console far enough apart to use one without the other", () => {
+    const at = (kind: string) => map.stations.find((s) => s.kind === kind)!.position;
+    const apart = Math.hypot(at("engine").x - at("steeringConsole").x, at("engine").y - at("steeringConsole").y);
+    expect(apart).toBeGreaterThan(INTERACT_RANGE);
+    expect(validateMap(map)).toEqual([]);
   });
 });

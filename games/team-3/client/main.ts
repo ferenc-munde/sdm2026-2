@@ -9,7 +9,7 @@ import { createConductor } from "./conductor.ts";
 import { COURSE_FX_SECONDS, courseFailed, courseFx, failureDirection } from "./courseFx.ts";
 import { createHelp } from "./help.ts";
 import { createCourseWarning } from "./courseWarning.ts";
-import { WebGLRenderer } from "three";
+import { ACESFilmicToneMapping, PCFSoftShadowMap, WebGLRenderer } from "three";
 import { FUEL_MAX, HULL_MAX, LOW_FUEL_THRESHOLD, WIN_DISTANCE } from "../shared/constants.ts";
 import type { ClientMessage, InputMessage } from "../shared/messages.ts";
 import type { GameState, Phase } from "../shared/types.ts";
@@ -49,6 +49,11 @@ if (!container) throw new Error("#app is missing from index.html");
 
 const renderer = new WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// Real shadows and filmic colour (visual pass): the crew and props sit on the floor.
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = PCFSoftShadowMap;
+renderer.toneMapping = ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
 renderer.setSize(container.clientWidth, container.clientHeight);
 container.appendChild(renderer.domElement);
 
