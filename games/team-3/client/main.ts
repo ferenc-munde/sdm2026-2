@@ -33,6 +33,8 @@ import { createSmoother, withPositions } from "./smoothing.ts";
 import { createRoom, joinRoomByCode, serverAddress, type RoomConnection } from "./roomConnection.ts";
 import { joinErrorText } from "./roomLinks.ts";
 import { createSharedLinkJoin } from "./sharedLinkJoin.ts";
+import { stationStatus } from "../shared/stations/status.ts";
+import { fixedHazardsBetween } from "../shared/hazards/feedback.ts";
 
 /** `?demo` opens the hand-check page; otherwise the page plays a real room. */
 const demo = new URLSearchParams(window.location.search).has("demo");
@@ -466,6 +468,7 @@ function drawLive(delta: number, time: number): void {
     players: withPositions(state.players, playerSmoother.step(positionsOf(state.players), delta)),
     items: withPositions(state.items, itemSmoother.step(positionsOf(state.items), delta)),
     hazards: Object.values(state.hazards),
+    stationStatuses: stationStatus(state, train.map),
   });
   train.updateMotion(
     delta,
@@ -476,6 +479,7 @@ function drawLive(delta: number, time: number): void {
   scenery.update(delta, state.phase === "playing" ? state.journey.speedFactor : 0);
   if (liveState && liveState.phase !== "lobby") {
     for (const name of eventsBetween(liveState, state)) sound.play(name);
+    if (fixedHazardsBetween(liveState, state).length > 0) showToast("Fixed!");
   }
   courseWarning.update(state);
   conductor.update(state);
