@@ -75,4 +75,13 @@ describe("scenery", () => {
     const scenery = buildScenery(bounds);
     expect(() => scenery.dispose()).not.toThrow();
   });
+  it("lays two steel rails beside the cars and poles that loop with the sleepers (#217)", () => {
+    const scenery = buildScenery(bounds);
+    const rails = scenery.group.children.filter((child) => child.userData.kind === "rail");
+    expect(rails.map((rail) => Math.sign(rail.position.z)).sort()).toEqual([-1, 1]);
+    for (const rail of rails) expect(Math.abs(rail.position.z)).toBeGreaterThan(bounds.depth / 2);
+    let poles = 0;
+    scenery.group.traverse((child) => { if (child.userData.kind === "pole") poles += 1; });
+    expect(poles).toBeGreaterThan(0);
+  });
 });

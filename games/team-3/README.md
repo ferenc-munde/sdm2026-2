@@ -2,7 +2,7 @@
 
 This folder holds the game of Team 3 (package `@team-3/game`, label `team-3`).
 
-**The Last Train** is a co-operative, non-violent, online multiplayer game for 2–4 players. The players are the maintenance crew of a moving train: they carry coal, repair leaks and put out fires so the train reaches its destination before the hull fails.
+**The Last Train** is a co-operative, non-violent, online multiplayer game for 2–4 players. The players are the maintenance crew of a moving train: they carry coal, repair broken steam pipes and put out engine fires so the train reaches its destination before the hull fails.
 
 - **Start here (status, folder map, how to run, what is left):** [docs/README.md](docs/README.md)
 - **Plan, scope, roles and backlog:** [PLAN.md](PLAN.md)
@@ -24,6 +24,10 @@ pnpm run typecheck   # TypeScript
 pnpm run build       # production build of the client
 ```
 
+**Testing alone:** the game needs two players, so `node bot.mjs` (with the server running) creates a room with a bot crewmate and prints its code. Join that code; the bot departs as soon as you're in, stands still while you play, and presses "play again" after a run. `SERVER=ws://host:port` points it at another server.
+
+**One address, as deployed:** after `pnpm run build`, `pnpm run server` also serves the built page (`@sdm/host` serves `dist/`), so `http://localhost:2567` is the whole game. That's how Railway runs it (`railway.json` with `GAME=team-3`).
+
 `pnpm test`, `pnpm run typecheck` and `pnpm run build` are the same steps the "Team 3 Feature CI" runs on every push to `Team_3_Feature`. The server runs with `vite-node`, the same loader as the tests, because the platform's state classes need TypeScript's legacy decorators.
 
 ## What works now
@@ -41,9 +45,9 @@ pnpm run build       # production build of the client
 | Action | Keys |
 |---|---|
 | Move | **W A S D** or the **arrow keys** |
-| Interact (hold) | **Space** or **E**: repair a breach with the wrench, put out a fire with the extinguisher, hold the steering console |
+| Interact (hold) | **Space** or **E**: repair a broken steam pipe with the wrench, put out an engine fire with the extinguisher, hold the brake lever |
 | Pick up / drop, take or deliver coal, pull the departure lever | **Tap E** or **left-click** |
-| Throw the held item | **Shift** or **F** |
+| Throw the held item, or **dash** with empty hands (1.5 s cooldown) | **Shift** or **F** |
 
 ## How the game works
 
@@ -51,8 +55,8 @@ The crew wins when the train reaches **1800** distance and loses when the **hull
 
 - **Fuel** drains **1.8 per second**. **Coal** from the dispenser in the last car adds **35** at the engine in the front car (up to 100).
 - **Speed** is full above 25 fuel, half at 25 or below, and **zero** when the tank is empty or **the engine is on fire**.
-- **Hazards** start every **12 s** (7 s late in the journey), more often with a bigger crew. A **breach** costs 2.5 hull per second until repaired (hold the wrench for 3 s); a **fire** costs 1.5 per second until put out (hold the extinguisher for 2.5 s) and **spreads after 15 s**.
-- **Course warning:** hold the steering console in the last 2 seconds of the warning, or lose 12 hull.
+- **Hazards** start every **12 s** (7 s late in the journey), more often with a bigger crew. A **broken steam pipe** costs 2.5 hull per second until repaired (hold the wrench for 3 s); an **engine fire** costs 1.5 per second until put out (hold the extinguisher for 2.5 s) and **spreads after 15 s**.
+- **Sharp curve warning:** hold the brake lever in the last 2 seconds of the warning, or lose 12 hull.
 - **Lobby:** the crew waits on a station platform. The first player to join is the host, picks the crew size (2–4) and pulls the departure lever when everyone is in.
 
 ## Team
