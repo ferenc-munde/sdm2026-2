@@ -50,11 +50,13 @@ export function createPreviewSnapshot(players = []) {
     })),
     secondsRemaining: 180,
     trainCondition: 100,
-    repairs: { completed: 0, total: 3 },
+    repairs: { completed: 0, total: 5 },
     tasks: [
-      { id: "wiring", label: "Reconnect the signal wires", status: "available", progress: 0 },
-      { id: "boiler", label: "Stabilize the boiler", status: "available", progress: 0 },
-      { id: "brakes", label: "Inspect the carriage brakes", status: "available", progress: 0 },
+      { id: "wiring", label: "Reconnect the signal wires (Electrical Room)", section: "electrical", status: "available", progress: 0 },
+      { id: "boiler", label: "Stabilize the boiler (Engine Room)", section: "engine", status: "available", progress: 0 },
+      { id: "instruments", label: "Restore the control cabin instruments (Control Cabin)", section: "control", status: "available", progress: 0 },
+      { id: "passenger-lights", label: "Fix the passenger carriage lights (Passenger Carriage)", section: "passenger", status: "available", progress: 0 },
+      { id: "brakes", label: "Inspect the carriage brakes (Rear Carriage)", section: "rear", status: "available", progress: 0 },
     ],
     outcome: { kind: "playing", message: "Keep the train moving." },
   };

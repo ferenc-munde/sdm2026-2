@@ -130,15 +130,18 @@ try {
       connectionState: "reconnecting",
       secondsRemaining: 19,
       trainCondition: 42,
+      localPlayerId: adapter.getSnapshot().players[0].id,
       repairs: { completed: 1, total: 3 },
-      tasks: [{ id: "wires", label: "Reconnect signal wires", status: "in-progress", progress: 55 }],
-      players: [{ ...adapter.getSnapshot().players[0], connected: false }],
+      tasks: [{ id: "wires", label: "Reconnect signal wires", section: "control", status: "in-progress", progress: 55 }],
+      players: [{ ...adapter.getSnapshot().players[0], section: "control", connected: false }],
     });
     assert.equal(root.querySelector("#countdown").textContent, "00:19");
     assert.equal(root.querySelector("#countdown").classList.contains("is-urgent"), true);
     assert.equal(root.querySelector("#condition-value").textContent, "42%");
     assert.equal(root.querySelector("#condition-meter").getAttribute("aria-valuenow"), "42");
     assert.equal(root.querySelector("#repair-count").textContent, "1 / 3");
+    assert.equal(root.querySelector("#repair-hint").dataset.mode, "ready");
+    assert.match(root.querySelector("#repair-hint").textContent, /PRESS E TO REPAIR/);
     assert.match(root.querySelector("#task-list").textContent, /Reconnect signal wires/);
     assert.equal(root.querySelector("#task-list .task-status").textContent, "IN PROGRESS");
     assert.equal(root.querySelector("#game-connection").textContent, "RECONNECTING");

@@ -73,6 +73,15 @@ describe("train layout", () => {
 });
 
 describe("lobby", () => {
+  it("deals all five configured repairs, including the control cabin and passenger carriage", () => {
+    const { state } = setup();
+    expect(config.taskCount).toBe(5);
+    expect(state.tasks).toHaveLength(5);
+    expect(new Set(state.tasks.map((task) => task.id))).toEqual(new Set(TASK_CATALOGUE.map((task) => task.id)));
+    expect(state.tasks.find((task) => task.id === "instruments")?.section).toBe("control");
+    expect(state.tasks.find((task) => task.id === "passenger-lights")?.section).toBe("passenger");
+  });
+
   it("starts in the lobby with a full clock and the configured number of tasks", () => {
     const { state } = setup({ taskCount: 2 });
     expect(state.phase).toBe("lobby");
@@ -192,10 +201,13 @@ describe("a run", () => {
     expect(boiler.progress).toBe(50);
     expect(wiring.progress).toBe(25);
 
-    // The control cabin has no task: nothing happens there.
+    // The new control-cabin and passenger repairs are authoritative too.
     player("a").x = 0.5;
     step(["a", { type: "repair" }]);
-    expect(state.tasks.map((task) => task.progress).sort()).toEqual([0, 25, 50]);
+    expect(state.tasks.find((task) => task.id === "instruments")?.progress).toBe(25);
+    player("a").x = 0.75;
+    step(["a", { type: "repair" }]);
+    expect(state.tasks.find((task) => task.id === "passenger-lights")?.progress).toBe(25);
   });
 
   it("ends in victory when every task is complete", () => {

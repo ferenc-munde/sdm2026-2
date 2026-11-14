@@ -70,7 +70,7 @@ await test("isolates repair counters across inputs, snapshots and subscribers", 
   initial.repairs.completed = 99;
   assert.equal(client.getSnapshot().repairs.completed, 0);
   client.getSnapshot().repairs.total = 99;
-  assert.equal(client.getSnapshot().repairs.total, 3);
+  assert.equal(client.getSnapshot().repairs.total, 5);
   const received = [];
   client.subscribe((snapshot) => { snapshot.repairs.completed = 99; });
   client.subscribe((snapshot) => received.push(snapshot.repairs.completed));

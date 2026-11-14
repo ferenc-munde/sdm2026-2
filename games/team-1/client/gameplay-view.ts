@@ -1,5 +1,5 @@
 import type { GameClientSnapshot, GameStateAdapter } from "./game-state-adapter.mjs";
-import { conditionBand, formatCountdown, toOutcomeViewModel, toTaskViewModels, toPlayerViewModels } from "./presentation-model.mjs";
+import { conditionBand, formatCountdown, toOutcomeViewModel, toRepairHint, toTaskViewModels, toPlayerViewModels } from "./presentation-model.mjs";
 import { mountTrainScene, type TrainScene } from "./player-scene";
 
 export type PreviewAction = "advance-time" | "damage-train" | "progress-repair" | "win" | "fail" | "reset";
@@ -29,7 +29,7 @@ export function mountGameplayView(root: HTMLElement, adapter: GameStateAdapter, 
       <aside class="hud-panel" aria-label="Train status">
         <section class="hud-block countdown-block"><div class="hud-label">TIME TO DESTINATION</div><output id="countdown" class="countdown-value" role="timer" aria-live="off">03:00</output><span class="hud-subtext">BACKEND STATE · MM:SS</span></section>
         <section class="hud-block condition-block"><div class="hud-label">TRAIN CONDITION <strong id="condition-value">100%</strong></div><div id="condition-meter" class="condition-track" role="meter" aria-label="Train condition" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><div id="condition-fill" class="condition-fill"></div></div><span id="condition-caption" class="hud-subtext">SYSTEMS STABLE</span></section>
-        <section class="hud-block repair-block"><div class="hud-label">REPAIRS <strong id="repair-count">0 / 3</strong></div><progress id="repair-progress" class="repair-progress" max="3" value="0" aria-label="Completed repairs"></progress><ul id="task-list" class="task-list"></ul></section>
+        <section class="hud-block repair-block"><div class="hud-label">REPAIRS <strong id="repair-count">0 / 5</strong></div><progress id="repair-progress" class="repair-progress" max="5" value="0" aria-label="Completed repairs"></progress><p id="repair-hint" class="repair-hint" role="status" aria-live="polite"></p><ul id="task-list" class="task-list"></ul></section>
         <section class="hud-block crew-block"><div class="hud-label">CREW ON BOARD <strong id="crew-count">0 / 4</strong></div><ul id="game-players" class="game-player-list" aria-label="Crew connection status"></ul></section>
       </aside>
     </div>
@@ -75,6 +75,10 @@ export function mountGameplayView(root: HTMLElement, adapter: GameStateAdapter, 
     const repairProgress = root.querySelector<HTMLProgressElement>("#repair-progress")!;
     repairProgress.max = Math.max(1, snapshot.repairs.total);
     repairProgress.value = Math.min(snapshot.repairs.completed, snapshot.repairs.total);
+    const repairHint = toRepairHint(snapshot);
+    const repairHintElement = root.querySelector<HTMLElement>("#repair-hint")!;
+    repairHintElement.textContent = repairHint.text;
+    repairHintElement.dataset.mode = repairHint.mode;
     root.querySelector<HTMLElement>("#task-list")!.innerHTML = toTaskViewModels(snapshot.tasks).map((task) => `
       <li class="task-row task-${task.status}"><span class="task-icon" aria-hidden="true">${task.status === "complete" ? "✓" : task.status === "in-progress" ? "◌" : "○"}</span><span class="task-content"><span class="task-title">${escapeHtml(task.label)}</span><span class="task-track"><span style="width:${task.progress}%"></span></span></span><span class="task-status">${task.statusLabel}</span></li>`).join("");
 

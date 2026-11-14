@@ -5,6 +5,7 @@
 import { hostRoom, joinRoomByCode, JoinError, type GameConnection, type ServerAddress } from "@sdm/core/client";
 // Type-only: the schema classes stay out of the browser bundle.
 import type { TrainState } from "../shared/game";
+import { sectionAt } from "../shared/train-layout";
 import { MAX_NAME_LENGTH, type Phase } from "../shared/constants";
 import type { GameClientSnapshot, GameInput, GameTask, LiveGameStateAdapter } from "./game-state-adapter.mjs";
 import { SessionError, type LobbyPlayer, type LobbySession, type SessionAdapter, type SessionEvent } from "./session-adapter.mjs";
@@ -23,7 +24,7 @@ const OUTCOME_MESSAGES: Record<Phase, string> = {
 };
 
 /** Maps the synced room state to the snapshot the HUD and the scene draw. */
-export function toSnapshot(state: TrainState | undefined, connectionState: ConnectionState): GameClientSnapshot {
+export function toSnapshot(state: TrainState | undefined, connectionState: ConnectionState, localPlayerId?: string): GameClientSnapshot {
   const players: Array<GameClientSnapshot["players"][number] & { seat: number }> = [];
   // Before the first state arrives the collections do not exist yet.
   state?.players?.forEach((player, id) => {
@@ -33,6 +34,7 @@ export function toSnapshot(state: TrainState | undefined, connectionState: Conne
       connected: player.connected,
       position: { x: player.x, z: player.z },
       color: player.color,
+      section: sectionAt(player.x),
       seat: player.seat,
     });
   });
@@ -43,6 +45,7 @@ export function toSnapshot(state: TrainState | undefined, connectionState: Conne
     tasks.push({
       id: task.id,
       label: task.label,
+      section: task.section as GameClientSnapshot["tasks"][number]["section"],
       status: task.progress >= 100 ? "complete" : task.progress > 0 ? "in-progress" : "available",
       progress: task.progress,
     });
@@ -56,6 +59,7 @@ export function toSnapshot(state: TrainState | undefined, connectionState: Conne
     trainCondition: state?.trainCondition ?? 100,
     repairs: { completed: tasks.filter((task) => task.status === "complete").length, total: tasks.length },
     tasks,
+    ...(localPlayerId ? { localPlayerId } : {}),
     outcome: { kind: phase === "victory" || phase === "failure" ? phase : "playing", message: OUTCOME_MESSAGES[phase] },
     phase,
   };
@@ -118,7 +122,7 @@ export class RoomClient {
   }
 
   getSnapshot(): GameClientSnapshot {
-    return toSnapshot(this.connection?.state(), this.connectionState);
+    return toSnapshot(this.connection?.state(), this.connectionState, this.connection?.sessionId);
   }
 
   sendInput(input: GameInput): void {

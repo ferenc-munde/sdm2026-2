@@ -4,6 +4,8 @@ export type GamePlayer = {
   connected: boolean;
   position: { x: number; z: number };
   color: string;
+  /** Derived from the authoritative position for repair guidance. */
+  section?: "engine" | "electrical" | "control" | "passenger" | "rear";
 };
 
 export type TaskStatus = "available" | "in-progress" | "complete";
@@ -13,6 +15,7 @@ export type GameTask = {
   label: string;
   status: TaskStatus;
   progress: number;
+  section?: "engine" | "electrical" | "control" | "passenger" | "rear";
 };
 
 export type GameOutcome = {
@@ -28,6 +31,8 @@ export type GameClientSnapshot = {
   repairs: { completed: number; total: number };
   tasks: GameTask[];
   outcome: GameOutcome;
+  /** Session id for this browser's player in a live room. */
+  localPlayerId?: string;
   /** The room's phase. Only the room-backed adapter sets it; mock snapshots leave it out. */
   phase?: "lobby" | "playing" | "victory" | "failure";
 };
