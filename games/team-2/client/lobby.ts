@@ -70,26 +70,31 @@ export function mountLobby(
 						<label class="lobby-label" for="lobby-player-name">Your player name</label>
 						<input id="lobby-player-name" name="playerName" maxlength="16" autocomplete="nickname"
 							placeholder="Enter a name" required>
-						<div class="lobby-room-options">
-							<div class="lobby-create-options">
-								<label class="lobby-label" for="lobby-team-size">Crew size</label>
-								<select id="lobby-team-size" name="teamSize">
-									<option value="2">2 players</option>
-									<option value="3">3 players</option>
-									<option value="4" selected>4 players</option>
-								</select>
-								<button class="lobby-primary" type="button" data-create-room>Create Room</button>
-							</div>
-							<div class="lobby-join-options">
-								<label class="lobby-label" for="lobby-room-code">Have a room code?</label>
-								<input id="lobby-room-code" name="roomCode" maxlength="20" autocomplete="off"
-									placeholder="Enter room code">
-								<button class="lobby-secondary" type="button" data-join-room>Join Room</button>
-							</div>
+						<div class="lobby-room-choices" data-room-choices>
+							<p class="lobby-label">How would you like to play?</p>
+							<button class="lobby-primary" type="button" data-choose-create>Create a Room</button>
+							<button class="lobby-secondary" type="button" data-choose-join>Join a Room</button>
+						</div>
+						<div class="lobby-room-step" data-create-step hidden>
+							<label class="lobby-label" for="lobby-team-size">Crew size</label>
+							<select id="lobby-team-size" name="teamSize">
+								<option value="2">2 players</option>
+								<option value="3">3 players</option>
+								<option value="4" selected>4 players</option>
+							</select>
+							<button class="lobby-primary" type="button" data-create-room>Create Room</button>
+							<button class="lobby-back" type="button" data-back>Back</button>
+						</div>
+						<div class="lobby-room-step" data-join-step hidden>
+							<label class="lobby-label" for="lobby-room-code">Enter your room code</label>
+							<input id="lobby-room-code" name="roomCode" maxlength="20" autocomplete="off"
+								placeholder="Room code">
+							<button class="lobby-primary" type="button" data-join-room>Join Room</button>
+							<button class="lobby-back" type="button" data-back>Back</button>
 						</div>
 						<p class="lobby-error" role="alert" aria-live="polite"></p>
 					</form>
-					<p class="lobby-footnote">Create a private room and share its code with your crew.</p>
+					<p class="lobby-footnote">Bring your crew together before the train departs.</p>
 				</section>
 				<section class="lobby-waiting" aria-label="Waiting room" hidden>
 					<div class="lobby-room-heading">
@@ -100,8 +105,8 @@ export function mountLobby(
 						<span class="lobby-count" data-player-count>0 / 4 PLAYERS</span>
 					</div>
 					<div class="lobby-room-code" data-room-code-panel hidden>
-						<span>ROOM CODE</span><strong data-room-code></strong>
-						<button type="button" class="lobby-copy-code" data-copy-code>Copy</button>
+						<span>SHARE THIS ROOM CODE</span>
+						<strong data-room-code aria-label="Room code"></strong>
 					</div>
 					<div class="lobby-countdown" aria-live="polite">
 						<span class="countdown-icon" aria-hidden="true">◷</span>
@@ -137,6 +142,11 @@ export function mountLobby(
 	const nameInput = root.querySelector<HTMLInputElement>("#lobby-player-name")!;
 	const sizeInput = root.querySelector<HTMLSelectElement>("#lobby-team-size")!;
 	const error = root.querySelector<HTMLElement>(".lobby-error")!;
+	const roomChoices = root.querySelector<HTMLElement>("[data-room-choices]")!;
+	const createStep = root.querySelector<HTMLElement>("[data-create-step]")!;
+	const joinStep = root.querySelector<HTMLElement>("[data-join-step]")!;
+	const createChoice = root.querySelector<HTMLButtonElement>("[data-choose-create]")!;
+	const joinChoice = root.querySelector<HTMLButtonElement>("[data-choose-join]")!;
 	const createButton = root.querySelector<HTMLButtonElement>("[data-create-room]")!;
 	const joinButton = root.querySelector<HTMLButtonElement>("[data-join-room]")!;
 	const roomCodeInput = root.querySelector<HTMLInputElement>("#lobby-room-code")!;
@@ -163,15 +173,12 @@ export function mountLobby(
 	});
 
 	form.addEventListener("submit", (event) => event.preventDefault());
+	createChoice.addEventListener("click", () => showSetupStep("create"));
+	joinChoice.addEventListener("click", () => showSetupStep("join"));
 	createButton.addEventListener("click", () => void connect("create"));
 	joinButton.addEventListener("click", () => void connect("join"));
-	root.querySelector<HTMLButtonElement>("[data-copy-code]")!.addEventListener("click", async () => {
-		try {
-			await navigator.clipboard.writeText(roomCodeLabel.textContent ?? "");
-			root.querySelector<HTMLButtonElement>("[data-copy-code]")!.textContent = "Copied";
-		} catch {
-			error.textContent = "Copy is unavailable. Select the room code to share it.";
-		}
+	root.querySelectorAll<HTMLButtonElement>("[data-back]").forEach((button) => {
+		button.addEventListener("click", () => showSetupStep("choices"));
 	});
 	leaveButton.addEventListener("click", () => void leaveLobby());
 	startNowButton.addEventListener("click", () => room?.send("start-now"));
@@ -228,6 +235,7 @@ export function mountLobby(
 					if (!cancelledPanel.hidden) return;
 					waiting.hidden = true;
 					setup.hidden = false;
+					showSetupStep("choices");
 					error.textContent = reason || "You left the lobby. Join again when ready.";
 				}
 			});
@@ -256,7 +264,7 @@ export function mountLobby(
 		countdown.textContent = formatTime(state.secondsRemaining);
 		const isHost = state.hostSessionId === room?.sessionId;
 		roomCodePanel.hidden = !isHost;
-		if (isHost) roomCodeLabel.textContent = state.roomCode;
+		if (isHost) roomCodeLabel.textContent = state.roomCode || room?.roomId || "Connecting…";
 		if (state.status === "cancelled") {
 			cancelReason.textContent = state.cancellationReason || "At least two players are needed to depart.";
 			waiting.hidden = true;
@@ -312,6 +320,13 @@ export function mountLobby(
 		});
 	}
 
+	function showSetupStep(step: "choices" | "create" | "join"): void {
+		roomChoices.hidden = step !== "choices";
+		createStep.hidden = step !== "create";
+		joinStep.hidden = step !== "join";
+		error.textContent = "";
+	}
+
 	function joinedSlot(
 		player: { sessionId: string; name: string; avatarIndex: number },
 		hostSessionId: string,
@@ -361,6 +376,7 @@ export function mountLobby(
 		if (activeRoom) await activeRoom.leave();
 		waiting.hidden = true;
 		setup.hidden = false;
+		showSetupStep("choices");
 		error.textContent = "You left the lobby. Join again when ready.";
 	}
 

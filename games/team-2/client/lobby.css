@@ -68,35 +68,41 @@
 	font: 14px/1.6 system-ui, sans-serif;
 }
 #last-train-lobby-root .lobby-form { display: grid; gap: 11px; }
-#last-train-lobby-root .lobby-room-options { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-#last-train-lobby-root .lobby-create-options,
-#last-train-lobby-root .lobby-join-options { display: grid; align-content: start; gap: 9px; }
-#last-train-lobby-root .lobby-room-options .lobby-label { margin-top: 7px; }
-#last-train-lobby-root .lobby-room-options .lobby-primary,
-#last-train-lobby-root .lobby-room-options .lobby-secondary { width: 100%; min-height: 46px; }
+#last-train-lobby-root .lobby-room-choices,
+#last-train-lobby-root .lobby-room-step { display: grid; gap: 11px; }
+#last-train-lobby-root .lobby-room-choices[hidden],
+#last-train-lobby-root .lobby-room-step[hidden] { display: none; }
+#last-train-lobby-root .lobby-room-choices .lobby-label { margin: 10px 0 0; }
+#last-train-lobby-root .lobby-back {
+	min-height: 38px;
+	border: 1px solid #596653;
+	border-radius: 7px;
+	background: transparent;
+	color: #c4cbb9;
+	cursor: pointer;
+	font: 700 11px "Courier New", monospace;
+}
 #last-train-lobby-root .lobby-room-code {
-	display: flex;
-	align-items: center;
-	gap: 12px;
+	display: grid;
+	justify-items: center;
+	gap: 8px;
 	margin: 0 0 16px;
-	padding: 12px 14px;
+	padding: 15px 14px 17px;
 	border: 1px solid #d8bd71;
 	border-radius: 9px;
 	background: linear-gradient(90deg, #40351f, #211e17);
 	color: #f4d17a;
 }
 #last-train-lobby-root .lobby-room-code[hidden] { display: none; }
-#last-train-lobby-root .lobby-room-code span { color: #c5b487; font-size: 9px; letter-spacing: .14em; }
-#last-train-lobby-root .lobby-room-code strong { font-size: 13px; letter-spacing: .08em; overflow-wrap: anywhere; }
-#last-train-lobby-root .lobby-copy-code {
-	margin-left: auto;
-	padding: 7px 10px;
-	border: 1px solid #95804d;
-	border-radius: 6px;
-	background: #111714;
-	color: #f4e9c8;
-	cursor: pointer;
-	font: 700 11px "Courier New", monospace;
+#last-train-lobby-root .lobby-room-code span { color: #c5b487; font-size: 9px; letter-spacing: .16em; }
+#last-train-lobby-root .lobby-room-code strong {
+	color: #ffe28a;
+	font: 900 clamp(22px, 6vw, 30px) "Courier New", monospace;
+	letter-spacing: .16em;
+	text-align: center;
+	text-shadow: 0 0 18px #f4d17a55;
+	user-select: all;
+	overflow-wrap: anywhere;
 }
 #last-train-lobby-root .lobby-label {
 	margin-top: 7px;
@@ -300,7 +306,6 @@
 	#last-train-lobby-root *, #last-train-lobby-root *::before, #last-train-lobby-root *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 @media (max-width: 520px) {
-	#last-train-lobby-root .lobby-room-options { grid-template-columns: 1fr; }
 	#last-train-lobby-root .lobby-backdrop { padding: 14px 12px 42px; }
 	#last-train-lobby-root .lobby-card { padding: 20px 16px; border-radius: 14px; }
 	#last-train-lobby-root .lobby-room-heading { align-items: flex-start; flex-direction: column; }
