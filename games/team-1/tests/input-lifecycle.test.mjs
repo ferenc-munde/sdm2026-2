@@ -42,6 +42,32 @@ try {
     Object.defineProperty(browser.document, "visibilityState", { configurable: true, value: "visible" });
   });
 
+  test("arrow keys move without scrolling while text inputs retain arrow navigation", () => {
+    const arrowDown = new browser.KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      bubbles: true,
+      cancelable: true,
+    });
+    browser.dispatchEvent(arrowDown);
+    controller.update();
+    assert.equal(arrowDown.defaultPrevented, true);
+    assert.deepEqual(send.at(-1), { type: "move", x: 0, z: 1 });
+
+    dispatchKey(browser, "keyup", "ArrowDown");
+    controller.update();
+    const input = browser.document.createElement("input");
+    browser.document.body.append(input);
+    const fieldArrowDown = new browser.KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      bubbles: true,
+      cancelable: true,
+    });
+    input.dispatchEvent(fieldArrowDown);
+    assert.equal(fieldArrowDown.defaultPrevented, false);
+    assert.deepEqual(send.at(-1), { type: "move", x: 0, z: 0 });
+    input.remove();
+  });
+
   test("movement and E are ignored while typing in inputs or contenteditable elements", () => {
     const input = browser.document.createElement("input");
     const editor = browser.document.createElement("div");
@@ -73,7 +99,7 @@ try {
     assert.equal(send.length, messageCount);
   });
 
-  console.log(`${passed}/4 input lifecycle tests passed.`);
+  console.log(`${passed}/5 input lifecycle tests passed.`);
 } finally {
   await vite.close();
   await browser.happyDOM.close();

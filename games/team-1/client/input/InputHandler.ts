@@ -45,6 +45,7 @@ export class InputHandler {
   private onKeyDown(event: KeyboardEvent): void {
     if (isTextEntryTarget(event.target)) return;
     const key = event.key.toLowerCase();
+    if (key.startsWith('arrow')) event.preventDefault();
 
     switch (key) {
       case 'w':
