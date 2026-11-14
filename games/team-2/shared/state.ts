@@ -50,6 +50,13 @@ export class LastTrainState extends BaseState {
 	@type("float32") journeyDistance: number = 0;
 	@type("float32") speed: number = 0;
 	@type("uint16") timeLimitTicks: number = 0;
+	/**
+	 * Ticks played in the current run. Written only by the rules (`step` in game.ts): it rises by one
+	 * per tick while `phase` is "running" and starts again at 0 when a run starts. The room does not
+	 * step while paused, so paused time is not counted. Clients read the run clock from here and never
+	 * count ticks themselves, so every player sees the same time, also after joining late or reconnecting.
+	 */
+	@type("uint32") runTicks: number = 0;
 	@type("float32") power: number = 100;
 	@type("float32") pressure: number = 0;
 	@type("boolean") endgameUnlocked: boolean = false;

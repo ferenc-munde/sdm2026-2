@@ -19,6 +19,8 @@ for (const name of ['hud-preview.html', 'hud.css']) {
 const routes = {
   '/': ['hud-preview.html', 'text/html; charset=utf-8'],
   '/hud.js': ['hud.js', 'text/javascript; charset=utf-8'],
+  '/journey-view': ['journey-view.js', 'text/javascript; charset=utf-8'],
+  '/journey-view.js': ['journey-view.js', 'text/javascript; charset=utf-8'],
   '/hud.css': ['hud.css', 'text/css; charset=utf-8'],
 };
 const server = createServer((request, response) => {
