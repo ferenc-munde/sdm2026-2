@@ -200,12 +200,18 @@ let demoPhase: Phase = "playing";
 let demoStart = 0;
 
 const endScreen = createEndScreen(document.body, {
-  onPlayAgain: () => {
+  onNewRun: () => {
     if (connection) return sendToRoom({ type: "playAgain" });
     demoStart = performance.now();
     demoPhase = "playing";
     endScreen.update("playing");
     help.update("playing");
+  },
+  onLeave: () => {
+    if (connection) return void leaveLive();
+    demoPhase = "lobby";
+    endScreen.update("lobby");
+    help.update("lobby");
   },
 });
 
@@ -471,9 +477,9 @@ function drawLive(delta: number, time: number): void {
     waiting.hide();
     platformBoard.hide();
     hud.root.hidden = false;
-    endScreen.update(state.phase);
     help.update(state.phase);
   }
+  endScreen.update(state, live.me);
   // Draw players and items gliding between the room's 20 updates a second instead of stepping.
   train.updateState({
     players: withPositions(state.players, playerSmoother.step(positionsOf(state.players), delta)),
