@@ -9,7 +9,8 @@
   "scripts": {
     "start": "vite-node src/main.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "start:all": "vite-node src/start-all.ts"
   },
   "devDependencies": {
     "@colyseus/schema": "^5.0.8",
