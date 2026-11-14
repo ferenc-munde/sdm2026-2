@@ -12,7 +12,7 @@
 .train-topbar {
   position: fixed; z-index: 10; top: 16px; left: 80px; right: 20px;
   max-width: 1240px; margin: 0 auto; padding: 14px 20px;
-  display: grid; grid-template-columns: minmax(0, 1fr) 130px 220px; gap: 24px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 130px; gap: 24px;
   min-height: 96px;
 }
 .train-journey {
@@ -86,7 +86,7 @@
   .train-result button { width: 100%; }
 }
 @media (max-width: 1000px) {
-  .train-topbar { gap: 14px; padding: 12px 14px; grid-template-columns: minmax(0, 1fr) 110px 160px; }
+  .train-topbar { gap: 14px; padding: 12px 14px; grid-template-columns: minmax(0, 1fr) 110px; }
   .train-journey { grid-template-columns: 115px minmax(50px, 1fr) 70px; column-gap: 10px; }
   .train-hud-gauges { padding-left: 14px; }
   .train-hud-gauges label { grid-template-columns: 90px minmax(0, 1fr); gap: 6px; font-size: 11px; }

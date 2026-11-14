@@ -50,10 +50,18 @@ export function createLastTrain(overrides: Partial<ModuleFactories> = {}): LastT
 		},
 
 		join: (state, playerId, _ctx, options) => {
+			// The lobby has already collected the crew. The first seat in the game
+			// room begins the shared run; later crew members join the running state.
+			if (state.players.size === 0 && state.phase === "lobby") {
+				state.phase = "running";
+				state.runTicks = 0;
+			}
 			const player = new Player();
 			player.name = options?.name ?? `Crew ${state.players.size + 1}`;
 			placeAtSpawn(player, state.players.size);
 			state.players.set(playerId, player);
+			// The separate waiting room has already departed before creating/joining this room.
+			if (state.phase === "lobby" && state.players.size === 1) state.phase = "running";
 		},
 
 		leave: (state, playerId) => {

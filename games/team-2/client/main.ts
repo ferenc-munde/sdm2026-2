@@ -148,7 +148,7 @@ function update() {
   if (isPreview()) {
     hud.updateTasks(tasks);
     hud.updateGauges({ power: tasks[0]?.current ? 100 : 40, pressure: 35 });
-    hud.updateJourney({ ...journey, speed: journey.phase === "running" && !demoPaused ? demoSpeed / 300 : 0 });
+    hud.updateJourney({ ...journey, speed: journey.phase === "running" && !demoPaused ? demoSpeed / gameConfig.timeLimitSeconds : 0 });
     trainScene?.setSpeed(journey.phase === "running" ? demoSpeed : 0);
     showStationPrompt(null);
     const demo = stationsById.get("breaker-box")!;
@@ -157,7 +157,8 @@ function update() {
     hud.updateTasks(idle ? [] : view.tasks);
     hud.updateGauges(idle ? { power: 100, pressure: 0 } : view.gauges);
     hud.updateJourney(journeyView);
-    trainScene?.setSpeed(view.speed);
+    // The scene expects a scenery multiplier; rules publish route fractions per second.
+    trainScene?.setSpeed(view.speed * gameConfig.timeLimitSeconds);
 
     if (isGameplayActive()) {
       const powerDanger = view.gauges.power < 15;
@@ -196,7 +197,7 @@ function update() {
 function reset() {
   demoSpeed = 1; demoPaused = false; speedInput.value = "1";
   tasks = [{ id: "example-repair", title: "Example: repair electrical panel", current: 0, target: 1 }];
-  journey = { distance: 0, remainingSeconds: 300, totalSeconds: 300, phase: "running" };
+  journey = { distance: 0, remainingSeconds: gameConfig.timeLimitSeconds, totalSeconds: gameConfig.timeLimitSeconds, phase: "running" };
   update();
 }
 function resetPerGameUi(): void {
@@ -205,7 +206,12 @@ function resetPerGameUi(): void {
   powerWasDangerous = false;
   pressureWasDangerous = false;
   tasks = [];
-  journey = { distance: 0, remainingSeconds: 300, totalSeconds: 300, phase: "lobby" };
+  journey = {
+    distance: 0,
+    remainingSeconds: gameConfig.timeLimitSeconds,
+    totalSeconds: gameConfig.timeLimitSeconds,
+    phase: "lobby",
+  };
   demoSpeed = 1;
   demoPaused = false;
   speedInput.value = "1";
@@ -388,7 +394,8 @@ async function enterGameRoom(connect: () => Promise<NetSession>) {
       update();
     });
   } catch (error) {
-    netStatus = `Could not join the game room (${error instanceof Error ? error.message : String(error)}) · reload to try again`;
+    netStatus = `Could not start the game: ${error instanceof Error ? error.message : String(error)}`;
+    lobby?.showTransitionError(netStatus);
     console.error(error);
   }
   update();
@@ -397,7 +404,10 @@ async function enterGameRoom(connect: () => Promise<NetSession>) {
 function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(message)), ms);
-    promise.then((value) => { clearTimeout(timer); resolve(value); }, reject);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
   });
 }
 

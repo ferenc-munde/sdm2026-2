@@ -9,13 +9,6 @@ export const gameRoomMessageSchema = z.object({ code: z.string().regex(/^[A-Za-z
 export type GameRoomMessage = z.infer<typeof gameRoomMessageSchema>;
 
 export const TEAM_SIZES = [2, 3, 4] as const;
-export const LOBBY_COUNTDOWN_SECONDS = 120;
-export const LOBBY_COUNTDOWN_URGENT_SECONDS = 30;
-
-export function isLobbyCountdownUrgent(secondsRemaining: number): boolean {
-	return secondsRemaining <= LOBBY_COUNTDOWN_URGENT_SECONDS;
-}
-
 export type TeamSize = (typeof TEAM_SIZES)[number];
 export type LobbyStatus = "waiting" | "running" | "cancelled";
 
@@ -39,11 +32,12 @@ export class LobbyState extends Schema {
 	@type("uint8") teamSize = 4;
 	@type("uint8") playerCount = 0;
 	@type("uint8") startedPlayerCount = 0;
-	@type("uint16") secondsRemaining = LOBBY_COUNTDOWN_SECONDS;
 	@type("string") status: LobbyStatus = "waiting";
 	@type("string") hostSessionId = "";
 	@type("string") cancellationReason = "";
 	@type("string") roomCode = "";
+	/** Durable hand-off value so clients joining after the host message still find the game room. */
+	@type("string") gameRoomCode = "";
 	@type({ map: LobbyPlayer }) players = new MapSchema<LobbyPlayer>();
 }
 
@@ -81,10 +75,9 @@ export function addLobbyPlayer(state: LobbyState, sessionId: string, rawName: un
 
 	if (!state.hostSessionId) {
 		assignHost(state, sessionId);
-		state.secondsRemaining = LOBBY_COUNTDOWN_SECONDS;
 	}
 
-	// A full crew departs immediately; smaller crews can wait or have the host skip.
+	// A full crew departs immediately; the host can start a smaller crew at any time.
 	if (state.playerCount >= state.teamSize) startLobby(state);
 	return true;
 }
@@ -101,27 +94,15 @@ export function removeLobbyPlayer(state: LobbyState, sessionId: string): boolean
 	reindexPlayers(state);
 
 	if (state.playerCount === 0 && state.status === "waiting") {
-		state.secondsRemaining = LOBBY_COUNTDOWN_SECONDS;
 		state.hostSessionId = "";
 	}
 	return true;
-}
-
-/** Advance the single server-owned countdown by one second. */
-export function advanceLobbyCountdown(state: LobbyState): boolean {
-	if (state.status !== "waiting" || state.playerCount === 0) return false;
-	if (state.playerCount >= state.teamSize) return startLobby(state);
-
-	state.secondsRemaining = Math.max(0, state.secondsRemaining - 1);
-	if (state.secondsRemaining === 0) return startLobby(state);
-	return false;
 }
 
 /** Cancel a waiting lobby when it cannot form a cooperative crew. */
 export function cancelLobby(state: LobbyState, reason: string): boolean {
 	if (state.status !== "waiting" || state.playerCount === 0) return false;
 	state.status = "cancelled";
-	state.secondsRemaining = 0;
 	state.cancellationReason = reason;
 	return true;
 }
@@ -130,7 +111,6 @@ export function cancelLobby(state: LobbyState, reason: string): boolean {
 export function startLobby(state: LobbyState): boolean {
 	if (state.status !== "waiting" || state.playerCount === 0) return false;
 	state.status = "running";
-	state.secondsRemaining = 0;
 	// Freeze the crew size at departure; the match can start with a single player.
 	state.startedPlayerCount = state.playerCount;
 	return true;

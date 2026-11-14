@@ -12,7 +12,7 @@ const valid = {
 
 describe("game config", () => {
 	it("accepts the shipped config/game.json", () => {
-		expect(parseGameConfig(configJson)).toMatchObject(valid);
+		expect(parseGameConfig(configJson)).toMatchObject({ ...valid, timeLimitSeconds: 240 });
 	});
 
 	it("has movement speeds, with defaults when the file leaves them out", () => {

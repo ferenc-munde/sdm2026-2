@@ -29,24 +29,24 @@ describe("local adapter to map/HUD integration", () => {
     const remaining = () => localStateToHud(s, 20).journey.remainingSeconds;
     const steps = (count: number) => { for (let i = 0; i < count; i++) model.drainAndStep(); };
     s.phase = "lobby"; s.tick = 100; steps(40);
-    expect(remaining()).toBe(300);
+    expect(remaining()).toBe(240);
     s.phase = "running"; steps(20);
-    expect(remaining()).toBe(299);
+    expect(remaining()).toBe(239);
     s.paused = true; steps(100);
-    expect(remaining()).toBe(299);
+    expect(remaining()).toBe(239);
     s.paused = false; steps(20);
-    expect(remaining()).toBe(298);
+    expect(remaining()).toBe(238);
     s.phase = "won"; steps(100);
-    expect(remaining()).toBe(298);
+    expect(remaining()).toBe(238);
     s.phase = "running"; steps(1);
-    expect(remaining()).toBe(299.95);
+    expect(remaining()).toBe(239.95);
   });
   it("shows the same time to a client that starts reading in the middle of a run", () => {
     const model = createLocalStateModel();
     const s = model.state;
     for (let i = 0; i < 200; i++) model.drainAndStep();
     // A late joiner or a reconnected client has no history: it only has the synced state.
-    expect(localStateToHud(s, 20).journey.remainingSeconds).toBe(290);
+    expect(localStateToHud(s, 20).journey.remainingSeconds).toBe(230);
   });
   it("stops visual speed on pause or end, and clamps expired time", () => {
     const s = createLocalStateModel().state;

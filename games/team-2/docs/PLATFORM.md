@@ -97,7 +97,7 @@ The lobby and the game are two different rooms, and the platform has no lobby of
 
 1. The host creates a private `train_lobby` with their name and a crew size from two to four. Colyseus generates a unique room ID; the server stores it as that lobby's room code.
 2. The host shares the lobby code. Friends join that same `train_lobby` by its code with their names; Colyseus rejects unknown, locked, and full rooms.
-3. When the lobby departs (full crew, countdown, or host skip), it sends `match-started`.
+3. When the lobby departs (full crew or host start-now), it sends `match-started`.
 4. The **lobby host's** browser creates the gameplay room (`hostGame`, which calls the platform's `hostRoom`) and sends the gameplay room code to the lobby with `game-room`.
 5. The **other** browsers join the gameplay room by that code (`joinGame`, which calls `joinRoomByCode`), with their lobby name.
 6. Everybody leaves the lobby room.
