@@ -40,7 +40,7 @@ export interface CourseFxView {
   shakeX: number;
   /** Camera offset along y, in world units. */
   shakeY: number;
-  /** Hull rotation around z, in radians. Positive is one side, negative the other. */
+  /** Hull roll across the track (around x, since the train runs along x), in radians. */
   tilt: number;
 }
 

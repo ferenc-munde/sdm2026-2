@@ -60,7 +60,7 @@ describe("the train", () => {
     expect(train.hullGroup.children).toEqual(
       expect.arrayContaining([train.mapGroup, train.itemsGroup, train.hazardsGroup, train.playersGroup]),
     );
-    expect(train.hullGroup.rotation.z).toBe(0);
+    expect(train.hullGroup.rotation.x).toBe(0);
   });
 
   it("puts the camera above the train, looking down at an angle", () => {

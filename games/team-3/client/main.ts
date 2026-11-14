@@ -236,10 +236,11 @@ function applyCourseFx(time: number): void {
   const elapsed = (time - fxStart) / 1000;
   const view = courseFx(elapsed, fxDirection);
   if (fxBase) train.camera.position.set(fxBase.x + view.shakeX, fxBase.y + view.shakeY, fxBase.z);
-  train.hullGroup.rotation.z = view.tilt;
+  // The train runs along x, so a sideways lurch (the rules push across the track) is a roll around x.
+  train.hullGroup.rotation.x = view.tilt;
   if (elapsed >= COURSE_FX_SECONDS) {
     fxStart = null;
-    train.hullGroup.rotation.z = 0;
+    train.hullGroup.rotation.x = 0;
     resize();
   }
 }
