@@ -75,38 +75,58 @@ export function areaOf(path) {
   return parts.length > 1 ? parts[0] : "repo root";
 }
 
+/** Share of the game quality in the total: the rest (75%) comes from the activity points. */
+export const QUALITY_WEIGHT = 0.25;
+/** Extra work a late student has to do for the same points: 25% more. */
+export const LATE_FACTOR = 1.25;
+
 /**
- * Grade proposal from activity, 0-10 points (the rule the Team 10 evaluation used, adapted):
+ * Grade proposal, 0-10 points. The total is 75% activity and 25% game quality.
+ *
+ * Activity, 0-10 points (the rule the Team 10 evaluation used, adapted):
  *   Delivery 0-4:      merged work PRs 5+ -> 4, 2-4 -> 3, 1 -> 2; none merged but one open -> 1
  *   Process 0-3:       +1 most merged PRs follow the PR rules; +1 issues opened follow the issue
  *                      rules; +1 closed at least one assigned issue. Only the rules in force when the
  *                      issue or PR was created count (RULES); with nothing to judge, the point is given.
  *   Collaboration 0-3: reviewed other people's PRs 5+ -> 2, 1-4 -> 1; +1 at least half of an equal
  *                      share of the team's merged work
- *   Points -> grade:   8-10 -> 5, 5-7 -> 4, 3-4 -> 3, 1-2 -> 2, 0 -> 1
  *
- * Late arrival: a student marked `"onTime": false` in the roster has to do twice as much for the same
- * points. Every count threshold above is doubled (merged PRs 10+ -> 4, 4-9 -> 3, 2-3 -> 2, 1 or only
- * open -> 1; at least 2 merged PRs / 2 issues opened / 2 assigned issues closed for the Process points;
- * reviews 10+ -> 2, 2-9 -> 1; at least a full equal share). The rule ratios (half of the PRs, 80% of
- * the issues) stay the same. A missing `onTime` counts as on time.
+ * Late arrival: a student marked `"onTime": false` in the roster has to do 25% more for the same
+ * activity points. Every count threshold is multiplied by 1.25 and rounded up (merged PRs 7+ -> 4,
+ * 3-6 -> 3, 2 -> 2, 1 or only open -> 1; 2 merged PRs / 2 issues opened / 2 closed assigned issues
+ * for the Process points; reviews 7+ -> 2, 2-6 -> 1; 62.5% of an equal share). The rule ratios (half
+ * of the PRs, 80% of the issues) stay the same. A missing `onTime` counts as on time.
+ *
+ * Game quality, 0-10 points: given by the instructors by hand, per team, in `gameQuality` in the roster
+ * (does the game run, does it meet the requirements). Every member of the team gets the team's value.
+ * While it is missing (null), the total is the activity points alone and the grade is provisional.
+ *
+ *   Total = 0.75 x activity + 0.25 x quality (one decimal)
+ *   Total -> grade:    8-10 -> 5, 5-7.9 -> 4, 3-4.9 -> 3, 1-2.9 -> 2, below 1 -> 1
  */
 export function effortFactor(p) {
-  return p.onTime === false ? 2 : 1;
+  return p.onTime === false ? LATE_FACTOR : 1;
 }
 
-export function scoreOf(p, teamSize) {
+export function gradeOf(total) {
+  return total >= 8 ? 5 : total >= 5 ? 4 : total >= 3 ? 3 : total >= 1 ? 2 : 1;
+}
+
+export function scoreOf(p, teamSize, quality = null) {
   const f = effortFactor(p);
-  const delivery = p.prsMerged >= 5 * f ? 4 : p.prsMerged >= 2 * f ? 3 : p.prsMerged >= f ? 2 : p.prsOpened > 0 ? 1 : 0;
+  const need = (n) => Math.ceil(n * f - 1e-9); // the smallest whole count that reaches n x f
+  const delivery = p.prsMerged >= need(5) ? 4 : p.prsMerged >= need(2) ? 3 : p.prsMerged >= need(1) ? 2 : p.prsOpened > 0 ? 1 : 0;
   let process = 0;
-  if (p.prsMerged >= f && (p.prsJudged === 0 || p.prsOk * 2 >= p.prsJudged)) process++;
-  if (p.issuesOpened >= f && (p.issuesJudged === 0 || p.issuesOk * 5 >= p.issuesJudged * 4)) process++;
-  if (p.issuesAssignedClosed >= f) process++;
-  let collaboration = p.reviewsGiven >= 5 * f ? 2 : p.reviewsGiven >= f ? 1 : 0;
+  if (p.prsMerged >= need(1) && (p.prsJudged === 0 || p.prsOk * 2 >= p.prsJudged)) process++;
+  if (p.issuesOpened >= need(1) && (p.issuesJudged === 0 || p.issuesOk * 5 >= p.issuesJudged * 4)) process++;
+  if (p.issuesAssignedClosed >= need(1)) process++;
+  let collaboration = p.reviewsGiven >= need(5) ? 2 : p.reviewsGiven >= need(1) ? 1 : 0;
   if (teamSize > 0 && p.share * teamSize * 2 >= f) collaboration++;
   const points = delivery + process + collaboration;
-  const grade = points >= 8 ? 5 : points >= 5 ? 4 : points >= 3 ? 3 : points >= 1 ? 2 : 1;
-  return { delivery, process, collaboration, points, grade };
+  const hasQuality = typeof quality === "number" && Number.isFinite(quality);
+  const q = hasQuality ? Math.min(10, Math.max(0, quality)) : null;
+  const total = hasQuality ? Math.round(((1 - QUALITY_WEIGHT) * points + QUALITY_WEIGHT * q) * 10) / 10 : points;
+  return { delivery, process, collaboration, points, quality: q, total, provisional: !hasQuality, grade: gradeOf(total) };
 }
 
 function plural(n, word) {
@@ -150,9 +170,11 @@ const emptyPerson = (login, name, team, onTime = true) => ({
  * Builds the report from plain data, without any network access.
  * @param {{issues: object[], pulls: object[], reviews: Record<number, object[]>, files?: Record<number, object[]>}} data
  *        GitHub REST shapes; `files` holds the changed files of each merged work PR.
- * @param {{instructors: string[], students: {login: string, name: string, nickname?: string, team: string, onTime?: boolean}[]}} roster
+ * @param {{instructors: string[], students: {login: string, name: string, nickname?: string, team: string, onTime?: boolean}[],
+ *          gameQuality?: Record<string, number | null>}} roster
  */
 export function buildReport(data, roster) {
+  const gameQuality = roster.gameQuality ?? {};
   const instructors = new Set(roster.instructors.map((l) => l.toLowerCase()));
   const people = new Map();
   for (const s of roster.students) {
@@ -245,11 +267,11 @@ export function buildReport(data, roster) {
       for (const m of members) {
         m.share = linesAdded > 0 ? m.linesAdded / linesAdded : 0;
         m.areas = Object.entries(m.areaLines).sort((a, b) => b[1] - a[1]).map(([area]) => area);
-        m.score = scoreOf(m, members.length);
+        m.score = scoreOf(m, members.length, gameQuality[team] ?? null);
         m.summary = summaryOf(m);
       }
       members.sort((a, b) => b.share - a.share || a.name.localeCompare(b.name) || a.login.localeCompare(b.login));
-      return { team, linesAdded, prsMerged: members.reduce((s, m) => s + m.prsMerged, 0), members };
+      return { team, quality: gameQuality[team] ?? null, linesAdded, prsMerged: members.reduce((s, m) => s + m.prsMerged, 0), members };
     });
 }
 
@@ -259,17 +281,20 @@ export function toMarkdown(report, repo) {
     "Issues assigned: closed / all issues the student is assigned to. PRs: work pull requests only",
     "(promotion and sync PRs between integration branches are left out). Reviews: other people's PRs reviewed.",
     "Share: part of the team's lines added in merged work PRs (generated files left out). Grade: proposal, 0-10 points -> 1-5.",
+    "Activity: 0-10 points from the repository. Quality: the team's game quality, 0-10, given by the instructors.",
+    "Total: 75% activity + 25% quality; while the quality is missing, the total is the activity alone (provisional, marked *).",
     "Rule problems: issues and PRs judged by the rules in force when they were created (see RULES in the script).",
-    "On time: no = arrived late, every point threshold is doubled for this student.",
+    "On time: no = arrived late, every activity threshold is 25% higher (rounded up) for this student.",
     "",
   );
-  for (const { team, members } of report) {
+  for (const { team, quality: q, members } of report) {
     lines.push(`## ${team}`, "");
-    lines.push("| Student | GitHub | On time | Issues assigned (closed / all) | Issues opened | PRs opened | PRs merged | Reviews given | Lines added | Share | Rule problems | Points | Grade |");
-    lines.push("|---|---|---|---|---|---|---|---|---|---|---|---|---|");
+    if (!team.startsWith("(")) lines.push(`Game quality: ${typeof q === "number" ? `${q} / 10` : "not given yet"}`, "");
+    lines.push("| Student | GitHub | On time | Issues assigned (closed / all) | Issues opened | PRs opened | PRs merged | Reviews given | Lines added | Share | Rule problems | Activity | Quality | Total | Grade |");
+    lines.push("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
     for (const m of members) {
       lines.push(
-        `| ${m.name || "–"} | ${m.login} | ${m.onTime ? "yes" : "no (×2)"} | ${m.issuesAssignedClosed} / ${m.issuesAssigned} | ${m.issuesOpened} | ${m.prsOpened} | ${m.prsMerged} | ${m.reviewsGiven} | ${m.linesAdded} | ${Math.round(m.share * 100)}% | ${m.ruleProblems.length} | ${m.score.points} | ${m.score.grade} |`,
+        `| ${m.name || "–"} | ${m.login} | ${m.onTime ? "yes" : "no (×1.25)"} | ${m.issuesAssignedClosed} / ${m.issuesAssigned} | ${m.issuesOpened} | ${m.prsOpened} | ${m.prsMerged} | ${m.reviewsGiven} | ${m.linesAdded} | ${Math.round(m.share * 100)}% | ${m.ruleProblems.length} | ${m.score.points} | ${m.score.quality ?? "–"} | ${m.score.total} | ${m.score.grade}${m.score.provisional ? "*" : ""} |`,
       );
     }
     lines.push("");

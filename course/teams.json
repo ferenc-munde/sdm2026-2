@@ -15,5 +15,6 @@
     {"login": "Wasay-3435", "name": "Shah Syed Wasia Ali", "nickname": "Wasey", "team": "team-1", "onTime": false},
     {"login": "Main-66", "name": "Sisoulath Phongpasith", "nickname": "Bee", "team": "team-3", "onTime": false},
     {"login": "elok9", "name": "Ude Ikenna Chukwueloka", "nickname": "Ikenna", "team": "platform", "onTime": true}
-  ]
+  ],
+  "gameQuality": {"team-1": null, "team-2": null, "team-3": null, "platform": null}
 }
