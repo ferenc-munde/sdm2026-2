@@ -49,7 +49,7 @@ team-N/<issue>-<description>  →  Team_N_Feature  →  development  →  stagin
 | `Team_N_Feature` | Team N's own integration branch (`Team_1_Feature` … `Team_3_Feature`) | PRs from that team's work branches |
 | `development` | Integration branch for all teams | PRs from `Team_N_Feature`, and from `platform` and `team-instructor` work branches |
 | `staging` | Release candidate | PRs from `development` only |
-| `main` | Production (prod): the stable, released state | PRs from `staging` only |
+| `main` | Production (prod): the stable, released state | PRs from `staging` only, merged by an instructor |
 
 - A game team's work branch never targets `development`, `staging` or `main` directly: it goes into the team's `Team_N_Feature`.
 - `platform` and `team-instructor` have no feature branch: their work branches start from `development` and their PRs go into `development`.
@@ -80,6 +80,7 @@ team-N/<issue>-<description>  →  Team_N_Feature  →  development  →  stagin
 
 - One pull request per issue, into your team's `Team_N_Feature` (`platform` and `team-instructor`: into `development`).
 - Promotion pull requests (`Team_N_Feature` → `development`, `development` → `staging`, `staging` → `main`) carry no new work: they only move what is already reviewed one step forward. Title: `chore(team-N): promote Team_N_Feature to development`.
+- Only an instructor merges `staging` → `main`. A repository ruleset enforces it: `main` changes only through a pull request merged by the repository admin, and cannot be deleted or force-pushed. Anyone may open the promotion PR; an instructor reviews and merges it.
 - The PR carries the same team label as its issue.
 - The title follows Conventional Commits with the team label as the scope: `feat(team-2): add login page`.
 - The description links the issue with a closing keyword (`Closes #14`) and says what changed and how it was tested.
@@ -91,7 +92,9 @@ team-N/<issue>-<description>  →  Team_N_Feature  →  development  →  stagin
 - Test everything: say in the PR how you tested it. Once CI exists, all checks must be green.
 - Resolve every review comment before merging.
 - The work branch is deleted automatically when its pull request is merged (the repository setting "Automatically delete head branches" is on). Do not delete it by hand, and do not reuse it: start the next issue from a fresh branch.
-- Long-lived branches (`main`, `staging`, `development`, `Team_N_Feature`) are never deleted. They must stay protected so that promotion and sync PRs, which use them as their head branch, cannot remove them.
+- Long-lived branches (`main`, `staging`, `development`, `Team_N_Feature`) are never deleted. Two repository rulesets protect them, so the automatic branch deletion cannot remove them after a promotion or sync PR, which uses them as its head branch:
+  - `main: only instructors promote`: on `main`, changes only through a pull request merged by the repository admin (an instructor); no deletion, no force push.
+  - `long-lived branches`: on `development`, `staging` and `Team_*_Feature`, changes only through a pull request; no deletion, no force push.
 
 ## Deployment
 

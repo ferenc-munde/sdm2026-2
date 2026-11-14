@@ -113,7 +113,7 @@ team-N/<issue>-<description>  →  Team_N_Feature  →  development  →  stagin
 
 | Branch | Purpose | Receives pull requests from |
 |---|---|---|
-| `main` | Production: the stable, released state | `staging` only |
+| `main` | Production: the stable, released state | `staging` only, merged by an instructor (enforced by a repository ruleset) |
 | `staging` | Release candidate, checked before it goes to production | `development` only |
 | `development` | Integration branch for all teams | `Team_N_Feature`, and `platform` and `team-instructor` work branches |
 | `Team_N_Feature` | Team N's integration branch | Team N's work branches (`team-N/<issue>-<description>`) |
@@ -122,6 +122,7 @@ Rules:
 
 - **A feature branch goes into `development`.** `Team_N_Feature` is never merged into `staging` or `main` directly, and a team's work branch is never merged into anything but its own `Team_N_Feature`.
 - Nobody commits directly to `main`, `staging`, `development` or `Team_N_Feature`: they change only through merged pull requests.
+- Two repository rulesets enforce this. `main: only instructors promote` protects `main` (only the repository admin, an instructor, merges into it). `long-lived branches` protects `development`, `staging` and `Team_*_Feature`. Both forbid deleting and force-pushing these branches, so the automatic deletion of merged head branches never removes them.
 - `platform` and `team-instructor` have no feature branch. Their work branches start from `development` and their pull requests go into `development`.
 - A team keeps its `Team_N_Feature` up to date by merging `development` into it.
 
@@ -136,7 +137,7 @@ Railway project `sdm2026-2`, separate from Team 10's `sdm2026-1` project (see th
 | Environment | Deploys | `APP_ENV` |
 |---|---|---|
 | development | `development`, after CI passed on the commit | `development` |
-| production | `main`, through a reviewed promotion PR from `staging` | `production` |
+| production | `main`, through a promotion PR from `staging` that an instructor merges | `production` |
 
 `staging` has no environment of its own yet: it is the release candidate that CI checks before the promotion to `main`.
 
