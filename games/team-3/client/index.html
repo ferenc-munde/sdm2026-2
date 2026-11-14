@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Last Train — renderer check</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #101018;
+        color: #e6e6ee;
+        font-family: system-ui, sans-serif;
+      }
+
+      #app {
+        width: 100vw;
+        height: 100vh;
+      }
+
+      .title {
+        position: fixed;
+        bottom: 16px;
+        left: 16px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: rgba(16, 16, 24, 0.7);
+        pointer-events: none;
+      }
+
+      .title h1 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .title p {
+        margin: 4px 0 0;
+        font-size: 12px;
+        opacity: 0.7;
+      }
+
+      /* Heads-up display (#20): three bars across the top of the screen. */
+      .hud {
+        position: fixed;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 16px;
+        width: min(860px, calc(100vw - 32px));
+        padding: 10px 14px;
+        border-radius: 10px;
+        background: rgba(16, 16, 24, 0.78);
+        pointer-events: none;
+      }
+
+      .hud-bar {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+        font-size: 12px;
+      }
+
+      .hud-bar-label {
+        opacity: 0.75;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .hud-bar-value {
+        min-width: 6ch;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .hud-bar-track {
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.14);
+        overflow: hidden;
+      }
+
+      .hud-bar-fill {
+        height: 100%;
+        width: 0;
+        border-radius: inherit;
+        transition: width 120ms linear, background 120ms linear;
+      }
+
+      .hud[hidden] {
+        display: none;
+      }
+
+      /* Win and lose screens (#21). */
+      .endscreen {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(8, 8, 12, 0.82);
+        z-index: 10;
+      }
+
+      .endscreen[hidden] {
+        display: none;
+      }
+
+      .endscreen-panel {
+        width: min(420px, calc(100vw - 32px));
+        padding: 24px 28px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: #17171f;
+        text-align: center;
+      }
+
+      .endscreen h2 {
+        margin: 0 0 8px;
+        font-size: 24px;
+      }
+
+      .endscreen[data-outcome="won"] h2 {
+        color: #30a46c;
+      }
+
+      .endscreen[data-outcome="lost"] h2 {
+        color: #e5484d;
+      }
+
+      .endscreen p {
+        margin: 0 0 18px;
+        opacity: 0.8;
+      }
+
+      .endscreen-action {
+        padding: 10px 16px;
+        border: 0;
+        border-radius: 8px;
+        background: #3e63dd;
+        color: #ffffff;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .endscreen-action:hover {
+        background: #4f74ee;
+      }
+
+      /* Sound on/off (#31). */
+      .mute {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(16, 16, 24, 0.8);
+        color: #e6e6ee;
+        font: 12px system-ui, sans-serif;
+        cursor: pointer;
+      }
+
+      .mute[aria-pressed="true"] {
+        border-color: rgba(247, 107, 21, 0.6);
+        color: #f76b15;
+      }
+
+      /* Main menu (#12). */
+      .lobby {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(8, 8, 12, 0.9);
+        z-index: 20;
+      }
+
+      .lobby[hidden] {
+        display: none;
+      }
+
+      .lobby-panel {
+        box-sizing: border-box;
+        width: min(420px, calc(100vw - 32px));
+        padding: 24px 28px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: #17171f;
+      }
+
+      .lobby h2 {
+        margin: 0 0 6px;
+        font-size: 24px;
+      }
+
+      .lobby-panel > p {
+        margin: 0 0 18px;
+        opacity: 0.75;
+      }
+
+      .lobby-form {
+        display: grid;
+        gap: 8px;
+      }
+
+      .lobby label {
+        margin-top: 6px;
+        font-size: 12px;
+        opacity: 0.75;
+      }
+
+      .lobby input {
+        box-sizing: border-box;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: #101018;
+        color: #e6e6ee;
+        font: inherit;
+      }
+
+      .lobby-code {
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+      }
+
+      .lobby button {
+        padding: 10px 14px;
+        border: 0;
+        border-radius: 8px;
+        background: #3e63dd;
+        color: #ffffff;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .lobby button:hover {
+        background: #4f74ee;
+      }
+
+      .lobby .lobby-join {
+        background: #2f2f3a;
+      }
+
+      .lobby .lobby-divider {
+        margin: 14px 0 4px;
+        font-size: 12px;
+        opacity: 0.6;
+        text-align: center;
+      }
+
+      .lobby-error {
+        margin: 12px 0 0;
+        color: #e5484d;
+      }
+
+      .lobby-status {
+        margin: 12px 0 0;
+        opacity: 0.75;
+      }
+
+      .lobby-error[hidden],
+      .lobby-status[hidden],
+      .lobby-room[hidden],
+      .lobby-form[hidden] {
+        display: none;
+      }
+
+      .lobby-room {
+        display: grid;
+        gap: 8px;
+      }
+
+      .lobby-room-code {
+        margin: 0;
+        font-size: 32px;
+        letter-spacing: 0.2em;
+      }
+
+      .lobby-room-link {
+        font-size: 12px;
+        opacity: 0.7;
+        word-break: break-all;
+      }
+
+      /* Waiting room (#146): a panel over the platform scene. */
+      .waiting {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        pointer-events: none;
+        z-index: 15;
+      }
+
+      .waiting[hidden] {
+        display: none;
+      }
+
+      .waiting-panel {
+        pointer-events: auto;
+        box-sizing: border-box;
+        display: grid;
+        gap: 10px;
+        width: min(520px, calc(100vw - 32px));
+        padding: 20px 24px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: #17171f;
+      }
+
+      .waiting h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+
+      .waiting-hint {
+        margin: 0;
+        opacity: 0.75;
+      }
+
+      .waiting-journey {
+        margin: 0;
+        font-size: 12px;
+        opacity: 0.6;
+      }
+
+      .waiting-crew {
+        display: grid;
+        gap: 4px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .waiting-member[data-host="true"]::after {
+        content: " · host";
+        color: #f5d90a;
+      }
+
+      .waiting-member[data-disconnected="true"] {
+        opacity: 0.5;
+      }
+
+      .waiting-size-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 12px;
+        opacity: 0.9;
+      }
+
+      .waiting-size {
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: #101018;
+        color: #e6e6ee;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .waiting-size.active {
+        background: #3e63dd;
+        border-color: #3e63dd;
+        color: #ffffff;
+      }
+
+      .waiting-size:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+
+      .waiting-ticket {
+        display: grid;
+        gap: 4px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: #101018;
+      }
+
+      .waiting-code {
+        font-size: 26px;
+        letter-spacing: 0.2em;
+      }
+
+      .waiting-link {
+        margin: 0;
+        font-size: 12px;
+        opacity: 0.7;
+        word-break: break-all;
+      }
+
+      .waiting-ticket button {
+        justify-self: start;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: #2f2f3a;
+        color: #e6e6ee;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .waiting-depart {
+        padding: 12px;
+        border: 0;
+        border-radius: 8px;
+        background: #30a46c;
+        color: #ffffff;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .waiting-depart:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .waiting-leave {
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: transparent;
+        color: #e6e6ee;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .waiting-copy-status {
+        margin: 0;
+        font-size: 12px;
+        opacity: 0.7;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="title">
+      <h1>The Last Train</h1>
+      <p>Renderer and HUD check (#10, #20)</p>
+    </div>
+    <div id="app"></div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

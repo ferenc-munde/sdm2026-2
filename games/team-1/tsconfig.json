@@ -8,4 +8,18 @@
     "useDefineForClassFields": false
   },
   "include": ["client/**/*.ts", "shared/**/*.ts", "vite.config.ts"]
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["client/**/*.ts", "shared/**/*.ts", "room/**/*.ts", "server.ts", "vite.config.ts", "vitest.config.ts"]
 }

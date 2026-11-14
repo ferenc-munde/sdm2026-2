@@ -41,17 +41,17 @@ How the system is built: [server/ARCHITECTURE.md](server/ARCHITECTURE.md).
 Every change follows the same path: **issue → branch → commits → pull request → review → merge**. The full rules are in [CLAUDE.md](CLAUDE.md).
 
 1. **Open an issue.** Title `[team-N] Short description`, one label (`team-N`), a goal and a "done when" checklist. Assign yourself.
-2. **Create a branch** from an up-to-date `main`, named after the label and the issue:
+2. **Create a branch** from your team's up-to-date feature branch (`Team_1_Feature` for Team 1, and so on; `platform` and `team-instructor` use `development`), named after the label and the issue:
 
    ```bash
-   git switch main
+   git switch Team_N_Feature
    git pull
    git switch -c team-N/42-short-description
    ```
 
 3. **Commit** small, focused changes: `feat(team-N): add score display`, with `Refs #42` on its own line in the body.
 4. **Test** your change, and write down how.
-5. **Open a pull request into `main`.** Title in the commit format, the same label as the issue, `Closes #42` in the description.
+5. **Open a pull request into your team's `Team_N_Feature`**, never into `development`, `staging` or `main` (`platform` and `team-instructor`: into `development`). Title in the commit format, the same label as the issue, `Closes #42` in the description.
 6. **Get a review** from a teammate, fix any comments, then merge and delete the branch.
 
 ## 5. Working with AI agents
