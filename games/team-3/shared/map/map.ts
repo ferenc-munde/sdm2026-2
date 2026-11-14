@@ -77,14 +77,19 @@ export interface TrainMap {
 /** The id of the hazard spot on the engine. A fire here stalls the train. */
 export const ENGINE_SPOT_ID = "engine";
 
-/** Stations every map must have. */
-export const REQUIRED_STATIONS: readonly StationKind[] = [
+/** Stations every map must have: every StationKind (#316). */
+export const REQUIRED_STATIONS = [
   "engine",
   "coalDispenser",
   "wrenchRack",
   "extinguisherRack",
   "steeringConsole",
-];
+] as const satisfies readonly StationKind[];
+
+/** Fails to compile when a StationKind is added to the contract but not listed above. */
+type UnlistedStation = Exclude<StationKind, (typeof REQUIRED_STATIONS)[number]>;
+const everyStationListed: [UnlistedStation] extends [never] ? true : UnlistedStation = true;
+void everyStationListed;
 
 /** Centre of a car along the train. */
 export function carCentreX(index: number): number {
