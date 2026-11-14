@@ -81,7 +81,17 @@ try {
   assert.equal(app.querySelector("#crew-count").textContent, "2 / 4");
   assert.equal(app.querySelector(".mock-controls"), null, "no mock controls in live mode");
   assert.equal(app.querySelector("#game-connection").textContent, "CONNECTED");
-  console.log("PASS boarding the train starts the run through the room for everyone");
+  assert.equal(app.querySelector("#repair-count").textContent, "0 / 5");
+  assert.equal(app.querySelectorAll("#task-list .task-row").length, 5);
+  assert.match(app.querySelector("#repair-hint").textContent, /PRESS E TO REPAIR/);
+  console.log("PASS boarding starts the five-task run and shows the local repair prompt");
+
+  const electricalTask = () => guest.game.getSnapshot().tasks.find((task) => task.id === "wiring");
+  assert.equal(electricalTask()?.section, "electrical");
+  browser.dispatchEvent(new browser.KeyboardEvent("keydown", { key: "e" }));
+  await waitFor(() => electricalTask()?.progress === 10, "the E-key repair to sync to the guest");
+  browser.dispatchEvent(new browser.KeyboardEvent("keyup", { key: "e" }));
+  console.log("PASS pressing E applies and synchronizes authoritative repair progress");
 
   // The page's keyboard input goes to the server; the guest sees the host move.
   const hostX = () => guest.game.getSnapshot().players[0].position.x;

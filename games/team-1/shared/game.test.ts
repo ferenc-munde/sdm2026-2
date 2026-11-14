@@ -1,3 +1,4 @@
+
 // Unit tests for the rules: no server, no clock. Each `step` call is one tick.
 import { describe, expect, it } from "vitest";
 import { SeededRandom } from "@sdm/core/shared";
@@ -18,7 +19,10 @@ import { SECTIONS, TASK_CATALOGUE, sectionAt } from "./train-layout";
 const config = ConfigSchema.parse(rawConfig);
 
 function setup(overrides: Partial<TrainConfig> = {}, seed = 1) {
-  const ctx: GameContext<TrainConfig> = { random: new SeededRandom(seed), config: { ...config, ...overrides } };
+  const ctx: GameContext<TrainConfig> = {
+    random: new SeededRandom(seed),
+    config: { ...config, ...overrides },
+  };
   const state: TrainState = lastTrain.createState(ctx.config);
   lastTrain.init(state, ctx);
   const join = (id: string, name = id) => lastTrain.join(state, id, ctx, { name });
@@ -56,6 +60,14 @@ describe("config and schemas", () => {
     expect(InputSchema.safeParse({ type: "move", x: Number.NaN, z: 0 }).success).toBe(false);
     expect(InputSchema.safeParse({ type: "start" }).success).toBe(true);
     expect(InputSchema.safeParse({ type: "repair" }).success).toBe(true);
+    expect(InputSchema.safeParse({
+      type: "brake-calibrate",
+      action: "apply-pressure",
+    }).success).toBe(true);
+    expect(InputSchema.safeParse({
+      type: "brake-calibrate",
+      action: "invalid-action",
+    }).success).toBe(false);
     expect(InputSchema.safeParse({ type: "fly" }).success).toBe(false);
   });
 });
@@ -73,6 +85,17 @@ describe("train layout", () => {
 });
 
 describe("lobby", () => {
+  it("deals all five configured repairs, including the control cabin and passenger carriage", () => {
+    const { state } = setup();
+    expect(config.taskCount).toBe(5);
+    expect(state.tasks).toHaveLength(5);
+    expect(new Set(state.tasks.map((task) => task.id))).toEqual(
+      new Set(TASK_CATALOGUE.map((task) => task.id)),
+    );
+    expect(state.tasks.find((task) => task.id === "instruments")?.section).toBe("control");
+    expect(state.tasks.find((task) => task.id === "passenger-lights")?.section).toBe("passenger");
+  });
+
   it("starts in the lobby with a full clock and the configured number of tasks", () => {
     const { state } = setup({ taskCount: 2 });
     expect(state.phase).toBe("lobby");
@@ -131,7 +154,6 @@ describe("a run", () => {
     const start = player("a").x;
     step(["a", { type: "move", x: 1, z: 0 }]);
     for (let tick = 1; tick < config.tickRate; tick += 1) step();
-    // One second of walking: playerSpeed world units over a 23 unit walkable length.
     expect(player("a").x - start).toBeCloseTo(config.playerSpeed / 23, 5);
     expect(player("a").z).toBe(0.5);
 
@@ -171,14 +193,16 @@ describe("a run", () => {
   });
 
   it("repairs only the task in the section the player stands in, one step per tick", () => {
-    const { state, join, step, player } = setup({ taskCount: TASK_CATALOGUE.length, repairStep: 25 });
+    const { state, join, step, player } = setup({
+      taskCount: TASK_CATALOGUE.length,
+      repairStep: 25,
+    });
     join("a");
     step(["a", { type: "start" }]);
     const wiring = state.tasks.find((task) => task.id === "wiring");
     const boiler = state.tasks.find((task) => task.id === "boiler");
     if (!wiring || !boiler) throw new Error("a task is missing");
 
-    // Seat 0 spawns at x = 0.18, which is the electrical room: the boiler is not there.
     expect(sectionAt(player("a").x)).toBe("electrical");
     step(["a", { type: "repair" }]);
     expect(wiring.progress).toBe(25);
@@ -192,14 +216,104 @@ describe("a run", () => {
     expect(boiler.progress).toBe(50);
     expect(wiring.progress).toBe(25);
 
-    // The control cabin has no task: nothing happens there.
     player("a").x = 0.5;
     step(["a", { type: "repair" }]);
-    expect(state.tasks.map((task) => task.progress).sort()).toEqual([0, 25, 50]);
+    expect(state.tasks.find((task) => task.id === "instruments")?.progress).toBe(25);
+    player("a").x = 0.75;
+    step(["a", { type: "repair" }]);
+    expect(state.tasks.find((task) => task.id === "passenger-lights")?.progress).toBe(25);
+  });
+
+  it("requires the correct brake calibration sequence", () => {
+    const { state, join, step, player } = setup({
+      taskCount: TASK_CATALOGUE.length,
+    });
+    join("a");
+    step(["a", { type: "start" }]);
+
+    const brakes = state.tasks.find((task) => task.id === "brakes");
+    if (!brakes) throw new Error("brakes task is missing");
+
+    player("a").x = 0.95;
+    expect(sectionAt(player("a").x)).toBe("rear");
+
+    step(["a", { type: "brake-calibrate", action: "apply-pressure" }]);
+    expect(brakes.calibrationStep).toBe(1);
+    expect(brakes.progress).toBe(33);
+
+    step(["a", { type: "brake-calibrate", action: "hold-pressure" }]);
+    expect(brakes.calibrationStep).toBe(2);
+    expect(brakes.progress).toBe(67);
+
+    step(["a", { type: "brake-calibrate", action: "release-pressure" }]);
+    expect(brakes.calibrationStep).toBe(3);
+    expect(brakes.progress).toBe(100);
+
+    // The other four tasks are still open, so the run must continue.
+    expect(state.phase).toBe("playing");
+  });
+
+  it("resets brake calibration after an incorrect action", () => {
+    const { state, join, step, player } = setup({
+      taskCount: TASK_CATALOGUE.length,
+    });
+    join("a");
+    step(["a", { type: "start" }]);
+
+    const brakes = state.tasks.find((task) => task.id === "brakes");
+    if (!brakes) throw new Error("brakes task is missing");
+
+    player("a").x = 0.95;
+    step(["a", { type: "brake-calibrate", action: "apply-pressure" }]);
+    expect(brakes.progress).toBe(33);
+
+    step(["a", { type: "brake-calibrate", action: "release-pressure" }]);
+    expect(brakes.calibrationStep).toBe(0);
+    expect(brakes.progress).toBe(0);
+    expect(state.phase).toBe("playing");
+  });
+
+  it("does not allow generic repair to bypass brake calibration", () => {
+    const { state, join, step, player } = setup({
+      taskCount: TASK_CATALOGUE.length,
+      repairStep: 100,
+    });
+    join("a");
+    step(["a", { type: "start" }]);
+
+    const brakes = state.tasks.find((task) => task.id === "brakes");
+    if (!brakes) throw new Error("brakes task is missing");
+
+    player("a").x = 0.95;
+    step(["a", { type: "repair" }]);
+
+    expect(brakes.progress).toBe(0);
+    expect(brakes.calibrationStep).toBe(0);
+    expect(state.phase).toBe("playing");
+  });
+
+  it("does not allow brake calibration outside the rear carriage", () => {
+    const { state, join, step, player } = setup({
+      taskCount: TASK_CATALOGUE.length,
+    });
+    join("a");
+    step(["a", { type: "start" }]);
+
+    const brakes = state.tasks.find((task) => task.id === "brakes");
+    if (!brakes) throw new Error("brakes task is missing");
+
+    player("a").x = 0.5;
+    step(["a", { type: "brake-calibrate", action: "apply-pressure" }]);
+
+    expect(brakes.progress).toBe(0);
+    expect(brakes.calibrationStep).toBe(0);
   });
 
   it("ends in victory when every task is complete", () => {
-    const { state, join, step, player } = setup({ taskCount: 1, repairStep: 50 });
+    const { state, join, step, player } = setup({
+      taskCount: 1,
+      repairStep: 50,
+    });
     join("a");
     step(["a", { type: "start" }]);
     const task = state.tasks.at(0);
@@ -213,14 +327,16 @@ describe("a run", () => {
     expect(task.progress).toBe(100);
     expect(state.phase).toBe("victory");
 
-    // The clock stops once the run is over.
     const ticks = state.runTicks;
     step();
     expect(state.runTicks).toBe(ticks);
   });
 
   it("ends in failure when the time runs out", () => {
-    const { state, join, step } = setup({ roundSeconds: 10, conditionDecayPerSecond: 0 });
+    const { state, join, step } = setup({
+      roundSeconds: 10,
+      conditionDecayPerSecond: 0,
+    });
     join("a");
     step(["a", { type: "start" }]);
     for (let tick = 1; tick < 10 * config.tickRate; tick += 1) step();
@@ -230,7 +346,9 @@ describe("a run", () => {
   });
 
   it("ends in failure when the train condition reaches zero", () => {
-    const { state, join, step } = setup({ conditionDecayPerSecond: 100 });
+    const { state, join, step } = setup({
+      conditionDecayPerSecond: 100,
+    });
     join("a");
     step(["a", { type: "start" }]);
     for (let tick = 0; tick < config.tickRate; tick += 1) step();
@@ -240,7 +358,9 @@ describe("a run", () => {
   });
 
   it("starts a fresh run after the previous one ended", () => {
-    const { state, join, step, player } = setup({ conditionDecayPerSecond: 100 });
+    const { state, join, step, player } = setup({
+      conditionDecayPerSecond: 100,
+    });
     join("a");
     step(["a", { type: "start" }]);
     step(["a", { type: "move", x: 1, z: 0 }]);
@@ -274,7 +394,9 @@ describe("determinism", () => {
       join("b");
       step(["a", { type: "start" }]);
       step(["a", { type: "move", x: 0.5, z: -1 }], ["b", { type: "repair" }]);
-      for (let tick = 0; tick < 40; tick += 1) step(["b", { type: "repair" }]);
+      for (let tick = 0; tick < 40; tick += 1) {
+        step(["b", { type: "repair" }]);
+      }
       return JSON.stringify(state.toJSON());
     };
     expect(run(7)).toBe(run(7));
