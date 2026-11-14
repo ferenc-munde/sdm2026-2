@@ -26,10 +26,12 @@ import {
   departAndBoard,
   platformLobbyView,
   playAgainOnPlatform,
+  startDepartCountdown,
   stepPlatformLobby,
   usePlatformAction,
   type PlatformLobbySession,
 } from "./boarding.ts";
+import { canDepart } from "./lobby.ts";
 import { courseTriggerSystem } from "./courseTrigger.ts";
 import { createSeededRandom, type RandomSource } from "./random.ts";
 import {
@@ -258,9 +260,13 @@ function applyMessage(room: Room, playerId: PlayerId, message: ClientMessage, wo
     case "configureRoom":
       return fromSession(room, configureRoom(session, playerId, message.crewSize));
 
-    case "startGame":
-      // The host departs: the same rule as pulling the lever, from anywhere on the platform.
-      return fromSession(room, departAndBoard(session, playerId, world.train));
+    case "startGame": {
+      // The host departs: start the 5 s countdown (#385); the lever stays an immediate skip.
+      if (phase !== "lobby") return refuse(room, "gameInProgress");
+      if (session.state.lobby.hostId !== playerId) return refuse(room, "notHost");
+      if (!canDepart(session.state, playerId)) return refuse(room, "notEnoughPlayers");
+      return { ok: true, room: { ...room, lobby: startDepartCountdown(room.lobby, playerId) } };
+    }
 
     case "pickUpOrDrop": {
       if (phase === "lobby") {
@@ -297,7 +303,7 @@ function applyMessage(room: Room, playerId: PlayerId, message: ClientMessage, wo
 export function stepRoom(room: Room, dt: number, world: RoomWorld): Room {
   const { session } = room.lobby;
   if (session.state.phase === "lobby") {
-    const lobby = stepPlatformLobby(room.lobby, dt, world.platform);
+    const lobby = stepPlatformLobby(room.lobby, dt, world.platform, world.train);
     return lobby === room.lobby ? room : { ...room, lobby };
   }
   const next = stepSession(session, dt, { spots: world.train.hazardSpots, random: room.random, systems: world.systems });

@@ -150,11 +150,14 @@ export function createWaitingRoom(container: HTMLElement, handlers: WaitingRoomH
       copy.hidden = shareLink.length === 0;
 
       depart.disabled = !view.canDepart;
-      depart.title = view.canDepart
-        ? "Start the run"
-        : view.isHost
-          ? "The crew must be complete"
-          : "Only the host can depart";
+      depart.textContent = view.departIn === null ? "Depart the train" : `Departing in ${Math.ceil(view.departIn)}…`;
+      depart.title = view.departIn !== null
+        ? "The train is departing"
+        : view.canDepart
+          ? "Start the run"
+          : view.isHost
+            ? "The crew must be complete"
+            : "Only the host can depart";
     },
     show(): void {
       root.hidden = false;
