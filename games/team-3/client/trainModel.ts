@@ -21,6 +21,7 @@ import {
 } from "three";
 import type { TrainMap } from "../shared/map/map.ts";
 import { LIGHTING, PALETTE, mat, ownMat } from "./style.ts";
+import { furnishingLayout } from "./trainFurnish.ts";
 
 /** How far the locomotive reaches in front of the first car, so the camera can frame it. */
 export const LOCOMOTIVE_LENGTH = 170;
@@ -145,6 +146,43 @@ export function buildTrainBody(map: TrainMap): TrainBody {
       const bracket = add(group, new BoxGeometry(9, 2, 3), brass, x, 37.5, far + 7, `car-lamp-bracket-${car.index}-${x}`);
       bracket.userData = { kind: "trainDetail", carDetail: "lampBracket", car: car.index };
     }
+
+    // Passenger furnishing (#437): benches on the far side, a luggage rack above the windows and
+    // a few cases. Decoration only, no collision; the layout skips stations and hazard spots.
+    const spots = [
+      ...map.stations.map((station) => station.position),
+      ...map.hazardSpots.map((spot) => spot.position),
+    ];
+    const benchWood = mat(PALETTE.wood, { roughness: 0.75 });
+    const benchPad = mat(PALETTE.paintDark, { roughness: 0.7 });
+    const caseColors = [PALETTE.overalls, PALETTE.woodDark, PALETTE.iron];
+    for (const spot of furnishingLayout(car, spots)) {
+      const x = car.x + spot.dx;
+      const z = car.y + spot.dz;
+      if (spot.kind === "bench") {
+        const bench = new Group();
+        bench.name = `bench-${car.index}-${Math.round(spot.dx)}`;
+        bench.position.set(x, 0, z);
+        bench.userData = { kind: "trainDetail", carDetail: "bench", car: car.index };
+        const seat = new Mesh(new BoxGeometry(64, 5, 26), benchWood);
+        seat.position.y = 14;
+        const pad = new Mesh(new BoxGeometry(58, 3, 20), benchPad);
+        pad.position.y = 18;
+        const back = new Mesh(new BoxGeometry(64, 26, 4), benchWood);
+        back.position.set(0, 26, -12);
+        bench.add(seat, pad, back);
+        bench.traverse((part) => { if (part instanceof Mesh) part.castShadow = false; });
+        group.add(bench);
+      } else {
+        const box = add(group, new BoxGeometry(18, 12, 12), mat(caseColors[Math.abs(Math.round(spot.dx)) % caseColors.length]!, { roughness: 0.7 }), x, 6, z, `case-${car.index}-${Math.round(spot.dx)}`);
+        box.userData = { kind: "trainDetail", carDetail: "suitcase", car: car.index };
+        box.castShadow = false;
+      }
+    }
+    // A thin brass luggage rack along the far windows.
+    const rack = add(group, new BoxGeometry(car.width - 70, 2.5, 22), brass, car.x, FAR_WALL_HEIGHT - 18, far + 20, `car-rack-${car.index}`);
+    rack.userData = { kind: "trainDetail", carDetail: "rack", car: car.index };
+    rack.castShadow = false;
 
     const plate = add(group, new BoxGeometry(18, 13, 1.6), brass, left + 26, 20, far + 6.4, `car-plate-${car.index}`);
     plate.userData = { kind: "trainDetail", carDetail: "plate", car: car.index };
