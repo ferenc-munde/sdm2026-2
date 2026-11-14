@@ -24,6 +24,8 @@ import {
   PLAYER_HEIGHT,
   PLAYER_RADIUS,
   createNameLabel,
+  reconcile,
+  type Drawn,
   type LabelFactory,
 } from "./trainScene.ts";
 
@@ -226,12 +228,24 @@ export function buildPlatformScene(
   playersGroup.name = "players";
   scene.add(playersGroup);
 
+  const drawnPlayers = new Map<string, Drawn<Group>>();
+
+  // Called once per animation frame while the crew waits: figures are kept and moved, and one is
+  // only rebuilt when its seat or name changes (see `reconcile` in trainScene.ts).
   const updatePlayers = (next: readonly RenderPlayer[]): void => {
-    for (const child of [...playersGroup.children]) {
-      playersGroup.remove(child);
-      disposeObject(child);
-    }
-    next.forEach((player, seat) => playersGroup.add(buildPlayerGroup(player, seat, labelFactory)));
+    reconcile(
+      playersGroup,
+      drawnPlayers,
+      next.map((player, seat) => ({
+        id: player.id,
+        key: [seat, player.name].join("|"),
+        build: () => buildPlayerGroup(player, seat, labelFactory),
+        place: (group: Group) => {
+          group.position.set(player.position.x, 0, player.position.y);
+        },
+      })),
+      disposeObject,
+    );
   };
 
   updatePlayers(players);
@@ -243,6 +257,9 @@ export function buildPlatformScene(
     mapGroup,
     map,
     updatePlayers,
-    dispose: () => disposeObject(scene),
+    dispose: () => {
+      drawnPlayers.clear();
+      disposeObject(scene);
+    },
   };
 }
