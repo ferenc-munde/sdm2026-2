@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "RAILPACK",
-    "buildCommand": "echo 'no build step: the game server runs from source with vite-node'"
+    "buildCommand": "pnpm --filter \"./games/${GAME:?set the GAME variable, for example team-1}\" run build"
   },
   "deploy": {
     "startCommand": "COMMIT_SHA=\"$RAILWAY_GIT_COMMIT_SHA\" pnpm --filter \"./games/${GAME:?set the GAME variable, for example team-1}\" run server",
