@@ -6,6 +6,7 @@
 import { INTERACT_RANGE } from "../constants.ts";
 import type { TrainMap } from "../map/map.ts";
 import type { PlatformMap } from "../map/platform.ts";
+import { isStationDisabledByFire } from "../hazards/fire.ts";
 import { isNearDepartureLever } from "../stations/platform.ts";
 import type { GameState, ItemId, PlayerId, Station, Vec2 } from "../types.ts";
 import { nearestFreeItem } from "./items.ts";
@@ -44,8 +45,10 @@ export function actionTarget(
   const station = world.train.stations
     .filter((s) => (s.kind === "coalDispenser" || s.kind === "engine") && distance(s.position, player.position) <= INTERACT_RANGE)
     .sort((a, b) => distance(a.position, player.position) - distance(b.position, player.position))[0];
-  if (station?.kind === "coalDispenser" && player.heldItem === null) return { kind: "takeCoal", station };
-  if (station?.kind === "engine" && held?.kind === "coal" && held.heldBy === playerId) return { kind: "deliverCoal", station };
+  // A fire next to a station disables it (#226); the room then falls through to pick up / drop.
+  const usable = station && !isStationDisabledByFire(state, station) ? station : undefined;
+  if (usable?.kind === "coalDispenser" && player.heldItem === null) return { kind: "takeCoal", station: usable };
+  if (usable?.kind === "engine" && held?.kind === "coal" && held.heldBy === playerId) return { kind: "deliverCoal", station: usable };
 
   if (player.heldItem !== null) return { kind: "drop", itemId: player.heldItem };
   const item = nearestFreeItem(state, player.position);
