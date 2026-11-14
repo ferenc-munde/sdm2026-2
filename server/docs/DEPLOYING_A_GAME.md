@@ -56,11 +56,11 @@ Each game was built and started the way `railway.json` does it, on a spare port,
 | Server starts, `/health` answers | yes | yes | yes |
 | The game's page is served at the server's address | yes | yes | yes |
 | A room can be created over WebSocket | yes | yes | yes |
-| The built client looks for the server at its own address | yes | game room yes, lobby no | no |
+| The built client looks for the server at its own address | yes | game room yes, lobby no | yes, on `Team_3_Feature` |
 
 - **Team 1**: uses `serverAddress` from `@sdm/core/client`. Nothing to do.
 - **Team 2**: the game room uses the helper, but `client/lobby.ts` builds the lobby's address itself and hard-codes `:2567`. Every match starts in the lobby, so a deployed game cannot be played until that is fixed. Tracked in [#302: The lobby looks for the server on port 2567 and cannot connect once the game is deployed](https://github.com/ferenc-munde/sdm2026-2/issues/302).
-- **Team 3**: `client/roomConnection.ts` has its own `serverAddress` that falls back to `:2567`. The fix is written and approved in #281, which is waiting for a conflict to be resolved. Tracked in [#303: Finish #281 so the deployed client finds the server: resolve the conflict and merge #281](https://github.com/ferenc-munde/sdm2026-2/issues/303).
+- **Team 3**: has its own `serverAddress` in `client/roomConnection.ts`. Since #281 it uses port 2567 only on the Vite dev server and the page's own address otherwise (#303, closed). The fix is on `Team_3_Feature`; it reaches `development` with the team's next promotion.
 
 The last row was read from the built bundles; nobody has yet opened a deployed game in two browsers.
 
