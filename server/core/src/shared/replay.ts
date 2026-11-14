@@ -1,7 +1,13 @@
 import { z } from "zod";
 
 export const ReplayEventSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("join"), tick: z.number().int(), playerId: z.string() }),
+  z.object({
+    type: z.literal("join"),
+    tick: z.number().int(),
+    playerId: z.string(),
+    /** What the client sent when it joined, after the game's `joinOptionsSchema` accepted it. */
+    options: z.unknown().optional(),
+  }),
   z.object({ type: z.literal("leave"), tick: z.number().int(), playerId: z.string() }),
   z.object({ type: z.literal("drop"), tick: z.number().int(), playerId: z.string() }),
   z.object({ type: z.literal("reconnect"), tick: z.number().int(), playerId: z.string() }),
@@ -29,6 +35,8 @@ export const ReplaySchema = z.object({
   config: z.unknown(),
   ticks: z.number().int().nonnegative(),
   events: z.array(ReplayEventSchema),
+  /** Set when the event list hit the recording limit; a truncated replay cannot be re-run to the final state. */
+  truncated: z.boolean().optional(),
   /** State hash after the last tick; a replay must reproduce it. */
   finalHash: z.string().optional(),
 });
