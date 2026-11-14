@@ -13,9 +13,9 @@ Blocked on the platform team: there is no gateway and no Railway setup yet, and 
 
 The server holds a dropped player's seat for 30 seconds (`reconnectSeconds`) and the rules handle `disconnect` and `reconnect`. The client does not use it: when the connection closes it goes back to the menu. Save `room.reconnectionToken` and call the SDK's `reconnect(token)` on load and on close, then fall back to joining by code.
 
-## 3. Stop rebuilding the scene every frame
+## 3. Stop rebuilding the scene every frame (done)
 
-`trainScene.updateState` and `platformScene.updatePlayers` dispose and rebuild every mesh and every name-label canvas texture on every animation frame. Keep the meshes and update positions, and rebuild a label only when the name changes. This is the most likely cause of stutter on slower machines.
+Done on 2026-11-14 with #217: `trainScene.updateState` and `platformScene.updatePlayers` keep the objects they drew and only move them. A player figure is rebuilt when its seat, name or held item changes; an item or hazard when its kind changes; anything that is gone is disposed. The shared helper is `reconcile` in `client/trainScene.ts`. Keep this in mind when you add something to a figure: put what changes every tick in the `place` step, and what shapes the object in its `key`.
 
 ## 4. Send less state
 

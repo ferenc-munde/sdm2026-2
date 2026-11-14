@@ -30,16 +30,27 @@ export function journeyFraction(journey: Pick<Journey, "distance">): number {
   return barFraction(journey.distance, WIN_DISTANCE);
 }
 
-/** The fuel bar turns orange at or below the low-fuel threshold, where the train slows down. */
+/** The fuel bar turns yellow below this value and red at or below the low-fuel threshold. */
+export const FUEL_YELLOW_AT = 50;
+
+/** The fuel bar is red at or below the low-fuel threshold, where the train slows down. */
 export function fuelIsLow(journey: Pick<Journey, "fuel">): boolean {
   return journey.fuel <= LOW_FUEL_THRESHOLD;
+}
+
+/** Green → yellow → red, the design document's fuel gauge (#217). */
+export function fuelColor(fuel: number): string {
+  if (!Number.isFinite(fuel) || fuel <= LOW_FUEL_THRESHOLD) return BAR_COLORS.fuelLow;
+  if (fuel <= FUEL_YELLOW_AT) return BAR_COLORS.fuelMid;
+  return BAR_COLORS.fuel;
 }
 
 /** CSS colours of a bar. */
 export const BAR_COLORS = {
   hull: "#e5484d",
   fuel: "#30a46c",
-  fuelLow: "#f76b15",
+  fuelMid: "#f5d90a",
+  fuelLow: "#e5484d",
   distance: "#3e63dd",
 } as const;
 
@@ -72,7 +83,7 @@ export function hudView(journey: Journey): HudView {
     hullWidth: hullFraction(journey),
     fuelWidth: fuelFraction(journey),
     distanceWidth: journeyFraction(journey),
-    fuelColor: lowFuel ? BAR_COLORS.fuelLow : BAR_COLORS.fuel,
+    fuelColor: fuelColor(journey.fuel),
     distanceText: `${round(journey.distance)} / ${WIN_DISTANCE}`,
     lowFuel,
   };

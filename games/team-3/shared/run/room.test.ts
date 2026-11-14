@@ -218,3 +218,17 @@ describe("a run", () => {
     expect(Object.keys(play(7).hazards).length).toBeGreaterThan(0);
   });
 });
+
+describe("dash through the room (#228)", () => {
+  it("dashes on throw with empty hands, and cools down", () => {
+    let room = send(readyRoom(), "host", { type: "startGame" });
+    const start = room.lobby.session.state.players.host!.position;
+    room = send(room, "host", { type: "throw" });
+    expect(room.lobby.session.state.players.host!.dashSeconds).toBeGreaterThan(0);
+    room = ticks(room, 4);
+    const moved = room.lobby.session.state.players.host!.position;
+    expect(Math.hypot(moved.x - start.x, moved.y - start.y)).toBeGreaterThan(50);
+    const again = send(room, "host", { type: "throw" });
+    expect(again.lobby.session.state.players.host!.position).toEqual(moved); // still cooling down
+  });
+});

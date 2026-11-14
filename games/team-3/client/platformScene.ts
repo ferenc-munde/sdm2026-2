@@ -10,6 +10,7 @@ import {
   Color,
   CylinderGeometry,
   DirectionalLight,
+  HemisphereLight,
   Group,
   Mesh,
   MeshStandardMaterial,
@@ -18,12 +19,20 @@ import {
   type Object3D,
 } from "three";
 import { createPlatformMap, type PlatformMap } from "../shared/map/platform.ts";
+import type { ActionHighlight } from "./actionHighlight.ts";
+import { applyCrewPose, buildCrewFigure } from "./crewModel.ts";
+import { buildBreachModel, buildStationModel } from "./propModels.ts";
+import { PALETTE, mat } from "./style.ts";
+import { advanceWalk, crewPose, smoothSpeed, speedBetween } from "./crewPose.ts";
+import { createHighlightRing } from "./highlightRing.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import {
   PLAYER_COLORS,
   PLAYER_HEIGHT,
   PLAYER_RADIUS,
   createNameLabel,
+  reconcile,
+  type Drawn,
   type LabelFactory,
 } from "./trainScene.ts";
 
@@ -47,6 +56,10 @@ export interface PlatformScene {
   mapGroup: Group;
   map: PlatformMap;
   updatePlayers(players: readonly RenderPlayer[]): void;
+  /** Walk/idle bob for the waiting crew (#294); call after `updatePlayers`. */
+  updateMotion(dt: number): void;
+  /** Rings the departure lever when the local player can use it (#295); null hides the ring. */
+  updateHighlight(highlight: ActionHighlight | null, seconds: number): void;
   dispose(): void;
 }
 
@@ -76,36 +89,42 @@ function platformObject(name: string, x: number, y: number): Object3D {
   group.userData = { kind: "platformObject", objectName: name };
   group.position.set(x, 0, y);
 
-  const add = (mesh: Mesh, offsetY: number): void => {
+  const add = (mesh: Mesh, offsetY: number): Mesh => {
     mesh.position.y = offsetY;
+    mesh.castShadow = true;
     group.add(mesh);
+    return mesh;
   };
 
+  // The practice objects reuse the train's own station models (visual pass), so players learn
+  // exactly what they'll see on board.
   switch (name) {
     case "coal pile":
-      add(new Mesh(new BoxGeometry(40, 16, 40), new MeshStandardMaterial({ color: 0x26262c, roughness: 1 })), 8);
+      group.add(buildStationModel("coalDispenser"));
       break;
     case "boiler":
-      add(new Mesh(new CylinderGeometry(20, 20, 26, 18), new MeshStandardMaterial({ color: 0xb3541e, roughness: 0.6 })), 13);
+      group.add(buildStationModel("engine"));
       break;
     case "wrench":
-      add(new Mesh(new BoxGeometry(18, 8, 18), new MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.5 })), 4);
+      group.add(buildStationModel("wrenchRack"));
       break;
     case "breach":
-      add(new Mesh(new CylinderGeometry(18, 18, 4, 20), new MeshStandardMaterial({ color: 0x3e63dd })), 2);
+      group.add(buildBreachModel());
       break;
     case "departure lever": {
-      add(new Mesh(new BoxGeometry(30, 6, 30), new MeshStandardMaterial({ color: 0x5c5c66 })), 3);
-      const post = new Mesh(new BoxGeometry(12, 44, 12), new MeshStandardMaterial({ color: 0xf5d90a }));
-      post.position.y = 28;
-      group.add(post);
+      group.add(buildStationModel("steeringConsole"));
+      add(new Mesh(new BoxGeometry(34, 2, 34), mat("#f5d90a", { emissive: "#f5d90a", emissiveIntensity: 0.25 })), 1);
       break;
     }
     default: {
-      // How-to-play boards stand against the train wall.
-      const board = new Mesh(new BoxGeometry(8, 50, 64), new MeshStandardMaterial({ color: 0x3e63dd }));
-      board.position.y = 25;
+      // A wooden how-to-play notice board on two posts, against the train.
+      for (const z of [-26, 26]) add(new Mesh(new BoxGeometry(5, 56, 5), mat(PALETTE.woodDark)), 28).position.z = z;
+      const board = new Mesh(new BoxGeometry(5, 34, 60), mat(PALETTE.wood));
+      board.position.y = 40;
       group.add(board);
+      const sheet = new Mesh(new BoxGeometry(5.6, 26, 50), mat("#efe6cf"));
+      sheet.position.y = 40;
+      group.add(sheet);
       break;
     }
   }
@@ -119,14 +138,21 @@ function buildMapGroup(map: PlatformMap): Group {
 
   const floor = new Mesh(
     new BoxGeometry(map.floor.width, FLOOR_THICKNESS, map.floor.depth),
-    new MeshStandardMaterial({ color: new Color(FLOOR_COLOR), roughness: 0.95 }),
+    mat("#8a8378", { roughness: 0.95 }),
   );
   floor.position.set(map.floor.x, -FLOOR_THICKNESS / 2, map.floor.y);
+  // Yellow safety line along the platform edge, and grass beyond it.
+  const line = new Mesh(new BoxGeometry(map.floor.width, 0.6, 6), mat("#e8c33a"));
+  line.position.set(map.floor.x, 0.3, map.floor.y + map.floor.depth / 2 - 14);
+  group.add(line);
+  const grass = new Mesh(new BoxGeometry(map.floor.width * 4, 4, map.floor.depth * 6), mat(PALETTE.grass, { roughness: 1 }));
+  grass.position.set(map.floor.x, -FLOOR_THICKNESS - 6, map.floor.y);
+  group.add(grass);
   floor.name = "platform-floor";
   floor.userData = { kind: "platformFloor" };
   group.add(floor);
 
-  const wallMaterial = new MeshStandardMaterial({ color: new Color(WALL_COLOR), roughness: 0.8 });
+  const wallMaterial = mat("#6e665b", { roughness: 0.9 });
   for (const wall of map.walls) {
     const mesh = new Mesh(new BoxGeometry(wall.width, WALL_HEIGHT, wall.depth), wallMaterial);
     mesh.position.set(wall.x, WALL_HEIGHT / 2, wall.y);
@@ -139,14 +165,25 @@ function buildMapGroup(map: PlatformMap): Group {
   const trainY = map.floor.y - map.floor.depth / 2 - 20;
   const body = new Mesh(
     new BoxGeometry(map.floor.width, 60, 40),
-    new MeshStandardMaterial({ color: 0x3a3a44, roughness: 0.8 }),
+    mat(PALETTE.paint, { roughness: 0.55 }),
   );
   body.position.set(map.floor.x, 30, trainY);
+  // Brass trim, a roof and a row of lit windows, so the waiting train is our train.
+  for (const [w, h, d, y, colour] of [[map.floor.width + 4, 3, 42, 4, PALETTE.brass], [map.floor.width + 8, 8, 52, 64, PALETTE.paintDark]] as const) {
+    const strip = new Mesh(new BoxGeometry(w, h, d), mat(colour));
+    strip.position.set(map.floor.x, y, trainY);
+    group.add(strip);
+  }
+  for (let x = map.floor.x - map.floor.width / 2 + 60; x < map.floor.x + map.floor.width / 2 - 40; x += 90) {
+    const pane = new Mesh(new BoxGeometry(46, 20, 1), mat(PALETTE.lamp, { emissive: PALETTE.lamp, emissiveIntensity: 0.5 }));
+    pane.position.set(x, 40, trainY + 20.6);
+    group.add(pane);
+  }
   body.name = "platform-train";
   body.userData = { kind: "platformTrain" };
   group.add(body);
 
-  const doorMaterial = new MeshStandardMaterial({ color: new Color(DOOR_COLOR), roughness: 0.6 });
+  const doorMaterial = mat(PALETTE.iron, { metalness: 0.3, roughness: 0.6 });
   for (const offset of [-150, 150]) {
     const door = new Mesh(new BoxGeometry(8, 50, 42), doorMaterial);
     door.position.set(map.floor.x + offset, 26, trainY);
@@ -174,19 +211,20 @@ function buildPlayerGroup(player: RenderPlayer, seat: number, labelFactory: Labe
   group.userData = { kind: "player", playerId: player.id, name: player.name };
 
   const color = new Color(PLAYER_COLORS[seat % PLAYER_COLORS.length] ?? PLAYER_COLORS[0]);
-  const body = new Mesh(
-    new CylinderGeometry(PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_HEIGHT, 20),
-    new MeshStandardMaterial({ color, roughness: 0.6 }),
-  );
-  body.position.y = PLAYER_HEIGHT / 2;
+  // The same crew member as on the train (visual pass, #262), so the lobby and the run match.
+  const { figure, body } = buildCrewFigure(color);
+  figure.scale.setScalar(1.35);
   body.userData = { kind: "playerBody", playerId: player.id, seat };
-  group.add(body);
+  group.add(figure);
 
   const label = labelFactory(player.name);
-  label.position.y = 62;
+  label.position.y = 70;
   group.add(label);
 
   group.position.set(player.position.x, 0, player.position.y);
+  const facing = player.facing;
+  group.rotation.y = facing && (facing.dx !== 0 || facing.dy !== 0) ? -Math.atan2(facing.dy, facing.dx) : 0;
+  group.userData.motion = { lastX: player.position.x, lastZ: player.position.y, speed: 0, phase: 0, seconds: 0 };
   return group;
 }
 
@@ -208,15 +246,20 @@ export function buildPlatformScene(
   const labelFactory = options.labelFactory ?? createNameLabel;
 
   const scene = new Scene();
-  scene.background = new Color("#101018");
+  scene.background = new Color(PALETTE.sky);
 
   const camera = new PerspectiveCamera(45, 16 / 9, 1, 6000);
   fitCameraToPlatform(camera, map, 16 / 9);
   scene.add(camera);
 
-  scene.add(new AmbientLight(0xffffff, 1.2));
-  const sun = new DirectionalLight(0xffffff, 2.2);
-  sun.position.set(-200, 900, 420);
+  // The same evening light as on the train.
+  scene.add(new AmbientLight(0xffffff, 0.35));
+  scene.add(new HemisphereLight("#9fb6e0", "#4a3a26", 1.1));
+  const sun = new DirectionalLight("#ffe2b8", 2.6);
+  sun.position.set(-300, 900, 500);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  Object.assign(sun.shadow.camera, { left: -600, right: 600, top: 400, bottom: -400, near: 100, far: 2200 });
   scene.add(sun);
 
   const mapGroup = buildMapGroup(map);
@@ -226,12 +269,58 @@ export function buildPlatformScene(
   playersGroup.name = "players";
   scene.add(playersGroup);
 
+  // Under the departure lever when it is usable (#295).
+  const actionRing = createHighlightRing();
+  scene.add(actionRing.group);
+
+  const drawnPlayers = new Map<string, Drawn<Group>>();
+
+  // Called once per animation frame while the crew waits: figures are kept and moved, and one is
+  // only rebuilt when its seat or name changes (see `reconcile` in trainScene.ts).
   const updatePlayers = (next: readonly RenderPlayer[]): void => {
-    for (const child of [...playersGroup.children]) {
-      playersGroup.remove(child);
-      disposeObject(child);
+    reconcile(
+      playersGroup,
+      drawnPlayers,
+      next.map((player, seat) => ({
+        id: player.id,
+        key: [seat, player.name].join("|"),
+        build: () => buildPlayerGroup(player, seat, labelFactory),
+        place: (group: Group) => {
+          group.position.set(player.position.x, 0, player.position.y);
+        },
+      })),
+      disposeObject,
+    );
+  };
+
+  /** Walk, idle and breathing poses for the waiting crew (#294), on the same figure as the train. */
+  const updateMotion = (dt: number): void => {
+    for (const group of playersGroup.children) {
+      const motion = group.userData.motion as
+        | { lastX: number; lastZ: number; speed: number; phase: number; seconds: number }
+        | undefined;
+      if (!motion) continue;
+      const measured = speedBetween(
+        { x: motion.lastX, y: motion.lastZ },
+        { x: group.position.x, y: group.position.z },
+        dt,
+      );
+      motion.speed = smoothSpeed(motion.speed, measured, dt);
+      motion.lastX = group.position.x;
+      motion.lastZ = group.position.z;
+      motion.phase = advanceWalk(motion.phase, motion.speed, dt);
+      if (Number.isFinite(dt) && dt > 0) motion.seconds += dt;
+
+      const pose = crewPose({
+        speed: motion.speed,
+        phase: motion.phase,
+        seconds: motion.seconds,
+        carrying: false,
+        interacting: false,
+      });
+      const figure = group.getObjectByName("crew");
+      if (figure) applyCrewPose(figure, { ...pose, bob: pose.bob / 1.35 });
     }
-    next.forEach((player, seat) => playersGroup.add(buildPlayerGroup(player, seat, labelFactory)));
   };
 
   updatePlayers(players);
@@ -243,6 +332,11 @@ export function buildPlatformScene(
     mapGroup,
     map,
     updatePlayers,
-    dispose: () => disposeObject(scene),
+    updateMotion,
+    updateHighlight: (highlight, seconds) => actionRing.show(highlight, seconds),
+    dispose: () => {
+      drawnPlayers.clear();
+      disposeObject(scene);
+    },
   };
 }

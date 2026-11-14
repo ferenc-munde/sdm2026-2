@@ -1,5 +1,23 @@
 # HUD handoff
 
+## Compact status bar (PR #341)
+
+The countdown is separate from the train-only route strip and turns red at
+two minutes or less during an active run. Schedule status remains a message;
+the internal schedule calculation is not exposed as an unused view field.
+`journeyView.speedText` supplies the final compact unit directly.
+
+The rules/help button has reserved space to the left of the status bar.
+Players and items use the team's visual modules in the foreground viewport;
+the moving landscape fills the whole screen behind it. HUD safe-area cleanup
+checks ownership and its last written value, so removing an older HUD does
+not clear the currently mounted HUD's offset.
+
+Validation: all 77 Team 2 tests, typecheck and production build passed after
+merging the updated base. Browser automation was blocked because the tool
+could not establish the Windows browser URL. Screenshots at 1280px and about
+700px are still required from a reviewer; they were not verified automatically.
+
 ## Journey HUD (#78)
 
 The player sees train position, percent distance left, remaining time, current

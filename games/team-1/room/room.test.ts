@@ -119,13 +119,41 @@ describe("team-1 room on the platform host", () => {
     await waitFor(() => host.state().phase === "playing");
     const task = await waitFor(() => host.state().tasks.at(0));
 
-    // Walk along the train, trying to repair, until the task's section is reached.
-    host.send({ type: "move", x: task.section === "engine" ? -1 : 1, z: 0 });
-    await waitFor(() => {
-      host.send({ type: "repair" });
-      return host.state().phase === "victory";
-    }, 8000);
+    // Move into the exact section first, then stop before sending a repair action.
+    let currentSection = sectionAt(host.state().players.get(host.sessionId)?.x ?? 0.18);
+    const targetIndex = SECTIONS.indexOf(task.section as (typeof SECTIONS)[number]);
+    while (currentSection !== task.section) {
+      const currentIndex = SECTIONS.indexOf(currentSection);
+      host.send({ type: "move", x: targetIndex > currentIndex ? 1 : -1, z: 0 });
+      await waitFor(
+        () => sectionAt(host.state().players.get(host.sessionId)?.x ?? 0.18) === task.section,
+        8000,
+      );
+      host.send({ type: "move", x: 0, z: 0 });
+      await waitFor(() => host.state().players.get(host.sessionId)?.moveX === 0);
+      currentSection = task.section as (typeof SECTIONS)[number];
+    }
+
+    // Brake calibration deliberately rejects generic repair input. Follow the task's
+    // actual interaction contract so random task selection cannot make this test hang.
+    const actions: TrainInput[] =
+      task.id === "brakes"
+        ? [
+            { type: "brake-calibrate", action: "apply-pressure" },
+            { type: "brake-calibrate", action: "hold-pressure" },
+            { type: "brake-calibrate", action: "release-pressure" },
+          ]
+        : [{ type: "repair" }];
+
+    for (const [index, action] of actions.entries()) {
+      host.send(action);
+      const expectedProgress = task.id === "brakes" ? [33, 67, 100][index] : 100;
+      await waitFor(() => host.state().tasks.at(0)?.progress === expectedProgress);
+    }
+
+    await waitFor(() => host.state().phase === "victory");
     expect(host.state().tasks.at(0)?.progress).toBe(100);
+    expect(host.state().phase).toBe("victory");
   }, 12000);
 
   it("syncs progress for all five section repairs and wins only after the last repair", async () => {
