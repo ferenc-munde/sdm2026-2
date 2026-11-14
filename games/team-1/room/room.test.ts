@@ -295,4 +295,3 @@ describe("team-1 client adapters against the platform host", () => {
     expect(host.game.getSnapshot().connectionState).not.toBe("connected");
   }, 10000);
 });
-
