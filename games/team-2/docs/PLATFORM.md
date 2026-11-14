@@ -38,6 +38,7 @@ The rule modules live in a `WeakMap` keyed by the state object. They hold nothin
 | `phase` | string: `lobby`, `running`, `won`, `lost` | No. Stays `lobby` in the game room |
 | `journeyDistance`, `speed`, `power`, `pressure`, `endgameUnlocked` | numbers, boolean | No (defaults) |
 | `timeLimitTicks` | uint16 | Yes, in `init` |
+| `runTicks` | uint32 | Yes, in `step`: ticks played in the current run. Rises while `phase` is `running`, restarts at 0 with a new run. The HUD reads the run clock from here; clients never count ticks |
 | `players` | map of `Player`, keyed by player id (the session id) | Yes |
 | `tasks`, `hazards`, `items`, `doors` | maps | No. Nothing creates entries yet |
 

@@ -2,7 +2,7 @@ import { createTrainScene } from "./scene";
 import { createHud, type HudTask, type HudJourney } from "./hud";
 import { createLocalStateModel, type GameSession } from "./stateModel.ts";
 import { hostGame, joinGame, serverAddress, type NetSession } from "./net.ts";
-import { createHudStateReader } from "./state-to-hud";
+import { localStateToHud } from "./state-to-hud";
 import gameConfig from "../config/game.json";
 import { TRAIN_CARS } from "./train-map";
 import { mountLobby } from "./lobby";
@@ -36,7 +36,6 @@ const local = createLocalStateModel();
 let session: GameSession = local;
 let online = false;
 let netStatus = offline ? "" : "Not in a game room yet · join through the lobby";
-let readHudState = createHudStateReader(gameConfig.tickRate);
 const mode = document.querySelector<HTMLSelectElement>("#view-mode")!;
 const status = document.querySelector<HTMLOutputElement>("#status")!;
 const speedInput = document.querySelector<HTMLInputElement>("#speed")!;
@@ -66,7 +65,7 @@ function describeSession(): string {
 
 function update() {
   const state = session.state;
-  const view = readHudState(state);
+  const view = localStateToHud(state, gameConfig.tickRate);
   if (isPreview()) {
     hud.updateTasks(tasks);
     hud.updateGauges({ power: tasks[0]?.current ? 100 : 40, pressure: 35 });
@@ -168,7 +167,7 @@ async function enterGameRoom(connect: () => Promise<NetSession>) {
   try {
     const next = await connect();
     local.stop();
-    session = next; online = true; readHudState = createHudStateReader(gameConfig.tickRate);
+    session = next; online = true;
     lastMove = STOPPED; sendMove();
     next.onTick(update);
     next.onClosed(() => {

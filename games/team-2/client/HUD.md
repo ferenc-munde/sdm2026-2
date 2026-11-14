@@ -6,10 +6,11 @@ The player sees train position, percent distance left, remaining time, current
 speed and the schedule ghost. The read-only presenter uses the active
 GameSession, preserving both the lobby/network session and offline `?local`.
 Speed uses percent of the route per second (SPEC's distance += speed * dt),
-not an invented km/h conversion. The observed-run clock excludes lobby age
-and paused ticks, freezes on results, and resets on session/run changes.
-It does not claim to reconstruct time spent in a run before this client joined;
-exact late-join timing needs an authoritative run-start/elapsed field.
+not an invented km/h conversion. The run clock is authoritative: the rules keep
+`runTicks` in the synced state (`shared/state.ts`), counting only ticks of a
+running, unpaused game and starting again with each run. The presenter reads
+it and never counts ticks itself, so a client that joins late or reconnects
+shows the same remaining time as everyone else.
 
 Normal pages hide developer controls. In the dev server only, use `?debug=1`
 (or `?local&debug=1` offline) to inspect fixtures. Production builds do not
