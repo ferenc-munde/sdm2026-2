@@ -5,6 +5,7 @@ import { hostGame, joinGame, serverAddress, type NetSession } from "./net.ts";
 import { localStateToHud } from "./state-to-hud";
 import gameConfig from "../config/game.json";
 import { TRAIN_CARS } from "./train-map";
+import { createInputAdapter } from "./input.ts";
 import { mountLobby } from "./lobby";
 import { mountGameRules } from "./rules";
 import "./hud.css";
@@ -116,50 +117,11 @@ function syncMode() {
 }
 mode.addEventListener("change", syncMode);
 
-// Keyboard → inputs. Movement is hold-to-move: one `move` input whenever the held direction
-// (or Shift) changes, and a zero vector on release. The server moves the player every tick.
-const moves: Record<string, [number, number]> = {
-  w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
-  ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
-};
-const STOPPED = "0,0,false";
-const held = new Set<string>();
-let running = false;
-let lastMove = STOPPED;
-function sendMove() {
-  let mx = 0, my = 0;
-  for (const key of held) { mx += moves[key]![0]; my += moves[key]![1]; }
-  mx = Math.sign(mx); my = Math.sign(my);
-  const run = running && (mx !== 0 || my !== 0);
-  const next = `${mx},${my},${run}`;
-  if (next === lastMove) return;
-  lastMove = next;
-  session.send({ type: "move", mx, my, run });
-}
-function releaseKeys() { held.clear(); running = false; sendMove(); }
-const keyOf = (event: KeyboardEvent) => event.key.length === 1 ? event.key.toLowerCase() : event.key;
-function onKeyDown(event: KeyboardEvent) {
-  if (!canControlGame || isPreview() || (event.target instanceof HTMLElement &&
-    (event.target.closest("input, select, textarea, button:not(.game-rules-control)") || event.target.isContentEditable))) return;
-  const key = keyOf(event);
-  running = event.shiftKey;
-  if (moves[key]) {
-    held.add(key); sendMove();
-    event.preventDefault();
-  } else if (key === "Shift") sendMove();
-  else if (event.repeat) return;
-  else if (key === "e") session.send({ type: "pickup", itemId: "wrench" });
-  else if (key === "q") session.send({ type: "drop", itemId: "wrench" });
-}
-function onKeyUp(event: KeyboardEvent) {
-  if (!canControlGame) return;
-  running = event.shiftKey;
-  held.delete(keyOf(event));
-  sendMove();
-}
-window.addEventListener("keydown", onKeyDown);
-window.addEventListener("keyup", onKeyUp);
-window.addEventListener("blur", releaseKeys);
+const { cleanup: cleanupInput, refreshMovement } = createInputAdapter({
+  send: (input) => session.send(input),
+  isEnabled: () => canControlGame,
+  isPreview,
+});
 
 /** Swap the offline model for a seat in the game room. */
 async function enterGameRoom(connect: () => Promise<NetSession>) {
@@ -170,7 +132,7 @@ async function enterGameRoom(connect: () => Promise<NetSession>) {
     local.stop();
     canControlGame = true;
     session = next; online = true;
-    lastMove = STOPPED; sendMove();
+    refreshMovement();
     next.onTick(update);
     next.onClosed(() => {
       online = false;
@@ -223,9 +185,8 @@ function enterPlayerFlow(): void {
 // Initial briefing and persistent help share one rules source and one fixed button.
 const gameRules = mountGameRules(document.body, enterPlayerFlow);
 window.addEventListener("pagehide", () => {
+  cleanupInput();
   session.stop(); local.stop();
-  window.removeEventListener("keydown", onKeyDown); window.removeEventListener("keyup", onKeyUp);
-  window.removeEventListener("blur", releaseKeys);
   lobby?.destroy(); trainScene?.destroy(); hud.destroy();
   gameRules.destroy();
 });
