@@ -2,6 +2,7 @@
 // platform; when the host departs, everyone boards the train at its player starts and the
 // tools go on their racks; after "play again" the crew is back on the platform.
 
+import { DEPART_COUNTDOWN_SECONDS } from "../constants.ts";
 import { createStartItems } from "../items/items.ts";
 import type { TrainMap } from "../map/map.ts";
 import { platformSpawn, type PlatformMap } from "../map/platform.ts";
@@ -61,6 +62,10 @@ export function playAgainOnPlatform(session: GameSession, platform: PlatformMap)
 export interface PlatformLobbySession {
   session: GameSession;
   practice: PlatformPractice;
+  /** Seconds left on the host's departure countdown (#385); null when not counting. */
+  departingIn: number | null;
+  /** Who asked to depart; the host at request time. */
+  departingBy: PlayerId | null;
 }
 
 export type PlatformActionResult =
@@ -68,20 +73,57 @@ export type PlatformActionResult =
   | { ok: false; platform: PlatformLobbySession; message: string };
 
 export function createPlatformLobby(session: GameSession, platform: PlatformMap): PlatformLobbySession {
-  return { session, practice: createPlatformPractice(platform.objects) };
+  return { session, practice: createPlatformPractice(platform.objects), departingIn: null, departingBy: null };
 }
 
-/** One authoritative lobby tick: walk and advance held practice repairs. */
-export function stepPlatformLobby(current: PlatformLobbySession, dt: number, platform: PlatformMap): PlatformLobbySession {
+/** Starts the host's 5-second departure countdown (#385); a second request is ignored. */
+export function startDepartCountdown(current: PlatformLobbySession, playerId: PlayerId): PlatformLobbySession {
+  if (current.departingIn !== null) return current;
+  return { ...current, departingIn: DEPART_COUNTDOWN_SECONDS, departingBy: playerId };
+}
+
+/**
+ * One authoritative lobby tick: walk, advance held practice repairs, and run the departure
+ * countdown. At zero the host's departure is applied; if it is no longer allowed (a player left)
+ * the countdown is cancelled.
+ */
+export function stepPlatformLobby(
+  current: PlatformLobbySession,
+  dt: number,
+  platform: PlatformMap,
+  train: TrainMap,
+): PlatformLobbySession {
   const session = stepLobby(current.session, dt, platform);
   const interactions = Object.fromEntries(Object.entries(session.inputs).map(([id, input]) => [id, input.interacting]));
   const practice = stepPlatformPractice(session.state, current.practice, interactions, dt, platform.objects);
-  return session === current.session && practice === current.practice ? current : { session, practice };
+
+  if (current.departingIn !== null) {
+    const remaining = current.departingIn - Math.max(0, dt);
+    // A tiny epsilon: 5 - 100 × 0.05 lands on ~1e-15, which must still count as zero.
+    if (remaining > 1e-6) return { ...current, session, practice, departingIn: remaining };
+    const by = current.departingBy;
+    if (by) {
+      const departure = departAndBoard(session, by, train);
+      if (departure.ok) {
+        // Carrying the held keys across the phase change matters as much here as in handleMessage (#385):
+        // otherwise a player still holding a direction stands frozen on the train.
+        const inputs = Object.fromEntries(
+          Object.entries(session.inputs).filter(([id]) => departure.session.state.players[id]?.connected),
+        );
+        return { session: { ...departure.session, inputs }, practice, departingIn: null, departingBy: null };
+      }
+    }
+    // The host left or the crew is no longer complete: cancel and let the lobby show why.
+    return { ...current, session, practice, departingIn: null, departingBy: null };
+  }
+
+  return session === current.session && practice === current.practice ? current : { ...current, session, practice };
 }
 
 /** State synced while waiting: real lobby data plus isolated practice objects. */
 export function platformLobbyView(current: PlatformLobbySession, platform: PlatformMap): GameState {
-  return platformPracticeView(current.session.state, current.practice, platform.objects);
+  const view = platformPracticeView(current.session.state, current.practice, platform.objects);
+  return { ...view, lobby: { ...view.lobby, departingIn: current.departingIn } };
 }
 
 /** Uses the real departure rule at the lever; otherwise operates practice objects. */
@@ -103,7 +145,7 @@ export function usePlatformAction(
       },
     );
     return result.ok
-      ? { ok: true, platform: { session: result.session, practice: current.practice } }
+      ? { ok: true, platform: { ...current, session: result.session } }
       : { ok: false, platform: current, message: result.message };
   }
   // A player carrying a practice item can always drop it, wherever they stand.

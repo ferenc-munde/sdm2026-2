@@ -97,6 +97,8 @@ export interface Lobby {
   hostId: PlayerId | null;
   /** How many players the crew will have (MIN_PLAYERS to MAX_PLAYERS). The room fills up to this. */
   crewSize: number;
+  /** Seconds left before the host's confirmed departure (#385); null/absent when not counting down. */
+  departingIn?: number | null;
 }
 
 export interface GameState {
