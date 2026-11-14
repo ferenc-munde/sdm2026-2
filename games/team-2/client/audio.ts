@@ -11,16 +11,16 @@
 type Patch = { gain: number; build: (ctx: AudioContext, out: GainNode) => { stop(): void } | null; asset?: string };
 
 const KINDS: Record<string, Patch> = {
-  POWER: { gain: 0.05, build: hum(55, 240) },
-  PRESSURE: { gain: 0.05, build: hiss(1400) },
-  FIRE: { gain: 0.12, build: crackle() },
-  NAVIGATION: { gain: 0.03, build: blips(880) },
-  CARGO: { gain: 0.09, build: rumble() },
+  POWER: { gain: 0.035, build: hum(55, 240) },
+  PRESSURE: { gain: 0.028, build: hiss(1400) },
+  FIRE: { gain: 0.045, build: crackle() },
+  NAVIGATION: { gain: 0.025, build: blips(880) },
+  CARGO: { gain: 0.04, build: rumble() },
   // Hazard aliases (D's hazard types) land on the closest existing patch.
-  steam: { gain: 0.05, build: hiss(2400) },
-  arcing: { gain: 0.04, build: blips(1400) },
-  spill: { gain: 0.03, build: hiss(600) },
-  darkness: { gain: 0.04, build: hum(40, 120) },
+  steam: { gain: 0.03, build: hiss(2400) },
+  arcing: { gain: 0.025, build: blips(1400) },
+  spill: { gain: 0.02, build: hiss(600) },
+  darkness: { gain: 0.03, build: hum(40, 120) },
 };
 
 let ctx: AudioContext | undefined;
@@ -28,6 +28,9 @@ let master: GainNode | undefined;
 let current: { stop(): void } | undefined;
 let currentKind: string | undefined;
 let trainAmbience: { stop(): void } | undefined;
+let lobbyMusic: { stop(): void } | undefined;
+let volume = 0.7;
+let muted = false;
 const buffers = new Map<string, AudioBuffer>();
 
 export function unlockAudio(): void {
@@ -36,33 +39,65 @@ export function unlockAudio(): void {
     if (!Ctor) return;
     ctx = new Ctor();
     master = ctx.createGain();
-    master.gain.value = 0.5;
+    master.gain.value = muted ? 0 : volume;
     master.connect(ctx.destination);
   }
   if (ctx.state === "suspended") void ctx.resume();
 }
 
+export function getAudioSettings(): { volume: number; muted: boolean } {
+  return { volume, muted };
+}
+
+export function setAudioVolume(next: number): void {
+  volume = Math.max(0, Math.min(1, next));
+  updateMasterVolume();
+}
+
+export function toggleAudioMute(): boolean {
+  muted = !muted;
+  updateMasterVolume();
+  return muted;
+}
+
+function updateMasterVolume(): void {
+  if (!ctx || !master) return;
+  master.gain.setTargetAtTime(muted ? 0 : volume, ctx.currentTime, 0.035);
+}
+
+function whenAudioRuns(action: (audio: AudioContext, output: GainNode) => void): void {
+  if (!ctx || !master) return;
+  const audio = ctx;
+  const output = master;
+  const run = () => {
+    if (ctx === audio && master === output && audio.state === "running") action(audio, output);
+  };
+  if (audio.state === "running") run();
+  else void audio.resume().then(run).catch(() => {});
+}
+
 /** A quiet mechanical bed while players are aboard the train. */
 export function playTrainAmbience(): void {
-  if (!ctx || !master || trainAmbience) return;
-  const out = ctx.createGain();
-  out.gain.value = 0.0001;
-  out.connect(master);
-  out.gain.linearRampToValueAtTime(0.018, ctx.currentTime + 1.5);
-  const inner = rumble()(ctx, out);
-  if (!inner) return;
-  const audio = ctx;
-  trainAmbience = {
-    stop: () => {
-      out.gain.cancelScheduledValues(audio.currentTime);
-      out.gain.setValueAtTime(out.gain.value, audio.currentTime);
-      out.gain.linearRampToValueAtTime(0.0001, audio.currentTime + 0.6);
-      window.setTimeout(() => {
-        inner.stop();
-        out.disconnect();
-      }, 800);
-    },
-  };
+  whenAudioRuns((audio, output) => {
+    if (trainAmbience) return;
+    const out = audio.createGain();
+    out.gain.value = 0.0001;
+    out.connect(output);
+    out.gain.linearRampToValueAtTime(0.07, audio.currentTime + 1.5);
+    const inner = rumble()(audio, out);
+    if (!inner) return;
+    trainAmbience = {
+      stop: () => {
+        out.gain.cancelScheduledValues(audio.currentTime);
+        out.gain.setValueAtTime(out.gain.value, audio.currentTime);
+        out.gain.linearRampToValueAtTime(0.0001, audio.currentTime + 0.6);
+        window.setTimeout(() => {
+          inner.stop();
+          out.disconnect();
+        }, 800);
+      },
+    };
+  });
 }
 
 export function stopTrainAmbience(): void {
@@ -70,43 +105,100 @@ export function stopTrainAmbience(): void {
   trainAmbience = undefined;
 }
 
+/** A mellow, repeating pentatonic phrase while players are gathering in the lobby. */
+export function playLobbyMusic(): void {
+  whenAudioRuns((audio, output) => {
+    if (lobbyMusic) return;
+    const bus = audio.createGain();
+    bus.gain.value = 0.0001;
+    bus.connect(output);
+    bus.gain.linearRampToValueAtTime(0.26, audio.currentTime + 1.8);
+
+    const phrase = [392, 440, 523.25, 440, 349.23, 392, 440, 392];
+    let index = 0;
+    let timer = 0;
+    let stopped = false;
+    const playNote = () => {
+      if (stopped || audio.state !== "running") return;
+      const start = audio.currentTime;
+      const note = audio.createOscillator();
+      const envelope = audio.createGain();
+      note.type = "sine";
+      note.frequency.value = phrase[index % phrase.length]!;
+      envelope.gain.setValueAtTime(0.0001, start);
+      envelope.gain.exponentialRampToValueAtTime(0.2, start + 0.24);
+      envelope.gain.exponentialRampToValueAtTime(0.0001, start + 1.25);
+      note.connect(envelope);
+      envelope.connect(bus);
+      note.start(start);
+      note.stop(start + 1.3);
+      index++;
+      timer = window.setTimeout(playNote, 1500);
+    };
+    playNote();
+    lobbyMusic = {
+      stop: () => {
+        stopped = true;
+        window.clearTimeout(timer);
+        bus.gain.cancelScheduledValues(audio.currentTime);
+        bus.gain.setValueAtTime(bus.gain.value, audio.currentTime);
+        bus.gain.linearRampToValueAtTime(0.0001, audio.currentTime + 0.5);
+        window.setTimeout(() => bus.disconnect(), 700);
+      },
+    };
+  });
+}
+
+export function stopLobbyMusic(): void {
+  lobbyMusic?.stop();
+  lobbyMusic = undefined;
+}
+
 function playToneSequence(notes: readonly { frequency: number; offset: number; duration: number; gain: number }[]): void {
-  if (!ctx || !master) return;
-  const start = ctx.currentTime;
-  for (const note of notes) {
-    const oscillator = ctx.createOscillator();
-    const envelope = ctx.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.value = note.frequency;
-    envelope.gain.setValueAtTime(0.0001, start + note.offset);
-    envelope.gain.exponentialRampToValueAtTime(note.gain, start + note.offset + 0.015);
-    envelope.gain.exponentialRampToValueAtTime(0.0001, start + note.offset + note.duration);
-    oscillator.connect(envelope);
-    envelope.connect(master);
-    oscillator.start(start + note.offset);
-    oscillator.stop(start + note.offset + note.duration + 0.02);
-  }
+  whenAudioRuns((audio, output) => {
+    const start = audio.currentTime;
+    for (const note of notes) {
+      const oscillator = audio.createOscillator();
+      const envelope = audio.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.value = note.frequency;
+      envelope.gain.setValueAtTime(0.0001, start + note.offset);
+      envelope.gain.exponentialRampToValueAtTime(note.gain, start + note.offset + 0.015);
+      envelope.gain.exponentialRampToValueAtTime(0.0001, start + note.offset + note.duration);
+      oscillator.connect(envelope);
+      envelope.connect(output);
+      oscillator.start(start + note.offset);
+      oscillator.stop(start + note.offset + note.duration + 0.02);
+    }
+  });
 }
 
 /** Soft confirmation tick for buttons; called after a user gesture unlocks audio. */
 export function playButtonInteraction(): void {
-  playToneSequence([{ frequency: 620, offset: 0, duration: 0.055, gain: 0.055 }]);
+  playToneSequence([{ frequency: 560, offset: 0, duration: 0.045, gain: 0.09 }]);
 }
 
-/** Short rising chime for completing a repair minigame. */
-export function playPuzzleSuccess(): void {
+/** Small tactile feedback shaped for each puzzle control. */
+export function playPuzzleAction(minigame: string): void {
+  const note = minigame === "crank" ? 235 : minigame === "wires" ? 740 : 470;
+  playToneSequence([{ frequency: note, offset: 0, duration: 0.055, gain: 0.075 }]);
+}
+
+/** Short, puzzle-appropriate cue for completing a repair minigame. */
+export function playPuzzleSuccess(minigame: string): void {
+  const first = minigame === "crank" ? 392 : minigame === "wires" ? 659 : 523;
+  const second = minigame === "crank" ? 523 : minigame === "wires" ? 880 : 659;
   playToneSequence([
-    { frequency: 660, offset: 0, duration: 0.12, gain: 0.11 },
-    { frequency: 880, offset: 0.11, duration: 0.16, gain: 0.12 },
-    { frequency: 1100, offset: 0.24, duration: 0.2, gain: 0.1 },
+    { frequency: first, offset: 0, duration: 0.14, gain: 0.1 },
+    { frequency: second, offset: 0.15, duration: 0.19, gain: 0.11 },
   ]);
 }
 
 /** Two restrained low notes for a newly dangerous train gauge. */
 export function playWarning(): void {
   playToneSequence([
-    { frequency: 330, offset: 0, duration: 0.16, gain: 0.09 },
-    { frequency: 260, offset: 0.2, duration: 0.2, gain: 0.085 },
+    { frequency: 294, offset: 0, duration: 0.13, gain: 0.095 },
+    { frequency: 294, offset: 0.22, duration: 0.13, gain: 0.085 },
   ]);
 }
 
@@ -225,21 +317,10 @@ function rumble(): Patch["build"] {
 
 /** Short ping when a task spawns, so the crew notices a new job. */
 export function taskSpawnPing(): void {
-  if (!ctx || !master) return;
-  const time = ctx.currentTime;
-  for (const [offset, frequency] of [[0, 880], [0.12, 1320]] as const) {
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.value = frequency;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, time + offset);
-    gain.gain.exponentialRampToValueAtTime(0.2, time + offset + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + offset + 0.18);
-    osc.connect(gain);
-    gain.connect(master);
-    osc.start(time + offset);
-    osc.stop(time + offset + 0.2);
-  }
+  playToneSequence([
+    { frequency: 659, offset: 0, duration: 0.1, gain: 0.08 },
+    { frequency: 784, offset: 0.13, duration: 0.12, gain: 0.075 },
+  ]);
 }
 
 /** Crossfade to the loop for `kind` (task type or hazard type). */
