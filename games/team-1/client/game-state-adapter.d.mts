@@ -7,6 +7,8 @@ export type GamePlayer = {
   color: string;
   /** Derived from the authoritative position for repair guidance. */
   section?: "engine" | "electrical" | "control" | "passenger" | "rear";
+  direction?: "up" | "down" | "left" | "right";
+  isMoving?: boolean;
 };
 
 export type TaskStatus = "available" | "in-progress" | "complete";
@@ -73,3 +75,7 @@ export declare class MockGameStateAdapter implements GameStateAdapter {
 }
 
 export declare function createPreviewSnapshot(players?: Array<Pick<GamePlayer, "id" | "name" | "connected">>): GameClientSnapshot;
+export declare function reconcilePreviewPlayers(
+  players: Array<Pick<GamePlayer, "id" | "name" | "connected">>,
+  existing?: GamePlayer[],
+): GamePlayer[];

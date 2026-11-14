@@ -1,6 +1,6 @@
 
 import { MockSessionAdapter, SessionError, type LobbyPlayer, type SessionAdapter, type SessionEvent } from "./session-adapter.mjs";
-import { createPreviewSnapshot, MockGameStateAdapter, type GameClientSnapshot, type GameStateAdapter } from "./game-state-adapter.mjs";
+import { createPreviewSnapshot, MockGameStateAdapter, reconcilePreviewPlayers, type GameClientSnapshot, type GameStateAdapter } from "./game-state-adapter.mjs";
 import { mountGameplayView, type PreviewAction } from "./gameplay-view";
 import { PlayerPreviewController } from "./player-preview-controller";
 import { serverAddress } from "@sdm/core/client";
@@ -272,9 +272,10 @@ function handleSessionEvent(event: SessionEvent): void {
   renderRoom();
 
   if (mockGameplay) {
+    const snapshot = mockGameplay.getSnapshot();
     mockGameplay.publish({
-      ...mockGameplay.getSnapshot(),
-      players: createPreviewSnapshot(crew).players,
+      ...snapshot,
+      players: reconcilePreviewPlayers(crew, snapshot.players),
     });
   }
 }

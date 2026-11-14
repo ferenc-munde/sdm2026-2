@@ -22,8 +22,13 @@ try {
   const after = adapter.getSnapshot();
   assert.ok(after.players[0].position.z < before.players[0].position.z);
   assert.equal(after.players[0].position.x, before.players[0].position.x);
+  assert.equal(after.players[0].direction, "up");
+  assert.equal(after.players[0].isMoving, true);
   assert.deepEqual(after.players[1], before.players[1]);
   assert.equal(received.length, 1);
+  controller.update(100);
+  assert.equal(adapter.getSnapshot().players[0].direction, "up");
+  assert.equal(adapter.getSnapshot().players[0].isMoving, false);
   controller.dispose();
   controller.dispose();
   const positionAfterDispose = adapter.getSnapshot().players[0].position;
