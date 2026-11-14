@@ -454,3 +454,36 @@ describe("the action highlight (#295)", () => {
     expect(ring?.visible).toBe(false);
   });
 });
+
+describe("taking a sharp curve (#384)", () => {
+  const course: RenderHazard = { id: "course-1", kind: "course", position: { x: -160, y: -80 }, progress: 0 };
+  const xs = (group: Object3D) => group.children.map((c) => Math.round(c.position.x));
+
+  it("has separate parts per car, so the cars can bend apart", () => {
+    const train = build();
+    const body = train.scene.getObjectByName("trainBody")!;
+    expect(new Set(xs(body)).size).toBeGreaterThan(3);
+  });
+
+  it("bends the cars during a curve, front car first, and straightens back exactly", () => {
+    const train = build({ players, items, hazards: [...hazards, course] });
+    const floors = train.mapGroup.children.filter((c) => /^car-\d$/.test(c.name));
+    expect(floors.length).toBe(3);
+    const rest = floors.map((f) => ({ x: f.position.x, z: f.position.z }));
+    let t = 0;
+    for (let i = 0; i < 10; i++) train.updateEffects((t += 0.05));
+    const earlyAngles = floors.map((f) => f.rotation.y);
+    expect(earlyAngles[0]).toBeGreaterThan(earlyAngles[2]!);
+    for (let i = 0; i < 60; i++) train.updateEffects((t += 0.05));
+    expect(floors[2]!.rotation.y).toBeGreaterThan(0.3);
+    expect(Math.hypot(floors[2]!.position.x - rest[2]!.x, floors[2]!.position.z - rest[2]!.z)).toBeGreaterThan(20);
+
+    train.updateState({ players, items, hazards }); // the curve is over
+    for (let i = 0; i < 100; i++) train.updateEffects((t += 0.05));
+    floors.forEach((f, i) => {
+      expect(f.rotation.y).toBeCloseTo(0, 9);
+      expect(f.position.x).toBeCloseTo(rest[i]!.x, 9);
+      expect(f.position.z).toBeCloseTo(rest[i]!.z, 9);
+    });
+  });
+});
