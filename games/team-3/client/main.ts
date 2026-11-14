@@ -266,6 +266,17 @@ courseButton.style.cssText =
 courseButton.addEventListener("click", () => triggerCourseFx(1));
 demoBar.append(courseButton);
 
+// Preview the train and track bending through a sharp curve (#384, #425) without a live run.
+let demoCurveUntil = 0;
+const curveButton = document.createElement("button");
+curveButton.type = "button";
+curveButton.textContent = "Sharp curve";
+curveButton.style.cssText = courseButton.style.cssText;
+curveButton.addEventListener("click", () => {
+  demoCurveUntil = performance.now() + 6000;
+});
+demoBar.append(curveButton);
+
 if (demo) document.body.append(demoBar);
 
 // One button per sound, so every cue can be checked by hand.
@@ -554,7 +565,11 @@ const walk = (time: number): void => {
       ...hazard,
       progress: (Math.sin(seconds * 0.7 + index) + 1) / 2,
     }));
-    train.updateState({ players: moved, items: demoItems, hazards });
+    const curve: RenderHazard[] =
+      performance.now() < demoCurveUntil
+        ? [{ id: "demo-curve", kind: "course", position: { x: carCentreX(0) - 160, y: -80 }, progress: 0 }]
+        : [];
+    train.updateState({ players: moved, items: demoItems, hazards: [...hazards, ...curve] });
 
     // A ~3 minute run: fuel and hull fall, distance grows, then the win screen.
     // The train slows at low fuel and stops when the tank is empty (#25).
