@@ -45,5 +45,7 @@ export interface TaskDefinition {
 export const TASK_CATALOGUE: readonly TaskDefinition[] = [
   { id: "wiring", label: "Reconnect the signal wires", section: "electrical" },
   { id: "boiler", label: "Stabilize the boiler", section: "engine" },
+  { id: "instruments", label: "Restore the control cabin instruments", section: "control" },
+  { id: "passenger-lights", label: "Fix the passenger carriage lights", section: "passenger" },
   { id: "brakes", label: "Inspect the carriage brakes", section: "rear" },
 ];

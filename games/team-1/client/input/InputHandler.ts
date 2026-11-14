@@ -11,9 +11,23 @@ export interface InputState {
   right: boolean;
 }
 
+/** True when keyboard input should remain available to a text-editing control. */
+export function isTextEntryTarget(target: EventTarget | null): boolean {
+  const element = target as (Element & { isContentEditable?: boolean }) | null;
+  if (!element || typeof element.closest !== "function") return false;
+  return Boolean(
+    element.isContentEditable ||
+    element.closest('input, textarea, select, [role="textbox"], [contenteditable=""], [contenteditable="true"]'),
+  );
+}
+
 export class InputHandler {
   private readonly handleKeyDown = (event: KeyboardEvent) => this.onKeyDown(event);
   private readonly handleKeyUp = (event: KeyboardEvent) => this.onKeyUp(event);
+  private readonly handleWindowBlur = () => this.reset();
+  private readonly handleVisibilityChange = () => {
+    if (window.document.visibilityState === "hidden") this.reset();
+  };
   private input: InputState = {
     forward: false,
     backward: false,
@@ -24,10 +38,14 @@ export class InputHandler {
   constructor() {
     window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keyup', this.handleKeyUp);
+    window.addEventListener('blur', this.handleWindowBlur);
+    window.document.addEventListener('visibilitychange', this.handleVisibilityChange);
   }
 
   private onKeyDown(event: KeyboardEvent): void {
+    if (isTextEntryTarget(event.target)) return;
     const key = event.key.toLowerCase();
+    if (key.startsWith('arrow')) event.preventDefault();
 
     switch (key) {
       case 'w':
@@ -77,6 +95,11 @@ export class InputHandler {
    */
   getInput(): InputState {
     return { ...this.input };
+  }
+
+  /** Clear every held key after focus changes or when its owning view is stopped. */
+  reset(): void {
+    this.input = { forward: false, backward: false, left: false, right: false };
   }
 
   /**
@@ -135,5 +158,7 @@ export class InputHandler {
   destroy(): void {
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);
+    window.removeEventListener('blur', this.handleWindowBlur);
+    window.document.removeEventListener('visibilitychange', this.handleVisibilityChange);
   }
 }

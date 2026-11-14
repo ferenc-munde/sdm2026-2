@@ -35,3 +35,18 @@ export function toTaskViewModels(tasks) {
     statusLabel: task.status === "complete" ? "DONE" : task.status === "in-progress" ? "IN PROGRESS" : "OPEN",
   }));
 }
+
+/** Describe whether the local player can repair here, using only the room snapshot. */
+export function toRepairHint(snapshot) {
+  const openTasks = snapshot.tasks.filter((task) => task.status !== "complete");
+  if (openTasks.length === 0) return { mode: "complete", text: "ALL REPAIRS COMPLETE" };
+
+  const player = snapshot.players.find((entry) => entry.id === snapshot.localPlayerId);
+  if (!player?.section) return { mode: "travel", text: `FOLLOW REPAIR MARKERS · ${openTasks[0].label}` };
+
+  const taskHere = openTasks.find((task) => task.section === player.section);
+  if (taskHere) return { mode: "ready", text: `${taskHere.label} · PRESS E TO REPAIR` };
+
+  const next = openTasks[0];
+  return { mode: "travel", text: `MOVE TO ${next.section?.toUpperCase() ?? "A MARKED REPAIR AREA"} · ${next.label}` };
+}

@@ -1,6 +1,6 @@
 # The Last Train (Team 1): start here
 
-This folder is written for the team and for the AI coding agents that work with it. Read this file first, then [PLATFORM.md](PLATFORM.md) (how the game talks to the server) and [NEXT_STEPS.md](NEXT_STEPS.md) (what is not done).
+This folder is written for the team and for the AI coding agents that work with it. Read this file first, then [PLATFORM.md](PLATFORM.md) (how the game talks to the server) and [NEXT_STEPS.md](NEXT_STEPS.md) (what is not done). The player classes (input, movement, collision, inventory, interactions) are described in [PLAYER_MECHANICS.md](PLAYER_MECHANICS.md).
 
 ## What the game is
 
@@ -10,7 +10,7 @@ A co-operative game for up to four players. The crew boards a night train, has a
 
 - The game runs on the shared platform (`server/`, Colyseus 0.18): one room per crew, a 4-character room code, the rules run on the server.
 - Two browsers can share a room: create, join by code, see each other in the lobby, start the run together, walk around, repair, win or lose.
-- The rules are small on purpose: walking, a countdown, a decaying train condition and three "stand in the right section and press E" repairs.
+- The rules are small on purpose: walking, a countdown, a decaying train condition and five "stand in the right section and press E" repairs.
 - Checked by automated tests only (rules, room with two real clients, the lobby page in a simulated DOM). **Nobody has looked at it in a real browser since the move to the platform**: do that first.
 
 ## Folder map
