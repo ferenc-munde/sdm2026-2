@@ -6,6 +6,7 @@
   "exports": {
     "./shared": "./src/shared/index.ts",
     "./sim": "./src/sim/index.ts",
+    "./server": "./src/server/index.ts",
     "./client": "./src/client/index.ts"
   },
   "scripts": {
