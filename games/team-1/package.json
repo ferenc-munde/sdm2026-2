@@ -11,7 +11,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "node tests/session-adapter.test.mjs && node tests/game-state-adapter.test.mjs && node tests/presentation-model.test.mjs && node tests/hud-presentation.test.mjs && node tests/three-scene-lifecycle.test.mjs && node tests/player-preview-controller.test.mjs && node tests/dom-integration.test.mjs && node tests/live-room-dom.test.mjs && vitest run",
+    "test": "node tests/session-adapter.test.mjs && node tests/game-state-adapter.test.mjs && node tests/presentation-model.test.mjs && node tests/hud-presentation.test.mjs && node tests/three-scene-lifecycle.test.mjs && node tests/player-preview-controller.test.mjs && node tests/input-lifecycle.test.mjs && node tests/restart-dom.test.mjs && node tests/dom-integration.test.mjs && node tests/live-room-dom.test.mjs && vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
