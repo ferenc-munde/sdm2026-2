@@ -32,8 +32,10 @@ export interface WaitingView {
   isHost: boolean;
   /** True when the connected players match the crew size. */
   complete: boolean;
-  /** True when this player may depart right now (host + complete + lobby). */
+  /** True when this player may depart right now (host + complete + lobby, and not already counting down). */
   canDepart: boolean;
+  /** Seconds left before the host's confirmed departure (#385), or null when not counting down. */
+  departIn: number | null;
   sizeOptions: CrewSizeOption[];
 }
 
@@ -60,13 +62,15 @@ export function waitingView(state: GameState, me: PlayerId): WaitingView {
     crewSize: state.lobby.crewSize,
     isHost: state.lobby.hostId === me,
     complete: connected === state.lobby.crewSize,
-    canDepart: canDepart(state, me),
+    canDepart: canDepart(state, me) && (state.lobby.departingIn ?? null) === null,
+    departIn: state.lobby.departingIn ?? null,
     sizeOptions,
   };
 }
 
 /** The line under the crew size: what the host is waiting for. */
 export function waitingHint(view: WaitingView): string {
+  if (view.departIn !== null) return `Departing in ${Math.max(1, Math.ceil(view.departIn))}…`;
   if (view.complete) {
     return view.isHost ? "Crew complete. Walk to the departure lever or press Depart." : "Waiting for the host to depart.";
   }
