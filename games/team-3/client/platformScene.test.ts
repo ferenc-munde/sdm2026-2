@@ -92,3 +92,31 @@ describe("the platform scene", () => {
     expect(() => platform.dispose()).not.toThrow();
   });
 });
+
+describe("updatePlayers keeps what did not change", () => {
+  it("moves the same figures and draws no new label when only positions change", () => {
+    let labels = 0;
+    const platform = buildPlatformScene(players, {
+      labelFactory: (name) => {
+        labels += 1;
+        return labelFactory(name);
+      },
+    });
+    const before = [...platform.playersGroup.children];
+
+    platform.updatePlayers(players.map((player) => ({ ...player, position: { x: player.position.x + 9, y: 3 } })));
+
+    platform.playersGroup.children.forEach((group, index) => expect(group).toBe(before[index]));
+    expect(platform.playersGroup.children[0]!.position.x).toBe(-51);
+    expect(platform.playersGroup.children[0]!.position.z).toBe(3);
+    expect(labels).toBe(players.length);
+  });
+
+  it("rebuilds a figure when its name changes", () => {
+    const platform = build();
+    const [ada, bela] = platform.playersGroup.children;
+    platform.updatePlayers([players[0] as RenderPlayer, { ...(players[1] as RenderPlayer), name: "Bella" }]);
+    expect(platform.playersGroup.children[0]).toBe(ada);
+    expect(platform.playersGroup.children[1]).not.toBe(bela);
+  });
+});
