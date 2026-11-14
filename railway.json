@@ -2,10 +2,10 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "RAILPACK",
-    "buildCommand": "pnpm --filter \"./games/${GAME:?set the GAME variable, for example team-1}\" run build"
+    "buildCommand": "if [ -n \"$GAME\" ]; then pnpm --filter \"./games/$GAME\" run build --base=./; else echo \"the gateway has no build step\"; fi"
   },
   "deploy": {
-    "startCommand": "COMMIT_SHA=\"$RAILWAY_GIT_COMMIT_SHA\" pnpm --filter \"./games/${GAME:?set the GAME variable, for example team-1}\" run server",
+    "startCommand": "if [ -n \"$GAME\" ]; then COMMIT_SHA=\"$RAILWAY_GIT_COMMIT_SHA\" pnpm --filter \"./games/$GAME\" run server; else COMMIT_SHA=\"$RAILWAY_GIT_COMMIT_SHA\" pnpm --filter ./server/gateway run start; fi",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",

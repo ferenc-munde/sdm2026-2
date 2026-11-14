@@ -49,7 +49,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: games/${{ matrix.team }}
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Test TypeScript game and server logic
         working-directory: games/${{ matrix.team }}

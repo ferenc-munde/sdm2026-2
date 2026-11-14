@@ -38,7 +38,7 @@ export interface StartGameServerOptions {
   logger?: Logger;
   /**
    * Folder with the game's built client (`index.html` and assets), served from the same origin.
-   * Defaults to `$CLIENT_DIR`, then `./dist` when that folder holds an `index.html`.
+   * Defaults to `$CLIENT_DIR`, then `./dist` or `./client/dist`, whichever holds an `index.html`.
    */
   clientDir?: string;
 }
@@ -50,9 +50,21 @@ export interface RunningGameServer {
   shutdown(): Promise<void>;
 }
 
-function findClientDir(option: string | undefined): string | undefined {
-  const candidate = resolve(option ?? process.env.CLIENT_DIR ?? "dist");
-  return existsSync(join(candidate, "index.html")) ? candidate : undefined;
+/** Where a game's Vite build usually lands, relative to the game's folder: the root or the client folder. */
+export const DEFAULT_CLIENT_DIRS = ["dist", "client/dist"];
+
+/**
+ * The folder to serve: the configured one (`clientDir` option, then `$CLIENT_DIR`) when there is one,
+ * otherwise the first default folder that holds an `index.html`.
+ */
+export function findClientDir(
+  option: string | undefined,
+  env: string | undefined = process.env.CLIENT_DIR,
+  base: string = process.cwd(),
+): string | undefined {
+  const configured = option ?? env;
+  const candidates = configured ? [configured] : DEFAULT_CLIENT_DIRS;
+  return candidates.map((dir) => resolve(base, dir)).find((dir) => existsSync(join(dir, "index.html")));
 }
 
 export async function startGameServer(options: StartGameServerOptions): Promise<RunningGameServer> {

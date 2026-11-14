@@ -71,7 +71,7 @@ importers:
         version: link:../../server/host
       colyseus:
         specifier: ^0.18.1
-        version: 0.18.12(@colyseus/core@0.18.28)(@colyseus/schema@5.0.48(typescript@5.9.3))(@colyseus/ws-transport@0.18.5)(@pm2/io@6.1.0)(express@5.3.0)(vite@7.3.8(@types/node@26.6.6))(zod@4.6.7)
+        version: 0.18.12(@colyseus/schema@5.0.48(typescript@5.9.3))(@pm2/io@6.1.0)(express@5.3.0)(vite@7.3.8(@types/node@26.6.6))(zod@4.6.7)
       three:
         specifier: ^0.170.0
         version: 0.170.0
@@ -148,6 +148,33 @@ importers:
         specifier: workspace:*
         version: link:../tooling
 
+  server/gateway:
+    devDependencies:
+      '@colyseus/schema':
+        specifier: ^5.0.8
+        version: 5.0.48(typescript@5.9.3)
+      '@colyseus/sdk':
+        specifier: ^0.18.1
+        version: 0.18.10(@colyseus/core@0.18.28)(typescript@5.9.3)(zod@4.6.7)
+      '@sdm/core':
+        specifier: workspace:*
+        version: link:../core
+      '@sdm/host':
+        specifier: workspace:*
+        version: link:../host
+      '@sdm/tooling':
+        specifier: workspace:*
+        version: link:../tooling
+      '@types/node':
+        specifier: ^26.6.6
+        version: 26.6.6
+      vite-node:
+        specifier: ^3.2.0
+        version: 3.2.4(@types/node@26.6.6)
+      zod:
+        specifier: ^4.1.12
+        version: 4.6.7
+
   server/host:
     dependencies:
       '@colyseus/core':
@@ -164,7 +191,7 @@ importers:
         version: link:../core
       colyseus:
         specifier: ^0.18.1
-        version: 0.18.12(@colyseus/core@0.18.28)(@colyseus/schema@5.0.48(typescript@5.9.3))(@colyseus/ws-transport@0.18.5)(@pm2/io@6.1.0)(express@5.3.0)(vite@7.3.8(@types/node@26.6.6))(zod@4.6.7)
+        version: 0.18.12(@colyseus/schema@5.0.48(typescript@5.9.3))(@pm2/io@6.1.0)(express@5.3.0)(vite@7.3.8(@types/node@26.6.6))(zod@4.6.7)
       express:
         specifier: ^5.1.0
         version: 5.3.0
@@ -967,11 +994,9 @@ packages:
     resolution: {integrity: sha512-e2o6ZMabiUdjJrnYjiYptjnPK9GijVJ2BFB/8aeMrRUwa4XRKFNooo5Rr2c4w/Ci5ky3XtXVbfUUk3V1oDUrzA==}
     engines: {node: '>= 22.x'}
     peerDependencies:
-      '@colyseus/core': ^0.18.10
       '@colyseus/schema': ^5.0.8
       '@colyseus/tunnel': 0.18.x
       '@colyseus/uwebsockets-transport': 0.18.x
-      '@colyseus/ws-transport': 0.18.x
       vite: '>=6.0.0'
     peerDependenciesMeta:
       '@colyseus/tunnel':
@@ -2351,7 +2376,7 @@ snapshots:
 
   cluster-key-slot@1.1.1: {}
 
-  colyseus@0.18.12(@colyseus/core@0.18.28)(@colyseus/schema@5.0.48(typescript@5.9.3))(@colyseus/ws-transport@0.18.5)(@pm2/io@6.1.0)(express@5.3.0)(vite@7.3.8(@types/node@26.6.6))(zod@4.6.7):
+  colyseus@0.18.12(@colyseus/schema@5.0.48(typescript@5.9.3))(@pm2/io@6.1.0)(express@5.3.0)(vite@7.3.8(@types/node@26.6.6))(zod@4.6.7):
     dependencies:
       '@colyseus/auth': 0.18.4(@colyseus/core@0.18.28)(express@5.3.0)(zod@4.6.7)
       '@colyseus/core': 0.18.28(@colyseus/auth@0.18.4)(@colyseus/schema@5.0.48(typescript@5.9.3))(@colyseus/ws-transport@0.18.5)(@pm2/io@6.1.0)(express@5.3.0)(zod@4.6.7)
@@ -2366,9 +2391,11 @@ snapshots:
       vite: 7.3.8(@types/node@26.6.6)
     transitivePeerDependencies:
       - '@pm2/io'
+      - bufferutil
       - cpupro
       - express
       - supports-color
+      - utf-8-validate
       - zod
 
   connect-redis@7.1.1(express-session@1.19.0):
