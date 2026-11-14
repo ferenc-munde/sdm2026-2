@@ -1,6 +1,6 @@
 # Architecture
 
-> **Target architecture.** This describes how the system is built. The repository is a skeleton: the platform team and the game teams build these parts during the hackathon. Each folder's `README.md` says what goes in it.
+> **Target architecture.** This describes how the system is built. The repository is a skeleton: the platform team and the game teams build these parts during the hackathon. Each folder's `README.md` says what goes in it. [Current status](#current-status) shows what exists so far.
 
 Every team builds its own real-time multiplayer browser game in `games/team-N/`. All games share one platform in `server/`: the same server host, contract, tooling and CI.
 
@@ -10,6 +10,9 @@ What has been done so far:
 
 | Area | Status |
 |---|---|
+| Repository skeleton | Done: rules (`CLAUDE.md`), getting started guide, `server/` structure with a README per package, `games/team-1` to `team-4` folders, course info |
+| Team roster | Done: `course/teams.json` lists instructors, students and their team |
+| Branches | Done: `main` → `staging` → `development` → `Team_1_Feature`, `Team_2_Feature`, `Team_3_Feature` (see [Branch structure](#branch-structure)) |
 | Repository skeleton | Done: rules (`CLAUDE.md`), getting started guide, `server/` structure with a README per package, `games/team-1` to `team-3` folders, course info |
 | Team roster | Done: `course/teams.json` lists instructors, students and their team |
 | Branches | Done: `main` (production), `staging`, `development`, `Team_1_Feature`, `Team_2_Feature`, `Team_3_Feature`. Work flows `Team_N_Feature` → `development` → `staging` → `main` (see [Branch structure](#branch-structure)) |
@@ -91,6 +94,31 @@ One address, one path per game. The gateway is the only public service of an env
 
 ## Branch structure
 
+Branches created so far. `staging` was cut from `main`, `development` from `staging`, and the feature branches from `development`, so every team has its own branch to put its work on:
+
+```
+main
+└─ staging
+   └─ development
+      ├─ Team_1_Feature
+      ├─ Team_2_Feature
+      └─ Team_3_Feature
+```
+
+| Branch | Purpose |
+|---|---|
+| `main` | Root branch of the repository |
+| `staging` | Created from `main` |
+| `development` | Created from `staging`; integration branch for the teams |
+| `Team_N_Feature` | Created from `development`; the branch a team works on and puts its stuff in |
+
+Teams commit to their own `Team_N_Feature` branch and merge into `development` through a PR. Only three feature branches exist so far; `Team_4_Feature` is not created yet.
+
+The repository rules in [../CLAUDE.md](../CLAUDE.md#2-branch) still describe short-lived `<team-label>/<issue-number>-<short-description>` branches and PRs into `main`. Which base branch those PRs target (`Team_N_Feature`, `development` or `main`) is still to be decided and then written into `CLAUDE.md`.
+
+## Environments (Railway)
+
+> **Not set up yet.** This is the target. Which branch deploys to which environment has to be aligned with the [branch structure](#branch-structure) above.
 `main` is production. Below it is `staging`, below that `development`, and below that one feature branch per team:
 
 ```
