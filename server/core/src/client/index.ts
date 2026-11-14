@@ -12,12 +12,40 @@ export interface ServerAddress {
 
 const LOCAL_SERVER_PORT = 2567;
 
+/** The parts of `window.location` the server address is built from. Pass `window.location` itself. */
+export interface PageLocation {
+  protocol: string;
+  hostname: string;
+  /** Host with the port, for example `games.example:8443`. Falls back to `hostname`. */
+  host?: string;
+  /** The page's path, for example `/team-2/index.html`. Falls back to `/`. */
+  pathname?: string;
+}
+
 /**
- * The server address for a page. A configured address (for example `import.meta.env.VITE_SERVER_URL`)
- * wins; otherwise the game server runs next to the page on port 2567, as it does in local development.
+ * True on the Vite dev server (`pnpm dev`), false in a production build. Vite replaces
+ * `import.meta.env.DEV` when it bundles this file into a game's client; where there is no Vite
+ * (plain Node), it is false.
  */
-export function serverAddress(page: { protocol: string; hostname: string }, configured?: string): ServerAddress {
-  const http = (configured?.trim() || `${page.protocol}//${page.hostname}:${LOCAL_SERVER_PORT}`).replace(/\/+$/, "");
+function onViteDevServer(): boolean {
+  return (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true;
+}
+
+/**
+ * The server address for a page:
+ * 1. A configured address (for example `import.meta.env.VITE_SERVER_URL`) wins.
+ * 2. On the Vite dev server the game server runs next to the page on port 2567.
+ * 3. Otherwise the game server itself served the page (`@sdm/host` serves the built client), so the
+ *    address is the page's own origin and folder. That also works behind the gateway under `/team-N/`.
+ *
+ * `devServer` is detected from Vite; pass it only to override that, as the tests do.
+ */
+export function serverAddress(page: PageLocation, configured?: string, devServer: boolean = onViteDevServer()): ServerAddress {
+  const folder = (page.pathname ?? "/").replace(/[^/]*$/, "");
+  const fallback = devServer
+    ? `${page.protocol}//${page.hostname}:${LOCAL_SERVER_PORT}`
+    : `${page.protocol}//${page.host ?? page.hostname}${folder}`;
+  const http = (configured?.trim() || fallback).replace(/\/+$/, "");
   return { http, ws: http.replace(/^http/, "ws") };
 }
 

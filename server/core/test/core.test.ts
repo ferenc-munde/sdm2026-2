@@ -75,6 +75,39 @@ describe("client helper", () => {
     });
   });
 
+  it("uses port 2567 next to the page on the Vite dev server", async () => {
+    const { serverAddress } = await import("../src/client");
+    const page = { protocol: "http:", hostname: "192.168.1.20", host: "192.168.1.20:5173", pathname: "/" };
+    expect(serverAddress(page, undefined, true)).toEqual({ http: "http://192.168.1.20:2567", ws: "ws://192.168.1.20:2567" });
+  });
+
+  it("uses the page's own origin and folder when the game server served the page", async () => {
+    const { serverAddress } = await import("../src/client");
+    // At the root of a domain, as on Railway.
+    expect(serverAddress({ protocol: "https:", hostname: "game.example", host: "game.example", pathname: "/" }, undefined, false)).toEqual({
+      http: "https://game.example",
+      ws: "wss://game.example",
+    });
+    // Under a path, as behind the gateway; the file name is dropped, the folder is kept.
+    expect(
+      serverAddress({ protocol: "https:", hostname: "games.example", host: "games.example", pathname: "/team-2/index.html" }, "", false),
+    ).toEqual({ http: "https://games.example/team-2", ws: "wss://games.example/team-2" });
+    // A port in the address is kept; an invite link's query does not matter because it is not in `pathname`.
+    expect(serverAddress({ protocol: "http:", hostname: "localhost", host: "localhost:2567", pathname: "/team-1/" }, undefined, false).http).toBe(
+      "http://localhost:2567/team-1",
+    );
+    // Callers that only know protocol and hostname still get a usable address.
+    expect(serverAddress({ protocol: "https:", hostname: "game.example" }, undefined, false).http).toBe("https://game.example");
+  });
+
+  it("lets a configured address win in every mode", async () => {
+    const { serverAddress } = await import("../src/client");
+    const page = { protocol: "https:", hostname: "game.example", host: "game.example", pathname: "/" };
+    for (const devServer of [true, false]) {
+      expect(serverAddress(page, "https://rooms.example/", devServer).http).toBe("https://rooms.example");
+    }
+  });
+
   it("numbers input envelopes from 1 and the host's envelope schema accepts them", async () => {
     const { createInputEnvelopes } = await import("../src/client");
     const envelope = createInputEnvelopes<{ move: string }>();
