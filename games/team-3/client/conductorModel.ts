@@ -23,9 +23,9 @@ export function announcementEvents(previous: GameState | null, next: GameState):
 
 export function fallbackAnnouncement(event: AnnouncementEvent): string {
   if (event.kind === "lowFuel") return "Crew, fuel is running low. Bring coal to the engine!";
-  if (event.hazard === "course") return "Course hazard ahead! Hold the steering console during the final two seconds.";
+  if (event.hazard === "course") return "Sharp curve ahead: hold the brake lever during the final two seconds!";
   const location = `car ${event.car + 1}`;
   return event.hazard === "fire"
     ? `Fire in ${location}! Bring the extinguisher and hold interact.`
-    : `Hull breach in ${location}! Bring a wrench and hold interact.`;
+    : `Broken steam pipe in ${location}! Bring a wrench and hold interact.`;
 }
