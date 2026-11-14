@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { GameClientSnapshot } from "./game-state-adapter.mjs";
 import { toPlayerViewModels } from "./presentation-model.mjs";
 import { TRAIN_LAYOUT } from "./environment/TrainEnvironment";
+import type { RepairStationsController } from "./environment/RepairStations";
 import { advanceTrainMotion } from "./environment/effects/TrainMotionEffects";
 import { createScene } from "./scene";
 
@@ -49,6 +50,8 @@ export function mountTrainScene(
   const scene = createScene();
   const railway = scene.userData.railwayMotion as THREE.Group;
   const trainRoot = scene.userData.trainMotionRoot as THREE.Group;
+  const trainEnvironment = trainRoot.getObjectByName("train-environment");
+  const repairStations = trainEnvironment?.userData.repairStations as RepairStationsController | undefined;
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 120);
   camera.position.set(0, 31, 9);
   camera.up.set(0, 0, -1);
@@ -120,6 +123,7 @@ export function mountTrainScene(
     lastFrameAt = now;
     const smoothing = 1 - Math.exp(-14 * elapsedSeconds);
     advanceTrainMotion(railway, trainRoot, elapsedSeconds);
+    repairStations?.animate(elapsedSeconds);
     for (const [id, group] of playerMeshes) {
       const target = group.userData.targetPosition as THREE.Vector3 | undefined;
       if (target) group.position.lerp(target, smoothing);
@@ -136,6 +140,8 @@ export function mountTrainScene(
   return {
     update(snapshot) {
       const players = toPlayerViewModels(snapshot);
+      const localPlayer = snapshot.players.find((player) => player.id === snapshot.localPlayerId);
+      repairStations?.update(snapshot.tasks, localPlayer?.section);
       const visible = new Set(players.map((player) => player.id));
       for (const [id, group] of playerMeshes) {
         if (!visible.has(id)) {
