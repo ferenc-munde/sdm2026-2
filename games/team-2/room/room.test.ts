@@ -10,10 +10,13 @@ import { CAR_FLOORS, SPAWN_CAR, contains } from "../shared/map.ts";
 import { rooms } from "./index.ts";
 
 interface LobbyView {
+	teamSize: number;
 	status: string;
 	hostSessionId: string;
 	playerCount: number;
 	roomCode: string;
+	gameRoomCode: string;
+	startedPlayerCount: number;
 }
 
 let running: TestServer | undefined;
@@ -157,9 +160,62 @@ describe("team-2 rooms on the platform host", () => {
 		hostLobby.send(GAME_ROOM_MESSAGE, { code: host.code });
 		await waitFor(() => received !== "");
 		expect(received).toBe(host.code);
+		await waitFor(() => hostLobby.state.gameRoomCode === host.code && guestLobby.state.gameRoomCode === host.code);
 
 		const guest = track(await joinGame(server, received, "Bo"));
 		await waitFor(() => host.state.players.size === 2);
 		expect(guest.state.players.get(host.playerId)?.name).toBe("Ada");
+		expect(host.state.phase).toBe("running");
+	});
+
+	it.each([2, 3, 4] as const)("auto-starts a full %i-player lobby and hands every player to one running game", async (teamSize) => {
+		const server = await boot();
+		const hostLobby = await new Client(server.ws).create<LobbyView>(LOBBY_ROOM_NAME, { name: "Ada", teamSize });
+		open.push(hostLobby);
+		hostLobby.onMessage("match-started", () => {});
+		hostLobby.onMessage(GAME_ROOM_MESSAGE, () => {});
+		const crewLobbies = [hostLobby];
+		const names = ["Ada"];
+		for (let index = 1; index < teamSize; index++) {
+			const name = `Crew ${index + 1}`;
+			names.push(name);
+			const member = await new Client(server.ws).joinById<LobbyView>(hostLobby.roomId, { name });
+			open.push(member);
+			member.onMessage("match-started", () => {});
+			member.onMessage(GAME_ROOM_MESSAGE, () => {});
+			crewLobbies.push(member);
+		}
+
+		await waitFor(() => crewLobbies.every((member) => member.state.status === "running"));
+		expect(crewLobbies.every((member) => member.state.playerCount === teamSize)).toBe(true);
+		expect(crewLobbies.every((member) => member.state.startedPlayerCount === teamSize)).toBe(true);
+		expect(crewLobbies.every((member) => !("secondsRemaining" in member.state))).toBe(true);
+
+		// Simulate the host creating the game room after match-started. All crew clients
+		// resolve from the durable state field, even when they subscribe after the event.
+		const hostGameRoom = track(await hostGame(server, names[0]));
+		hostLobby.send(GAME_ROOM_MESSAGE, { code: hostGameRoom.code });
+		await waitFor(() => crewLobbies.every((member) => member.state.gameRoomCode === hostGameRoom.code));
+		const gameSessions = [hostGameRoom];
+		for (let index = 1; index < teamSize; index++) {
+			gameSessions.push(track(await joinGame(server, crewLobbies[index]!.state.gameRoomCode, names[index])));
+		}
+		await waitFor(() => gameSessions.every((session) => session.state.players.size === teamSize));
+		expect(gameSessions.every((session) => session.code === hostGameRoom.code)).toBe(true);
+		expect(gameSessions.every((session) => session.state.phase === "running")).toBe(true);
+		for (let index = 0; index < teamSize; index++) {
+			expect(gameSessions[0]!.state.players.get(gameSessions[index]!.playerId)?.name).toBe(names[index]);
+		}
+	});
+
+	it("lets the host start a partially filled lobby early", async () => {
+		const server = await boot();
+		const lobby = await new Client(server.ws).create<LobbyView>(LOBBY_ROOM_NAME, { name: "Ada", teamSize: 4 });
+		open.push(lobby);
+		lobby.onMessage("match-started", () => {});
+		lobby.send("start-now");
+		await waitFor(() => lobby.state.status === "running");
+		expect(lobby.state.playerCount).toBe(1);
+		expect(lobby.state.startedPlayerCount).toBe(1);
 	});
 });

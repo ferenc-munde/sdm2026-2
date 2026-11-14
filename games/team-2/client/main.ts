@@ -299,7 +299,8 @@ async function enterGameRoom(connect: () => Promise<NetSession>) {
       update();
     });
   } catch (error) {
-    netStatus = `Could not join the game room (${error instanceof Error ? error.message : String(error)}) · reload to try again`;
+    netStatus = `Could not start the game: ${error instanceof Error ? error.message : String(error)}`;
+    lobby?.showTransitionError(netStatus);
     console.error(error);
   }
   update();
@@ -308,7 +309,10 @@ async function enterGameRoom(connect: () => Promise<NetSession>) {
 function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(message)), ms);
-    promise.then((value) => { clearTimeout(timer); resolve(value); }, reject);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
   });
 }
 

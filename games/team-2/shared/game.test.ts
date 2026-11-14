@@ -65,6 +65,7 @@ describe("lastTrain game definition", () => {
 		game.init(state, ctx);
 		game.join(state, "s1", ctx, { name: "Mahmoud" });
 		expect(state.players.get("s1")?.name).toBe("Mahmoud");
+		expect(state.phase).toBe("running");
 
 		const item = new Item();
 		item.type = "wrench";
@@ -82,6 +83,24 @@ describe("lastTrain game definition", () => {
 		expect(state.items.get("i1")?.holderId).toBe("");
 		expect(state.items.get("i1")?.x).toBeCloseTo(3.5);
 		expect(state.items.get("i1")?.y).toBeCloseTo(-2);
+	});
+
+	it("starts a new game room when its first crew member joins, without restarting for later joins", () => {
+		const game = createLastTrain();
+		const state = game.createState(config);
+		const ctx = newCtx();
+		game.init(state, ctx);
+		state.runTicks = 90;
+
+		game.join(state, "host", ctx, { name: "Ada" });
+		expect(state.phase).toBe("running");
+		expect(state.runTicks).toBe(0);
+		game.step(state, [], ctx);
+		expect(state.runTicks).toBe(1);
+
+		game.join(state, "guest", ctx, { name: "Bo" });
+		expect(state.phase).toBe("running");
+		expect(state.runTicks).toBe(1);
 	});
 
 	it("progress clamps per input, then completes and erases at the target", () => {
