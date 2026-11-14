@@ -43,6 +43,7 @@ import {
 } from "./crewPose.ts";
 import type { StationStatuses } from "../shared/stations/status.ts";
 import { createHighlightRing } from "./highlightRing.ts";
+import { bendPoint, carIndexAt, chain, createBendState, restFronts } from "./trainBend.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import { applyCrewPose, buildCrewFigure, HOLD_POINT } from "./crewModel.ts";
 
@@ -636,6 +637,37 @@ export function buildTrainScene(
   const actionRing = createHighlightRing();
   scene.add(actionRing.group);
 
+  // Taking sharp curves (#384): each car follows the bend while a course (sharp curve) event runs.
+  const fronts = restFronts(map);
+  const bend = createBendState(map.cars.length);
+  let curveActive = false;
+  let bendWasStraight = true;
+  const restOf = (o: Object3D): { x: number; z: number; ry: number } => {
+    o.userData.rest ??= { x: o.position.x, z: o.position.z, ry: o.rotation.y };
+    return o.userData.rest as { x: number; z: number; ry: number };
+  };
+  /** Moves (and for the train's own parts, turns) every drawn object with the car it stands in. */
+  const applyBend = (dt: number): void => {
+    const angles = bend.step(dt, curveActive);
+    if (bend.isStraight() && bendWasStraight) return;
+    bendWasStraight = bend.isStraight();
+    const poses = chain(fronts, angles);
+    const place = (o: Object3D, rest: { x: number; z: number; ry: number }, turnIt: boolean): void => {
+      const car = carIndexAt(fronts, rest.x);
+      const p = bendPoint(fronts, poses, car, { x: rest.x, z: rest.z });
+      o.position.x = p.x;
+      o.position.z = p.z;
+      if (turnIt) o.rotation.y = rest.ry + (poses[car]?.angle ?? 0);
+    };
+    // Wheels only move with their car: their rotation.y is the roll that updateMotion advances.
+    for (const o of [...mapGroup.children, ...body.group.children, ...hazardsGroup.children]) place(o, restOf(o), o.name !== "wheel");
+    // Players and items: moved with their car; their own turning (heading, spin) stays theirs.
+    for (const o of [...playersGroup.children, ...itemsGroup.children]) place(o, restOf(o), false);
+    for (const puff of smoke) place(puff, { x: puff.position.x, z: puff.position.z, ry: 0 }, false);
+    // The action ring (#331) was just placed on the straight train by updateHighlight; follow the bend.
+    if (actionRing.group.visible) place(actionRing.group, { x: actionRing.group.position.x, z: actionRing.group.position.z, ry: 0 }, false);
+  };
+
   const drawnPlayers = new Map<string, Drawn<Group>>();
   const drawnItems = new Map<string, Drawn<Mesh>>();
   const drawnHazards = new Map<string, Drawn<Group>>();
@@ -646,6 +678,7 @@ export function buildTrainScene(
     const players = next.players ?? [];
     const items = next.items ?? [];
     const hazards = next.hazards ?? [];
+    curveActive = hazards.some((hazard) => hazard.kind === "course");
 
     if (next.stationStatuses) {
       // Only the station's own pad is tinted: the models share cached materials with the train.
@@ -701,6 +734,10 @@ export function buildTrainScene(
       })),
       disposeObject,
     );
+    // Their straight positions were just set; the bend starts from these (#384).
+    for (const o of [...playersGroup.children, ...itemsGroup.children, ...hazardsGroup.children]) {
+      o.userData.rest = { x: o.position.x, z: o.position.z, ry: o.rotation.y };
+    }
   };
 
   /** Fire flicker and rising breach steam; pure presentation, driven by the frame clock. */
@@ -776,6 +813,7 @@ export function buildTrainScene(
         }
       }
     }
+    applyBend(dt);
   };
 
 

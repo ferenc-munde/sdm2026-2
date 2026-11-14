@@ -96,6 +96,10 @@ team-N/<issue>-<description>  →  Team_N_Feature  →  development  →  stagin
   - `main: only instructors promote`: on `main`, changes only through a pull request merged by the repository admin (an instructor); no deletion, no force push.
   - `long-lived branches`: on `development`, `staging` and `Team_*_Feature`, changes only through a pull request; no deletion, no force push.
 
+## Grades
+
+When someone asks about their grade or points, run `node course/tooling/student-report.mjs --me` (or `--student <github-login>`) on an up-to-date `development` branch and explain its output. The rules are in [course/README.md](course/README.md#check-your-own-grade). Never commit the output: it has per-person numbers.
+
 ## Deployment
 
 Nothing is deployed yet. Railway belongs to the platform team: teams don't create or change Railway services, variables or domains; they open a `platform` issue instead. The target setup (one gateway, one service per game, the `development` branch deploys to the development environment, `main` to production) is in [server/ARCHITECTURE.md](server/ARCHITECTURE.md). Secrets live only in Railway variables, never in the repository.
