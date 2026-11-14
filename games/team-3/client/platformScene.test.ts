@@ -68,7 +68,8 @@ describe("the platform scene", () => {
     expect(platform.playersGroup.children).toHaveLength(2);
 
     const colours = platform.playersGroup.children.map((group) => {
-      const body = group.children.find((child) => child.userData.kind === "playerBody");
+      let body: Object3D | undefined;
+      group.traverse((child) => { if (child.userData.kind === "playerBody") body = child; });
       expect(body).toBeInstanceOf(Mesh);
       return new Color(((body as Mesh).material as MeshStandardMaterial).color).getHexString();
     });
@@ -125,16 +126,16 @@ describe("updatePlayers keeps what did not change", () => {
 describe("waiting crew animation (#294)", () => {
   it("breathes while standing still and never leaves the floor", () => {
     const platform = build();
-    const body = platform.playersGroup.children[0]!.children.find(
-      (child) => child.userData.kind === "playerBody",
-    )!;
-    const base = body.position.y;
+    // The crew figure (visual pass) bobs at the hips; it is drawn 1.35x, so compare in world units.
+    const hips = platform.playersGroup.children[0]!.getObjectByName("hips")!;
+    const base = hips.position.y;
+    const lift = () => (hips.position.y - base) * 1.35;
 
     platform.updateMotion(0.5);
-    expect(body.position.y).not.toBe(base);
-    expect(Math.abs(body.position.y - base)).toBeLessThanOrEqual(IDLE_BOB + 1e-6);
+    expect(hips.position.y).not.toBe(base);
+    expect(Math.abs(lift())).toBeLessThanOrEqual(IDLE_BOB + 1e-6);
 
     platform.updateMotion(0.5);
-    expect(Math.abs(body.position.y - base)).toBeLessThanOrEqual(IDLE_BOB + 1e-6);
+    expect(Math.abs(lift())).toBeLessThanOrEqual(IDLE_BOB + 1e-6);
   });
 });

@@ -14,6 +14,8 @@ interface Modules {
 	items: ItemsModule;
 	sim: SimModule;
 	movement: MovementModule;
+	/** Whether the previous step was part of a run; a change to true starts the run clock again. */
+	wasRunning: boolean;
 }
 
 interface ModuleFactories {
@@ -43,6 +45,7 @@ export function createLastTrain(overrides: Partial<ModuleFactories> = {}): LastT
 				items: factories.createItems(state, ctx.random, cfg),
 				sim: factories.createSim(state, ctx.random, cfg),
 				movement: createMovement(state, cfg),
+				wasRunning: false,
 			});
 		},
 
@@ -77,6 +80,12 @@ export function createLastTrain(overrides: Partial<ModuleFactories> = {}): LastT
 			const modules = modulesByState.get(state);
 			if (!modules) return;
 			const dt = 1 / ctx.config.tickRate;
+			// The run clock lives in the synced state, not in any client: see `runTicks` in state.ts.
+			const running = state.phase === "running";
+			if (running && !modules.wasRunning) state.runTicks = 0;
+			if (running) state.runTicks += 1;
+			else if (state.phase === "lobby") state.runTicks = 0;
+			modules.wasRunning = running;
 			modules.tasks.tick();
 			modules.items.tick(dt);
 			modules.sim.tick(dt);

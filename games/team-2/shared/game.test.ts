@@ -29,6 +29,35 @@ describe("lastTrain game definition", () => {
 		expect(state.timeLimitTicks).toBe(6000);
 	});
 
+	it("keeps the run clock in the state: it counts running ticks only and restarts with a new run", () => {
+		const game = createLastTrain();
+		const state = game.createState(config);
+		const ctx = newCtx();
+		game.init(state, ctx);
+		const steps = (count: number) => {
+			for (let i = 0; i < count; i++) game.step(state, [], ctx);
+		};
+
+		steps(30);
+		expect(state.runTicks).toBe(0); // the lobby consumes no time
+
+		state.phase = "running";
+		steps(50);
+		expect(state.runTicks).toBe(50);
+
+		state.phase = "won";
+		steps(40);
+		expect(state.runTicks).toBe(50); // a finished run keeps its final time
+
+		state.phase = "running";
+		steps(1);
+		expect(state.runTicks).toBe(1); // a new run starts the clock again
+
+		state.phase = "lobby";
+		steps(1);
+		expect(state.runTicks).toBe(0);
+	});
+
 	it("join adds a named player, leave drops their item at their last position", () => {
 		const game = createLastTrain();
 		const state = game.createState(config);

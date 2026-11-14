@@ -46,6 +46,8 @@ export function createLocalStateModel(seed = 1): StateModel {
 	const listeners: Array<(s: LastTrainState) => void> = [];
 
 	const drainAndStep = (): PlayerInput<ClientInput>[] => {
+		// Like the room: a paused game does not advance, and queued inputs wait.
+		if (state.paused) return [];
 		const inputs = queue.map((input) => ({ playerId: LOCAL_SESSION_ID, input }));
 		queue = [];
 		state.tick += 1;
