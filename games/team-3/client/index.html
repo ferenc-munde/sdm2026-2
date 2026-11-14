@@ -92,6 +92,24 @@
         transition: width 120ms linear, background 120ms linear;
       }
 
+      /* What is draining the hull (#421), next to its value. */
+      .hud-bar-drain {
+        margin-left: -0.4ch;
+        color: #ff9b9b;
+        font-size: 11px;
+        letter-spacing: 0;
+      }
+
+      /* Below 30 the hull bar pulses red (#421). */
+      .hud.is-hull-critical .hud-bar[data-bar="hull"] .hud-bar-fill {
+        animation: hull-pulse 0.9s ease-in-out infinite;
+      }
+
+      @keyframes hull-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+      }
+
       .hud[hidden] {
         display: none;
       }

@@ -6,8 +6,15 @@
 // The server owns `journey` in `GameState` (shared/types.ts) and patches it ~20
 // times a second; the HUD renders whatever `journey` it is handed.
 
-import { FUEL_MAX, HULL_MAX, LOW_FUEL_THRESHOLD, WIN_DISTANCE } from "../shared/constants.ts";
-import type { Journey } from "../shared/types.ts";
+import {
+  FUEL_MAX,
+  HULL_LOSS_PER_BREACH_PER_SECOND,
+  HULL_LOSS_PER_FIRE_PER_SECOND,
+  HULL_MAX,
+  LOW_FUEL_THRESHOLD,
+  WIN_DISTANCE,
+} from "../shared/constants.ts";
+import type { Hazard, Journey } from "../shared/types.ts";
 
 /** Clamps `value` into `0..max` and returns the share of the bar to fill. */
 export function barFraction(value: number, max: number): number {
@@ -54,6 +61,26 @@ export const BAR_COLORS = {
   distance: "#3e63dd",
 } as const;
 
+/** The hull bar pulses below this; the run is in trouble (#421). */
+export const HULL_CRITICAL_AT = 30;
+/** The one-off "hull critical" toast fires below this (#421). */
+export const HULL_DANGER_AT = 15;
+
+/** True the first time the hull is below HULL_DANGER_AT in a run (#421). */
+export function shouldWarnHull(hull: number, alreadyShown: boolean): boolean {
+  return !alreadyShown && Number.isFinite(hull) && hull < HULL_DANGER_AT;
+}
+
+/** Hull lost per second to the open hazards the room sends (#421). */
+export function hullDrainPerSecond(hazards: readonly Pick<Hazard, "kind">[] = []): number {
+  let drain = 0;
+  for (const hazard of hazards) {
+    if (hazard.kind === "breach") drain += HULL_LOSS_PER_BREACH_PER_SECOND;
+    else if (hazard.kind === "fire") drain += HULL_LOSS_PER_FIRE_PER_SECOND;
+  }
+  return drain;
+}
+
 /** Everything the HUD needs for one tick, ready to write into the page. */
 export interface HudView {
   hull: number;
@@ -66,6 +93,10 @@ export interface HudView {
   /** "620 / 1800" for screen readers and tests. */
   distanceText: string;
   lowFuel: boolean;
+  /** Hull lost per second to open hazards; 0 hides the readout. */
+  hullDrain: number;
+  /** Below HULL_CRITICAL_AT the hull bar pulses. */
+  hullCritical: boolean;
 }
 
 /** Whole numbers, as shown to players. */
@@ -73,8 +104,8 @@ function round(value: number): number {
   return Math.round(Number.isFinite(value) ? value : 0);
 }
 
-/** Builds the view of the three bars from the server state. */
-export function hudView(journey: Journey): HudView {
+/** Builds the view of the three bars from the server state and the open hazards. */
+export function hudView(journey: Journey, hazards: readonly Pick<Hazard, "kind">[] = []): HudView {
   const lowFuel = fuelIsLow(journey);
   return {
     hull: round(journey.hull),
@@ -86,5 +117,7 @@ export function hudView(journey: Journey): HudView {
     fuelColor: fuelColor(journey.fuel),
     distanceText: `${round(journey.distance)} / ${WIN_DISTANCE}`,
     lowFuel,
+    hullDrain: hullDrainPerSecond(hazards),
+    hullCritical: journey.hull < HULL_CRITICAL_AT,
   };
 }
