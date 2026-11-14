@@ -29,6 +29,8 @@ export const PALETTE = {
   leavesLight: "#3f7434",
   rock: "#7d7a74",
   hill: "#2c3f2a",
+  grassDark: "#36502a",
+  fence: "#6b5038",
   sky: "#2a3550",
   fog: "#3a4560",
   // Props
@@ -41,6 +43,21 @@ export const PALETTE = {
   steam: "#dfe7f2",
   skin: "#f1c9a5",
   overalls: "#3b4a63",
+} as const;
+
+/**
+ * Evening light shared by the train and the platform (#358): a low warm sun with longer shadows,
+ * a cool sky fill and a warm ground bounce. Less flat ambient, so shapes read by their shading.
+ */
+export const LIGHTING = {
+  ambient: 0.22,
+  skyColor: "#a9b8de",
+  groundColor: "#5a4128",
+  hemisphere: 0.95,
+  sunColor: "#ffcb8e",
+  sunIntensity: 3.1,
+  /** Sun offset from the scene centre: low and to the side, so shadows stretch across the floor. */
+  sunOffset: { x: -650, y: 720, z: 560 },
 } as const;
 
 const cache = new Map<string, MeshStandardMaterial>();
