@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { CARRY_ARM_LIFT, INTERACT_ARM_LIFT } from "./crewPose.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import {
+  HELD_SHINE,
   PLAYER_COLORS,
   buildTrainScene,
   fitCameraToMap,
@@ -485,5 +486,48 @@ describe("the action highlight (#295)", () => {
 
     train.updateHighlight(null, 0);
     expect(ring?.visible).toBe(false);
+  });
+});
+
+describe("item shadows and held shine (#357)", () => {
+  const shadowOf = (item: Object3D) => item.getObjectByName("itemShadow");
+  const meshes = (root: Object3D): Mesh[] => {
+    const out: Mesh[] = [];
+    root.traverse((child) => { if (child instanceof Mesh && child.name !== "itemShadow") out.push(child); });
+    return out;
+  };
+
+  it("puts a shadow under every loose item, and none under a held one", () => {
+    const train = build();
+    expect(train.itemsGroup.children).toHaveLength(2);
+    for (const item of train.itemsGroup.children) expect(shadowOf(item)).toBeInstanceOf(Mesh);
+    let held: Object3D | undefined;
+    train.playersGroup.traverse((child) => { if (child.userData.kind === "heldItem") held = child; });
+    expect(held && shadowOf(held)).toBeUndefined();
+  });
+
+  it("keeps the shadow on the floor while the item bobs", () => {
+    const train = build();
+    for (const t of [0.1, 0.4, 0.9, 1.7]) {
+      train.updateEffects(t);
+      for (const item of train.itemsGroup.children) {
+        const shadow = shadowOf(item)!;
+        expect(item.position.y + shadow.position.y * item.scale.y).toBeCloseTo(0.5, 5);
+      }
+    }
+  });
+
+  it("makes a held tool glow with its own materials, leaving loose items unchanged", () => {
+    const train = build();
+    let held: Object3D | undefined;
+    train.playersGroup.traverse((child) => { if (child.userData.kind === "heldItem") held = child; });
+    const heldMats = meshes(held!).map((m) => m.material as MeshStandardMaterial);
+    expect(heldMats.length).toBeGreaterThan(0);
+    for (const m of heldMats) expect(m.emissiveIntensity).toBeCloseTo(HELD_SHINE);
+    const looseMats = train.itemsGroup.children.flatMap((item) => meshes(item).map((m) => m.material as MeshStandardMaterial));
+    for (const m of looseMats) {
+      expect(heldMats).not.toContain(m);
+      expect(m.emissive.getHex() === 0 || m.emissiveIntensity !== HELD_SHINE).toBe(true);
+    }
   });
 });
