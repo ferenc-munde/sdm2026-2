@@ -1,0 +1,24 @@
+{
+  "name": "@sdm/gateway",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "vite-node src/main.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@colyseus/schema": "^5.0.8",
+    "@colyseus/sdk": "^0.18.1",
+    "@sdm/core": "workspace:*",
+    "@sdm/host": "workspace:*",
+    "@sdm/tooling": "workspace:*",
+    "@types/node": "^26.6.6",
+    "vite-node": "^3.2.0",
+    "zod": "^4.1.12"
+  }
+}
