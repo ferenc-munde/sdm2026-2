@@ -59,7 +59,12 @@ describe("never disagrees with the room (useRunAction)", () => {
       const items: GameState["items"] = { ...createStartItems(train), ...(hold === "coal" ? { c: makeItem("c", "coal", { heldBy: "p1", position }) } : {}) };
       if (hold === "wrench") items.wrench = { ...items.wrench!, heldBy: "p1" };
       const heldItem = hold === "coal" ? "c" : hold === "wrench" ? "wrench" : null;
-      const s = solo(position, { items }, heldItem);
+      // Sometimes a fire burns beside a station, which disables it (#226).
+      const near = train.stations.find((st) => Math.hypot(st.position.x - position.x, st.position.y - position.y) < 70);
+      const hazards: GameState["hazards"] = near && random.next() < 0.4
+        ? { f: { id: "f", kind: "fire", car: near.car, spotId: "test", position: { x: near.position.x + 10, y: near.position.y }, age: 0, progress: 0, countdown: null } }
+        : {};
+      const s = solo(position, { items, hazards }, heldItem);
 
       const target = actionTarget(s, "p1", world);
       const after = useRunAction(s, "p1", train);
@@ -71,5 +76,15 @@ describe("never disagrees with the room (useRunAction)", () => {
       else if (target.kind === "drop") expect([p.heldItem, after.items[target.itemId]?.heldBy], where).toEqual([null, null]);
       else if (target.kind === "pickUp") expect(p.heldItem, where).toBe(target.itemId);
     }
+  });
+});
+
+describe("stations disabled by fire (#226)", () => {
+  it("does not offer the coal dispenser while a fire burns beside it, like the room", () => {
+    const dispenser = train.stations.find((st) => st.kind === "coalDispenser")!;
+    const fire = { id: "f", kind: "fire" as const, car: dispenser.car, spotId: "x", position: { x: dispenser.position.x + 10, y: dispenser.position.y }, age: 0, progress: 0, countdown: null };
+    const s = solo(near(dispenser.position), { hazards: { f: fire } });
+    expect(actionTarget(s, "p1", world)?.kind).not.toBe("takeCoal");
+    expect(Object.values(useRunAction(s, "p1", train).items).some((i) => i.kind === "coal")).toBe(false);
   });
 });
