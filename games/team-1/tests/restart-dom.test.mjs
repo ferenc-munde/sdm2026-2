@@ -60,8 +60,10 @@ try {
   await waitFor(() => app.querySelector("#outcome-overlay").hidden === true, "the reset result overlay");
   const restartedCondition = Number.parseInt(app.querySelector("#condition-value").textContent, 10);
   assert.ok(restartedCondition < 100 && restartedCondition > 80, "the restarted train recovers to near-full condition");
-  assert.equal(app.querySelector("#repair-count").textContent, "0 / 3");
-  assert.ok([...app.querySelectorAll("#task-list .task-row")].every((row) => row.querySelector(".task-track > span").style.width === "0%"));
+  assert.equal(app.querySelector("#repair-count").textContent, `0 / ${config.taskCount}`);
+  const restartedTasks = [...app.querySelectorAll("#task-list .task-row")];
+  assert.equal(restartedTasks.length, config.taskCount, "the restarted run restores the configured repair list");
+  assert.ok(restartedTasks.every((row) => row.querySelector(".task-track > span").style.width === "0%"));
   console.log("PASS returning to crew and restarting resets the authoritative run");
 } finally {
   browser.dispatchEvent(new browser.Event("pagehide"));
