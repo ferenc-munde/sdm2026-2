@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Client } from "@colyseus/sdk";
 import { type } from "@colyseus/schema";
+import { Room } from "colyseus";
 import { z } from "zod";
 import { MESSAGES } from "@sdm/core/shared";
 import { hostRoom, joinRoomByCode } from "@sdm/core/client";
@@ -10,6 +11,13 @@ import { startTestServer, type TestServer } from "../src/testing";
 
 class CounterState extends BaseState {
   @type("number") total = 0;
+}
+
+class MatchmakingRoom extends Room {
+  onCreate(_options: { teamSize: number }) {
+    this.maxClients = 4;
+    this.setState(new CounterState());
+  }
 }
 
 const InputSchema = z.object({ add: z.number().int().min(0).max(10) });
@@ -89,6 +97,30 @@ describe("@sdm/host", () => {
     });
     expect(unknown.status).toBe(404);
     await room.leave();
+  });
+
+  it("filters joinOrCreate rooms by registered options", async () => {
+    running = await startTestServer({
+      gameId: "matchmaking",
+      config,
+      env: "local",
+      rooms: {
+        lobby: {
+          room: () => MatchmakingRoom,
+          filterBy: ["teamSize"],
+          sortBy: { createdAt: 1 },
+        },
+      },
+    });
+
+    const client = new Client(running.url.replace("http", "ws"));
+    const smallCrew = await client.joinOrCreate("lobby", { teamSize: 2 });
+    const largeCrew = await client.joinOrCreate("lobby", { teamSize: 3 });
+    const anotherSmallCrew = await client.joinOrCreate("lobby", { teamSize: 2 });
+
+    expect(largeCrew.roomId).not.toBe(smallCrew.roomId);
+    expect(anotherSmallCrew.roomId).toBe(smallCrew.roomId);
+    await Promise.all([smallCrew.leave(), largeCrew.leave(), anotherSmallCrew.leave()]);
   });
 
   it("applies validated inputs on the server and ignores repeated sequence numbers", async () => {
