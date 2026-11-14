@@ -1,4 +1,4 @@
-import { createTrainScene } from "./scene";
+import { createTrainScene, type SceneTaskMarker } from "./scene";
 import { createHud, type HudTask, type HudJourney } from "./hud";
 import { createLocalStateModel, type GameSession } from "./stateModel.ts";
 import { hostGame, joinGame, serverAddress, type NetSession } from "./net.ts";
@@ -8,6 +8,8 @@ import { TRAIN_CARS } from "./train-map";
 import { createInputAdapter } from "./input.ts";
 import { mountLobby } from "./lobby";
 import { mountGameRules } from "./rules";
+import { openTaskModal, closeTaskModal, showStationPrompt, showTaskToast, type OpenTask } from "./task-modal";
+import { playAmbient, stopAmbient, taskSpawnPing, unlockAudio } from "./audio";
 import "./hud.css";
 import "./styles.css";
 
@@ -51,6 +53,53 @@ let demoSpeed = 1;
 let demoPaused = false;
 const isPreview = () => developerTools && mode.value === "preview";
 
+// --- Tasks: station prompts, spawn noise, minigames -------------------------
+const TASK_RANGE = 30; // map units between the player and a task station
+const stationsById = new Map<string, { x: number; y: number }>();
+for (const car of TRAIN_CARS) {
+  for (const station of car.stations) stationsById.set(station.id, { x: station.x, y: station.y });
+}
+let knownTaskIds = new Set<string>();
+let promptTaskId: string | undefined;
+
+function nearestTaskInTaskRange(): OpenTask | undefined {
+  const state = session.state;
+  const me = state.players.get(session.playerId);
+  if (!me) return undefined;
+  let best: OpenTask | undefined;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const [id, task] of state.tasks) {
+    const station = stationsById.get(task.stationId);
+    if (!station) continue;
+    const distance = Math.hypot(station.x - me.x, station.y - me.y);
+    if (distance <= TASK_RANGE && distance < bestDistance) {
+      bestDistance = distance;
+      best = { id, title: task.title, type: task.type, minigame: task.minigame, current: task.current, target: task.target };
+    }
+  }
+  return best;
+}
+
+function openTask(task: OpenTask): void {
+  unlockAudio();
+  playAmbient(task.type);
+  openTaskModal(task, (amount) => {
+    session.send({ type: "progress", taskId: task.id, amount });
+  }, { onClosed: () => stopAmbient() });
+}
+
+/** New task ids since the last update → spawn ping + toast ("the noise"). */
+function watchTaskNoise(liveTasks: ReadonlyMap<string, { title: string }>): void {
+  for (const [id, task] of liveTasks) {
+    if (!knownTaskIds.has(id)) {
+      taskSpawnPing();
+      showTaskToast(`New task: ${task.title}`);
+    }
+  }
+  knownTaskIds = new Set(liveTasks.keys());
+}
+
+
 mapSelect.addEventListener("change", () => {
   if (mapSelect.value === "follow") {
     trainScene?.followPlayer();
@@ -79,11 +128,27 @@ function update() {
     hud.updateGauges({ power: tasks[0]?.current ? 100 : 40, pressure: 35 });
     hud.updateJourney({ ...journey, speed: journey.phase === "running" && !demoPaused ? demoSpeed / 300 : 0 });
     trainScene?.setSpeed(journey.phase === "running" ? demoSpeed : 0);
+    showStationPrompt(null);
+    const demo = stationsById.get("breaker-box")!;
+    trainScene?.setTaskMarkers([{ id: "example-repair", x: demo.x, y: demo.y, type: "POWER" }]);
   } else {
     hud.updateTasks(view.tasks);
     hud.updateGauges(view.gauges);
     hud.updateJourney(view.journey);
     trainScene?.setSpeed(view.speed);
+
+    const liveTasks = new Map(Array.from(state.tasks, ([id, task]) => [id, { title: task.title }] as const));
+    watchTaskNoise(liveTasks);
+    const inRange = nearestTaskInTaskRange();
+    promptTaskId = inRange?.id;
+    showStationPrompt(inRange ? `E — ${inRange.title}` : null);
+
+    const taskMarkers: SceneTaskMarker[] = [];
+    for (const [id, task] of state.tasks) {
+      const station = stationsById.get(task.stationId);
+      if (station) taskMarkers.push({ id, x: station.x, y: station.y, type: task.type });
+    }
+    trainScene?.setTaskMarkers(taskMarkers);
   }
   // Draw players and items from the live game state every frame.
   trainScene?.setPlayers(state.players, session.playerId);
@@ -126,6 +191,23 @@ const { cleanup: cleanupInput, refreshMovement } = createInputAdapter({
   send: (input) => session.send(input),
   isEnabled: () => canControlGame,
   isPreview,
+});
+
+// E is contextual: a task station in range opens its minigame, otherwise pick up.
+// Separate from the input adapter because it drives the modal, not a room input.
+window.addEventListener("keydown", (event) => {
+  if (!canControlGame || isPreview() || event.repeat) return;
+  if (event.key.length === 1 ? event.key.toLowerCase() !== "e" : event.key !== "e") return;
+  const target = event.target;
+  if (target instanceof HTMLElement && (target.closest("input, select, textarea, button:not(.game-rules-control)") || target.isContentEditable)) return;
+  unlockAudio();
+  const task = promptTaskId ? session.state.tasks.get(promptTaskId) : undefined;
+  if (task) {
+    openTask({ id: promptTaskId!, title: task.title, type: task.type, minigame: task.minigame, current: task.current, target: task.target });
+    event.preventDefault();
+  } else {
+    session.send({ type: "pickup", itemId: "wrench" });
+  }
 });
 
 /** Swap the offline model for a seat in the game room. */
@@ -192,6 +274,7 @@ const gameRules = mountGameRules(document.body, enterPlayerFlow);
 window.addEventListener("pagehide", () => {
   cleanupInput();
   session.stop(); local.stop();
+  closeTaskModal(); stopAmbient(); showStationPrompt(null);
   lobby?.destroy(); trainScene?.destroy(); hud.destroy();
   gameRules.destroy();
 });

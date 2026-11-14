@@ -13,7 +13,7 @@ export function localStateToHud(state: LastTrainState, tickRate: number) {
   const phase: HudJourney["phase"] = state.phase === "running" || state.phase === "won" || state.phase === "lost"
     ? state.phase : "lobby";
   return {
-    tasks: Array.from(state.tasks, ([id, task]) => ({ id, title: task.title, current: task.current, target: task.target })),
+    tasks: Array.from(state.tasks, ([id, task]) => ({ id, title: task.title, type: task.type, current: task.current, target: task.target })),
     gauges: { power: state.power, pressure: state.pressure },
     journey: { distance: state.journeyDistance, remainingSeconds: Math.max(0, totalSeconds - elapsed), totalSeconds, phase,
       speed: state.paused || phase !== "running" ? 0 : state.speed },

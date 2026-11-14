@@ -19,6 +19,7 @@ export class Task extends Schema {
 	@type("uint8") target: number = 1;
 	@type("string") type: string = "POWER";
 	@type("string") minigame: string = "wires";
+	@type("string") stationId: string = "";
 	@type("uint8") stepCount: number = 1;
 	@type("uint8") stepIndex: number = 0;
 }
@@ -60,6 +61,7 @@ export class LastTrainState extends BaseState {
 	@type("float32") power: number = 100;
 	@type("float32") pressure: number = 0;
 	@type("boolean") endgameUnlocked: boolean = false;
+	@type("uint16") completedCount: number = 0;
 	@type({ map: Player }) players = new MapSchema<Player>();
 	@type({ map: Task }) tasks = new MapSchema<Task>();
 	@type({ map: Hazard }) hazards = new MapSchema<Hazard>();

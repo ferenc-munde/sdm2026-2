@@ -1,10 +1,18 @@
 import * as THREE from "three";
-import { MAP_HEIGHT, MAP_WIDTH, PLAYER_RADIUS } from "../shared/map.ts";
+import { MAP_HEIGHT, MAP_WIDTH } from "../shared/map.ts";
 import type { Item, Player } from "../shared/state.ts";
 import { createPlayerVisuals } from "./player-visuals";
 import { createItemVisuals } from "./item-visuals";
-import { TRAIN_CARS, TRAIN_PASSAGES } from "./train-map";
+import { TRAIN_CARS, TRAIN_PASSAGES, taskColor } from "./train-map";
 import { followFrame, localCameraTarget, smoothCameraY, type CameraTarget } from "./camera-framing";
+
+/** One active task: a pulsing light column and floor ring at its station. */
+export interface SceneTaskMarker {
+  id: string;
+  x: number;
+  y: number;
+  type: string;
+}
 
 /** One colour per seat, in the order players joined (same order as the lobby avatars). */
 export const PLAYER_COLORS = ["#62cdd3", "#e46c63", "#e0bc4e", "#6f9bea"] as const;
@@ -121,6 +129,23 @@ export function createTrainScene(container: HTMLElement) {
   scene.add(itemLayer);
   const playerVisuals = createPlayerVisuals(playerLayer);
   const itemVisuals = createItemVisuals(itemLayer, (id) => playerVisuals.getCarryAnchor(id));
+  // Task beacons: a floor ring under the station panel plus a translucent light
+  // column above it, tinted by task type and pulsing so the eye finds them.
+  const ringGeometry = new THREE.RingGeometry(20, 26, 32);
+  const beamGeometry = new THREE.PlaneGeometry(30, 84);
+  interface TaskBeacon {
+    group: THREE.Group;
+    ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+    beam: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  }
+  const taskMarkers = new Map<string, TaskBeacon>();
+  function removeTaskMarker(id: string) {
+    const beacon = taskMarkers.get(id);
+    if (!beacon) return;
+    scene.remove(beacon.group);
+    beacon.ring.material.dispose(); beacon.beam.material.dispose();
+    taskMarkers.delete(id);
+  }
   const renderer = new THREE.WebGLRenderer({ antialias: false });
   renderer.autoClear = false;
   renderer.domElement.setAttribute("aria-label", "2D top-down train with five carriages and forest tracks");
@@ -184,6 +209,13 @@ export function createTrainScene(container: HTMLElement) {
     if (!paused && !document.hidden) {
       landscapeTexture.offset.y = (landscapeTexture.offset.y + dt * speed * 0.12) % 1;
     }
+    // Beacon pulse: all task lights breathe together, like alarm lamps.
+    const pulse = 0.5 + 0.5 * Math.sin(time / 250);
+    for (const beacon of taskMarkers.values()) {
+      beacon.ring.scale.setScalar(1 + 0.2 * pulse);
+      beacon.ring.material.opacity = 0.4 + 0.4 * pulse;
+      beacon.beam.material.opacity = 0.14 + 0.16 * pulse;
+    }
     render();
   });
   return {
@@ -216,12 +248,39 @@ export function createTrainScene(container: HTMLElement) {
     setItems(items: Iterable<[string, Item]>) {
       itemVisuals.update(items);
     },
+    /** Light the stations that hold an active task; an unlit station has no task. */
+    setTaskMarkers(markers: Iterable<SceneTaskMarker>) {
+      const seen = new Set<string>();
+      for (const marker of markers) {
+        seen.add(marker.id);
+        let beacon = taskMarkers.get(marker.id);
+        if (!beacon) {
+          const color = taskColor(marker.type);
+          const ringMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, depthWrite: false });
+          const beamMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending });
+          const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+          const beam = new THREE.Mesh(beamGeometry, beamMaterial);
+          const group = new THREE.Group();
+          group.add(ring, beam);
+          beacon = { group, ring, beam };
+          taskMarkers.set(marker.id, beacon);
+          scene.add(group);
+          // Stations are given at their panel's top-left corner; centre on the panel.
+          beacon.group.position.set(marker.x + 29 - MAP_WIDTH / 2, MAP_HEIGHT / 2 - (marker.y + 15), 0);
+          beacon.ring.position.z = 0.12;
+          beacon.beam.position.set(0, 42, 0.14);
+        }
+      }
+      for (const id of [...taskMarkers.keys()]) if (!seen.has(id)) removeTaskMarker(id);
+    },
     destroy() {
     renderer.setAnimationLoop(null);
     viewportObserver.disconnect();
     hudObserver.disconnect();
     playerVisuals.destroy();
     itemVisuals.destroy();
+    for (const id of [...taskMarkers.keys()]) removeTaskMarker(id);
+    ringGeometry.dispose(); beamGeometry.dispose();
     window.removeEventListener("resize", resize); geometry.dispose(); material.dispose();
     landscapeTexture.dispose(); landscapeMaterial.dispose();
     texture.dispose(); renderer.dispose(); renderer.domElement.remove();

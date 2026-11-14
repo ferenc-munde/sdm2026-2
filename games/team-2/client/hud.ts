@@ -1,4 +1,5 @@
 import { journeyView } from "./journey-view";
+import { taskColor } from "./train-map";
 // Only the latest HUD may own the global safe-area value.
 let hudOffsetOwner: symbol | undefined;
 
@@ -7,6 +8,8 @@ export interface HudTask {
   title: string;
   current: number;
   target: number;
+  /** Task type; tints the row chip to match the station beacon colour. */
+  type?: string;
 }
 
 export interface HudJourney {
@@ -157,7 +160,10 @@ export function createHud(container: HTMLElement) {
         }
         const done = task.current >= task.target;
         row.classList.toggle("is-complete", done);
-        row.textContent = `${done ? "✓" : "○"} ${task.title} — ${task.current}/${task.target}`;
+        row.textContent = "";
+        const chip = document.createElement("span");
+        chip.style.cssText = `display:inline-block;width:8px;height:8px;border-radius:4px;margin-right:6px;background:${taskColor(task.type ?? "")}`;
+        row.append(chip, document.createTextNode(`${done ? "✓" : "○"} ${task.title} — ${task.current}/${task.target}`));
       }
       for (const [id, row] of rows) {
         if (!seen.has(id)) {
