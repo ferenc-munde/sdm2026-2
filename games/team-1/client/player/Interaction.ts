@@ -24,7 +24,6 @@ export class InteractionSystem {
     this.interactionRange = interactionRange;
 
     // Listen for E key
-    window.addEventListener('keydown', this.onKeyDown.bind(this));
     window.addEventListener('keydown', this.handleKeyDown);
   }
 
@@ -144,7 +143,6 @@ export class InteractionSystem {
    * Cleanup
    */
   destroy(): void {
-    window.removeEventListener('keydown', this.onKeyDown.bind(this));
     window.removeEventListener('keydown', this.handleKeyDown);
     this.targets.clear();
     this.callbacks.clear();
