@@ -39,6 +39,8 @@
 .train-ghost { color: #c3d2df; font-size: 36px; }
 .train-station { position: absolute; right: -16px; top: -8px; }
 .train-journey small { display: block; color: #bdc9d2; }
+.journey-heading { color: #f5d190; font-weight: 700; margin-bottom: 8px; }
+.journey-stats { margin: 10px 0; font-variant-numeric: tabular-nums; }
 .train-journey.is-behind { border-color: #f37566; }
 .train-journey.is-behind small { color: #ffb0a6; }
 .train-result {
