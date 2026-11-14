@@ -2,22 +2,24 @@
 
 For the game teams, the platform team and their AI coding agents. It says how a deployed game is put together, what each game's client has to do so it finds its server, and where each game stands. Checked on 2026-11-14 against `development`.
 
-## How a deployed game runs
+## How production deploys the games
 
-One Railway service runs one game. `railway.json` at the repository root does two things with the `GAME` variable (for example `team-3`):
+The production Railway service builds all game clients and starts the gateway. `railway.json` at the repository root runs:
 
 | Step | Command | Result |
 |---|---|---|
-| Build | `pnpm --filter "./games/$GAME" run build` | Vite builds the game's client into `dist/` (or `client/dist/`) |
-| Start | `pnpm --filter "./games/$GAME" run server` | `startGameServer()` from `@sdm/host` starts Colyseus and Express on `$PORT` |
+| Build | `pnpm --filter "./games/*" --if-present run build --base=./` | Vite builds each game's client with relative asset paths |
+| Start | `pnpm --filter ./server/gateway run start:all` | The gateway starts each game server on an internal port and routes requests by game path |
 
-The host then serves **everything from one address**:
+The public gateway serves the games at:
 
-- the built client (`index.html` and its assets), from `$CLIENT_DIR`, or `./dist`, or `./client/dist`, whichever holds an `index.html`;
-- `GET /health`, `POST /api/rooms/join`, replays, bug reports, stats;
-- the game rooms, over WebSocket.
+- Team 1: <https://sdm2026.online/team-1/>
+- Team 2: <https://sdm2026.online/team-2/>
+- Team 3: <https://sdm2026.online/team-3/>
 
-So in a deployment **the page and the server share one address and one port**. That is different from local development, where Vite serves the page on `:5173` and the game server listens on `:2567`.
+The gateway health check is <https://sdm2026.online/health>. Each game server's health endpoint is available through the gateway at `https://sdm2026.online/team-N/health`; it reports the game's environment and commit SHA. The Railway-generated gateway address <https://sdm2026-2-production.up.railway.app/> is a fallback.
+
+In production, a game's page and its server share the same origin and path prefix. That is different from local development, where Vite serves the page on `:5173` and the game server listens on `:2567`.
 
 ## The rule for every client
 
@@ -75,12 +77,11 @@ In the game's folder:
 
 On Railway (platform team only, see the repository rules):
 
-5. One service per game, with `GAME` set to the game's folder name. Without it the build stops on purpose with "set the GAME variable".
+5. The monorepo gateway service builds and starts the games using the root `railway.json`; it serves each one under `/team-N/`.
 6. `APP_ENV=production`. Without it the server reports `env: "local"` and debug commands stay switched on.
-7. `GET <address>/health` shows the expected commit in `sha`.
+7. Check `GET https://sdm2026.online/health` for gateway health, and `GET https://sdm2026.online/team-N/health` for the game's health and expected commit SHA.
 
 ## Not built yet
 
-- **One address for all games.** There is no gateway, and each game's page loads its assets from the root (`/assets/...`), so a game does not work under `/team-N/` yet. For now each game gets its own Railway address. To serve a game under a path later, its Vite config needs `base: "./"` so the asset links become relative; `serverAddress` already handles the path.
 - **Persistent replays and bug reports.** They are kept in memory and are lost when the service restarts.
 - **Deploying from `development`.** Railway deploys `main`, so a fix reaches the deployed game only after it has been promoted: `Team_N_Feature` → `development` → `staging` → `main`.
