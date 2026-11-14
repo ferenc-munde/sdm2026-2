@@ -74,7 +74,10 @@ export const HAZARD_INTERVAL_BY_PLAYERS: Readonly<Record<number, number>> = {
 export const COURSE_WARNING_SECONDS = 5; // from #28
 export const COURSE_HOLD_WINDOW_SECONDS = 2; // from #28 (hold in the last 2 seconds)
 export const COURSE_HULL_DAMAGE = 12; // from #28
-export const COURSE_IMPULSE_SPEED = 450; // idea document §3
+// Knockback travel is v² / (2 × THROW_FRICTION) = 260² / 800 ≈ 84.5 units: about 13 short of the
+// wall from the centre of a car (110 − 12 = 98), so a player near the middle is pushed hard but
+// not stunned (#335). 280 travels exactly 98 and still touches the wall.
+export const COURSE_IMPULSE_SPEED = 260;
 export const COURSE_STUN_SECONDS = 1.5; // idea document §3
 
 // --- Dash (#228): Shift or F with empty hands ---
