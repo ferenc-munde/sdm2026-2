@@ -14,7 +14,7 @@ export const CONTROL_HINTS = "Move: WASD / arrows · Tap E: pick up / drop · Ho
 export function createHelp(container: HTMLElement, beforeOpen: () => void = () => {}) {
   const open = document.createElement("button");
   open.type = "button"; open.textContent = "How to play";
-  open.style.cssText = "position:fixed;right:16px;top:56px;z-index:40;padding:8px;border-radius:6px";
+  open.className = "help-open";
   const dialog = document.createElement("dialog");
   dialog.setAttribute("aria-labelledby", "how-to-play-title");
   dialog.style.cssText = "max-width:540px;width:calc(100vw - 72px);max-height:80vh;overflow:auto;padding:24px;border-radius:12px;background:#17171f;color:#fff;border:1px solid #555";
