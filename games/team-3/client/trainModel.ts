@@ -11,14 +11,16 @@ import {
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
+  PointLight,
   SphereGeometry,
   SRGBColorSpace,
+  TorusGeometry,
   type Material,
   type Object3D,
   type Texture,
 } from "three";
 import type { TrainMap } from "../shared/map/map.ts";
-import { PALETTE, mat, ownMat } from "./style.ts";
+import { LIGHTING, PALETTE, mat, ownMat } from "./style.ts";
 
 /** How far the locomotive reaches in front of the first car, so the camera can frame it. */
 export const LOCOMOTIVE_LENGTH = 170;
@@ -189,6 +191,28 @@ export function buildTrainBody(map: TrainMap): TrainBody {
   for (const dx of [-45, 0, 45]) {
     for (const side of [-1, 1]) wheels.push(wheel(loco, cx + 15 + dx, first.y + side * (first.depth / 2 - 30), dx === 0 ? 20 : 16));
   }
+
+  // Locomotive details (visual polish): a red buffer beam with two buffers, brass handrails along
+  // the boiler, a brass ring on the smokebox door, a whistle by the dome, a lamp housing, and a
+  // warm headlamp glow. Shared geometry; drawing only.
+  const front = nose - LOCOMOTIVE_LENGTH;
+  add(loco, new BoxGeometry(6, 14, first.depth - 70), paint, front + 2, 10, first.y, "bufferBeam");
+  const bufferGeometry = new CylinderGeometry(4, 4, 10, 10);
+  for (const side of [-1, 1]) {
+    const buffer = add(loco, bufferGeometry, iron, front - 4, 10, first.y + side * (first.depth / 2 - 60), "buffer");
+    buffer.rotation.z = Math.PI / 2;
+    const rail = add(loco, new CylinderGeometry(1.2, 1.2, LOCOMOTIVE_LENGTH - 60, 6), brass, cx + 10, 58, first.y + side * 41, "handrail");
+    rail.rotation.z = Math.PI / 2;
+  }
+  const doorRing = add(loco, new TorusGeometry(30, 2.2, 6, 20), brass, front + 20, 40, first.y, "smokeboxRing");
+  doorRing.rotation.y = Math.PI / 2;
+  add(loco, new CylinderGeometry(2.2, 2.6, 12, 8), brass, cx + 44, 88, first.y, "whistle");
+  add(loco, new BoxGeometry(10, 14, 14), iron, front + 22, 60, first.y, "lampHousing");
+  const headlamp = new PointLight(LIGHTING.headlamp.color, LIGHTING.headlamp.intensity, LIGHTING.headlamp.distance, 2);
+  headlamp.name = "headlamp";
+  headlamp.position.set(front + 8, 60, first.y);
+  headlamp.castShadow = false;
+  loco.add(headlamp);
 
   return { group, wheels, chimneyTop: { x: chimneyX, y: 120, z: first.y } };
 }
