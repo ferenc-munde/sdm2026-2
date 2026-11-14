@@ -92,7 +92,9 @@ team-N/<issue>-<description>  →  Team_N_Feature  →  development  →  stagin
 - Test everything: say in the PR how you tested it. Once CI exists, all checks must be green.
 - Resolve every review comment before merging.
 - The work branch is deleted automatically when its pull request is merged (the repository setting "Automatically delete head branches" is on). Do not delete it by hand, and do not reuse it: start the next issue from a fresh branch.
-- Long-lived branches (`main`, `staging`, `development`, `Team_N_Feature`) are never deleted. They must stay protected so that promotion and sync PRs, which use them as their head branch, cannot remove them.
+- Long-lived branches (`main`, `staging`, `development`, `Team_N_Feature`) are never deleted. Two repository rulesets protect them, so the automatic branch deletion cannot remove them after a promotion or sync PR, which uses them as its head branch:
+  - `main: only instructors promote`: on `main`, changes only through a pull request merged by the repository admin (an instructor); no deletion, no force push.
+  - `long-lived branches`: on `development`, `staging` and `Team_*_Feature`, changes only through a pull request; no deletion, no force push.
 
 ## Deployment
 
