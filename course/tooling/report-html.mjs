@@ -12,11 +12,12 @@ function esc(value) {
     .replace(/"/g, "&quot;");
 }
 
+const fmt = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 const pct = (share) => `${Math.round(share * 100)}%`;
 const num = (n) => n.toLocaleString("en-US").replace(/,/g, " ");
 const anchor = (team) => `team-${team.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase()}`;
 
-function teamSection({ team, linesAdded, prsMerged, members }) {
+function teamSection({ team, quality, linesAdded, prsMerged, members }) {
   const color = (i) => `var(${SERIES[i % SERIES.length]})`;
   const bar = linesAdded > 0
     ? members
@@ -33,17 +34,17 @@ function teamSection({ team, linesAdded, prsMerged, members }) {
       const s = m.score;
       return `
       <article class="student">
-        <div class="who"><b>${esc(m.name || m.login)}</b><small>@${esc(m.login)}${m.areas.length ? ` · ${esc(m.areas.slice(0, 2).join(", "))}` : ""}</small></div>
+        <div class="who"><b>${esc(m.name || m.login)}</b><small>@${esc(m.login)}${m.onTime === false ? ` · <span class="late">late: ×1.2 effort</span>` : ""}${m.sharedWith?.length ? ` · <span class="shared" title="${esc(m.sharedWith.map((g) => g.reason).join(" "))}">shared credit with @${esc(m.sharedWith.flatMap((g) => g.with).join(", @"))}</span>` : ""}${m.areas.length ? ` · ${esc(m.areas.slice(0, 2).join(", "))}` : ""}</small></div>
         <div class="share">
-          <div class="row"><span class="pct num">${pct(m.share)}</span><span class="num lines">${num(m.linesAdded)} lines</span></div>
+          <div class="row"><span class="pct num">${pct(m.share)}</span><span class="num lines">${num(Math.round(m.linesAdded))} lines</span></div>
           <div class="track"><span style="width:${(m.share * 100).toFixed(2)}%;background:${color(i)}"></span></div>
-          <div class="stats"><span><b class="num">${m.prsMerged}</b> ${m.prsMerged === 1 ? "PR" : "PRs"} merged</span><span><b class="num">${m.issuesAssignedClosed}/${m.issuesAssigned}</b> issues closed</span><span><b class="num">${m.reviewsGiven}</b> ${m.reviewsGiven === 1 ? "review" : "reviews"}</span></div>
+          <div class="stats"><span><b class="num">${fmt(m.prsMerged)}</b> ${m.prsMerged === 1 ? "PR" : "PRs"} merged</span><span><b class="num">${fmt(m.issuesAssignedClosed)}/${fmt(m.issuesAssigned)}</b> issues closed</span><span><b class="num">${fmt(m.reviewsGiven)}</b> ${m.reviewsGiven === 1 ? "review" : "reviews"}</span></div>
         </div>
         <div class="summary"><p>${esc(m.summary)}</p>${m.ruleProblems?.length
           ? `<p class="rules" title="${esc(m.ruleProblems.join("\n"))}">${m.ruleProblems.length} rule ${m.ruleProblems.length === 1 ? "problem" : "problems"}: ${esc(m.ruleProblems.slice(0, 3).join("; "))}${m.ruleProblems.length > 3 ? " …" : ""}</p>`
           : ""}</div>
-        <div class="grade" title="Delivery ${s.delivery}/4 · Process ${s.process}/3 · Collaboration ${s.collaboration}/3">
-          <span class="chip g${s.grade}">${s.grade}</span><small>${s.points}/10 points<br>${GRADE_WORDS[s.grade]}</small>
+        <div class="grade" title="Activity ${s.points}/10 (Delivery ${s.delivery}/4 · Process ${s.process}/3 · Collaboration ${s.collaboration}/3)${m.onTime === false ? ", late arrival: thresholds ×1.2" : ""} · Game quality ${s.quality ?? "not given yet"}${s.quality === null ? "" : "/10"} · Total = 75% activity + 25% quality">
+          <span class="chip g${s.grade}">${s.grade}</span><small>${s.total}/10${s.provisional ? " *" : ""}<br>${s.provisional ? "provisional" : GRADE_WORDS[s.grade]}</small>
         </div>
       </article>`;
     })
@@ -52,7 +53,7 @@ function teamSection({ team, linesAdded, prsMerged, members }) {
   <section class="sheet" id="${anchor(team)}" aria-labelledby="${anchor(team)}-title">
     <div class="teamhead">
       <h2 id="${anchor(team)}-title">${esc(team)}</h2>
-      <span class="teammeta"><span class="num">${num(linesAdded)}</span> lines in <span class="num">${prsMerged}</span> merged pull requests · ${members.length} students</span>
+      <span class="teammeta"><span class="num">${num(linesAdded)}</span> lines in <span class="num">${prsMerged}</span> merged pull requests · ${members.length} students${team.startsWith("(") ? "" : ` · game quality ${typeof quality === "number" ? `<span class="num">${quality}</span>/10` : "not given yet"}`}</span>
     </div>
     <div class="sharebar" role="img" aria-label="${esc(members.map((m) => `${m.name || m.login} ${pct(m.share)}`).join(", "))}">${bar}</div>
     <div class="legend">${legend}</div>
@@ -140,6 +141,8 @@ nav a:hover, nav a:focus-visible { border-color: var(--accent); outline: none; }
 .summary { font-size: 0.93rem; min-width: 0; display: grid; gap: 4px; }
 .summary p { margin: 0; }
 .summary .rules { font-size: 0.8rem; color: var(--g2); }
+.who .late { color: var(--g2); font-weight: 600; }
+.who .shared { color: var(--accent); font-weight: 600; cursor: help; }
 .grade { display: grid; justify-items: center; gap: 4px; cursor: help; }
 .chip { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; color: var(--chip-fg); }
 .grade small { font-size: 0.72rem; color: var(--muted); text-align: center; line-height: 1.25; }
@@ -184,10 +187,15 @@ footer { color: var(--muted); font-size: 0.82rem; }
       <table aria-label="Scoring">
         <thead><tr><th>Area</th><th>Points</th></tr></thead>
         <tbody>
+          <tr><td><b>Activity</b> (75% of the total), 0–10:</td><td></td></tr>
           <tr><td>Delivery: merged PRs (5+ / 2–4 / 1 / only open)</td><td class="num">4 / 3 / 2 / 1</td></tr>
           <tr><td>Process: PRs follow the rules · issues follow the rules · assigned issue closed</td><td class="num">+1 each</td></tr>
           <tr><td>Collaboration: reviews (5+ / 1–4) · at least half an equal share</td><td class="num">2 / 1 · +1</td></tr>
-          <tr><td>Points → grade: 8–10 / 5–7 / 3–4 / 1–2 / 0</td><td class="num">5 / 4 / 3 / 2 / 1</td></tr>
+          <tr><td>Late arrival: every count above ×1.2, rounded up (merged PRs 6+ / 3–5 / 2 / 1 or open, reviews 6+ / 2–5, 60% of an equal share, 2 of each Process item)</td><td class="num">×1.2 effort</td></tr>
+          <tr><td>Shared credit: where two students worked from one account, their work in that window is split evenly (counts can be fractions)</td><td class="num">50 / 50</td></tr>
+          <tr><td><b>Game quality</b> (25% of the total): the game runs and meets the requirements, given by the instructors per team</td><td class="num">0–10</td></tr>
+          <tr><td>Total = 0.75 × activity + 0.25 × quality. Without a quality score yet: activity alone, marked * (provisional)</td><td class="num">0–10</td></tr>
+          <tr><td>Total → grade: 8–10 / 5–7.9 / 3–4.9 / 1–2.9 / below 1</td><td class="num">5 / 4 / 3 / 2 / 1</td></tr>
         </tbody>
       </table>
     </div>

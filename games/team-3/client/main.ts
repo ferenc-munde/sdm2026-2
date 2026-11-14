@@ -17,7 +17,7 @@ import { CAR_LENGTH, carCentreX } from "../shared/map/map.ts";
 import { buildTrainScene, fitCameraToMap, type RenderHazard, type RenderItem } from "./trainScene.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import { createHudBars } from "./hud.ts";
-import { hudView } from "./hudModel.ts";
+import { hudView, shouldWarnHull } from "./hudModel.ts";
 import { createKeyboard, isEditableTarget, isIdle } from "./keyboard.ts";
 import { createLobby } from "./lobby.ts";
 import { buildPlatformScene, fitCameraToPlatform } from "./platformScene.ts";
@@ -198,12 +198,14 @@ readout.textContent = describeInput(keyboard.current());
 // the ~3 minute demo run to finish.
 let demoPhase: Phase = "playing";
 let demoStart = 0;
+let demoHullDangerShown = false;
 
 const endScreen = createEndScreen(document.body, {
   onPlayAgain: () => {
     if (connection) return sendToRoom({ type: "playAgain" });
     demoStart = performance.now();
     demoPhase = "playing";
+    demoHullDangerShown = false;
     endScreen.update("playing");
     help.update("playing");
   },
@@ -353,6 +355,7 @@ const waiting = createWaitingRoom(document.body, {
     demoStart = performance.now();
     previousDemoState = null;
     demoPhase = "playing";
+    demoHullDangerShown = false;
     endScreen.update("playing");
     help.update("playing");
     hud.root.hidden = false;
@@ -375,6 +378,7 @@ const waiting = createWaitingRoom(document.body, {
 
 // A short line for the room's refusals (not host, crew incomplete, …).
 const toast = document.createElement("div");
+toast.className = "toast";
 toast.setAttribute("role", "status");
 toast.style.cssText =
   "position:fixed;left:50%;top:96px;transform:translateX(-50%);padding:8px 14px;border-radius:8px;" +
@@ -390,6 +394,7 @@ function showToast(text: string): void {
 }
 
 let liveState: GameState | null = null;
+let hullDangerShown = false;
 const playerSmoother = createSmoother();
 const itemSmoother = createSmoother();
 const positionsOf = (records: Record<string, { position: { x: number; y: number } }>) =>
@@ -400,6 +405,7 @@ function enterLive(next: RoomConnection): void {
   connection = next;
   liveState = null;
   lastNotice = 0;
+  hullDangerShown = false;
   next.onClosed(() => backToMenu("The connection to the room was lost."));
   lobby.hide();
   hud.root.hidden = true;
@@ -490,11 +496,18 @@ function drawLive(delta: number, time: number): void {
     localActionHighlight(state, live.me, { train: train.map, platform: platformScene.map }),
     time / 1000,
   );
-  hud.update(hudView(state.journey));
+  if (phaseChanged && state.phase === "playing") hullDangerShown = false;
+  hud.update(hudView(state.journey, Object.values(state.hazards)));
+  if (state.phase === "playing" && shouldWarnHull(state.journey.hull, hullDangerShown)) {
+    hullDangerShown = true;
+    showToast("Hull critical: fix the hazards!");
+  }
   scenery.update(delta, state.phase === "playing" ? state.journey.speedFactor : 0);
   if (liveState && liveState.phase !== "lobby") {
     for (const name of eventsBetween(liveState, state)) sound.play(name);
     if (fixedHazardsBetween(liveState, state).length > 0) showToast("Fixed!");
+  } else if (liveState?.phase === "lobby" && state.phase === "playing") {
+    sound.play("depart"); // the countdown just ended (#401)
   }
   courseWarning.update(state);
   conductor.update(state);
@@ -561,7 +574,11 @@ const walk = (time: number): void => {
     const speedFactor = fuel <= 0 ? 0 : fuel <= LOW_FUEL_THRESHOLD ? 0.5 : 1;
     const progress = Math.min(1, seconds / 180);
     const journey = { fuel, hull, distance: progress * WIN_DISTANCE, speedFactor };
-    hud.update(hudView(journey));
+    hud.update(hudView(journey, hazards));
+    if (shouldWarnHull(hull, demoHullDangerShown)) {
+      demoHullDangerShown = true;
+      showToast("Hull critical: fix the hazards!");
+    }
     scenery.update(delta, speedFactor);
     train.updateMotion(delta, speedFactor);
 
