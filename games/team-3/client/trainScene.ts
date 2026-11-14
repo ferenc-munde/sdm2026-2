@@ -33,6 +33,8 @@ import type { ActionHighlight } from "./actionHighlight.ts";
 import {
   advanceWalk,
   crewPose,
+  easeAngle,
+  headingFor,
   smoothSpeed,
   speedBetween,
   wheelAngle,
@@ -322,6 +324,7 @@ function buildPlayerGroup(
   }
 
   placePlayer(group, player);
+  group.rotation.y = headingFor(player.facing); // snap on spawn; later turns ease
   // Walk-cycle state (#294), kept on the group so a rebuilt figure starts fresh.
   group.userData.motion = { lastX: player.position.x, lastZ: player.position.y, speed: 0, phase: 0, seconds: 0 };
   return group;
@@ -346,12 +349,14 @@ function poseFigure(group: Object3D, pose: CrewPose): void {
   }
 }
 
-/** Moves a player figure to its position and turns it to face its walking direction. */
+/**
+ * Moves a player figure to its position and stores the heading it should turn toward. The turn is
+ * eased in `updateMotion` (#355); a newly built figure snaps to it so it never spins on spawn.
+ */
 function placePlayer(group: Object3D, player: RenderPlayer): void {
   group.position.set(player.position.x, 0, player.position.y);
   // Local +x points along `facing`; a player with no direction faces +x, as a newly built one does.
-  const facing = player.facing;
-  group.rotation.y = facing && (facing.dx !== 0 || facing.dy !== 0) ? -Math.atan2(facing.dy, facing.dx) : 0;
+  group.userData.targetHeading = headingFor(player.facing);
 }
 
 function buildHazardGroup(hazard: RenderHazard): Group {
@@ -714,6 +719,11 @@ export function buildTrainScene(
       motion.lastZ = group.position.z;
       motion.phase = advanceWalk(motion.phase, motion.speed, dt);
       if (Number.isFinite(dt) && dt > 0) motion.seconds += dt;
+
+      // Turn toward the latest facing the short way round (#355).
+      const targetHeading =
+        typeof group.userData.targetHeading === "number" ? group.userData.targetHeading : group.rotation.y;
+      group.rotation.y = easeAngle(group.rotation.y, targetHeading, dt);
 
       const carrying = group.children.some((child) => child.userData.kind === "heldItem");
       const interacting = interactingPlayerId !== undefined && interactingPlayerId === group.userData.playerId;

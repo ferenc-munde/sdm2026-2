@@ -3,7 +3,20 @@
 // carriage body: tall windowed walls on the far side, low walls on the near side so the camera
 // sees inside. The collision walls and floors stay exactly where the rules have them.
 
-import { BoxGeometry, CylinderGeometry, Group, Mesh, SphereGeometry, type Material, type Object3D } from "three";
+import {
+  BoxGeometry,
+  CanvasTexture,
+  CylinderGeometry,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  PlaneGeometry,
+  SphereGeometry,
+  SRGBColorSpace,
+  type Material,
+  type Object3D,
+  type Texture,
+} from "three";
 import type { TrainMap } from "../shared/map/map.ts";
 import { PALETTE, mat, ownMat } from "./style.ts";
 
@@ -48,6 +61,29 @@ export interface TrainBody {
   chimneyTop: { x: number; y: number; z: number };
 }
 
+/** A small brass number plate texture (#355); null outside a browser, where tests build the plate plain. */
+function plateTexture(number: number): Texture | null {
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 48;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  context.fillStyle = PALETTE.brass;
+  context.fillRect(0, 0, 64, 48);
+  context.strokeStyle = PALETTE.woodDark;
+  context.lineWidth = 3;
+  context.strokeRect(2, 2, 60, 44);
+  context.fillStyle = "#2b2117";
+  context.font = "bold 32px system-ui, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(String(number), 32, 26);
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  return texture;
+}
+
 export function buildTrainBody(map: TrainMap): TrainBody {
   const group = new Group();
   group.name = "trainBody";
@@ -84,6 +120,40 @@ export function buildTrainBody(map: TrainMap): TrainBody {
     add(group, new BoxGeometry(car.width + 6, 2, 28), brass, car.x, FAR_WALL_HEIGHT + 6.5, far + 8);
     // Lamp over each door end, glowing warm.
     add(group, new SphereGeometry(3.2, 8, 6), mat(PALETTE.lamp, { emissive: PALETTE.lamp, emissiveIntensity: 1.5 }), car.x, FAR_WALL_HEIGHT - 6, far + 12);
+
+    // Carriage details (#355), all decoration: a runner rug in the middle, small warm lamps
+    // between the windows, and a brass number plate near the front of the car.
+    const rug = add(
+      group,
+      new BoxGeometry(car.width * 0.52, 0.8, car.depth * 0.42),
+      paintDark,
+      car.x,
+      0.8,
+      car.y,
+      `car-rug-${car.index}`,
+    );
+    rug.userData = { kind: "trainDetail", carDetail: "rug", car: car.index };
+    rug.castShadow = false; // flat on the floor; it should not shadow the crew
+
+    const warmLamp = mat(PALETTE.lamp, { emissive: PALETTE.lamp, emissiveIntensity: 1.6 });
+    for (let x = left + 90; x < left + car.width - 40; x += 120) {
+      const lamp = add(group, new BoxGeometry(5, 9, 2.5), warmLamp, x, 32, far + 7, `car-lamp-${car.index}-${x}`);
+      lamp.userData = { kind: "trainDetail", carDetail: "lamp", car: car.index };
+      lamp.castShadow = false;
+      const bracket = add(group, new BoxGeometry(9, 2, 3), brass, x, 37.5, far + 7, `car-lamp-bracket-${car.index}-${x}`);
+      bracket.userData = { kind: "trainDetail", carDetail: "lampBracket", car: car.index };
+    }
+
+    const plate = add(group, new BoxGeometry(18, 13, 1.6), brass, left + 26, 20, far + 6.4, `car-plate-${car.index}`);
+    plate.userData = { kind: "trainDetail", carDetail: "plate", car: car.index };
+    const numberTexture = plateTexture(car.index + 1);
+    if (numberTexture) {
+      const number = new Mesh(new PlaneGeometry(16, 11), new MeshBasicMaterial({ map: numberTexture }));
+      number.position.set(left + 26, 20, far + 7.3);
+      number.name = `car-number-${car.index}`;
+      number.userData = { kind: "trainDetail", carDetail: "number", car: car.index };
+      group.add(number);
+    }
   }
 
   // Couplings under each gangway between two cars.

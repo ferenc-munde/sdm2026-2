@@ -155,3 +155,20 @@ describe("the action highlight (#295)", () => {
     expect(ring?.visible).toBe(false);
   });
 });
+
+describe("smooth turning (#355)", () => {
+  it("eases the waiting crew toward their facing", () => {
+    const platform = build();
+    const figure = platform.playersGroup.children[0]!;
+    expect(figure.rotation.y).toBe(0);
+
+    platform.updatePlayers([{ ...players[0]!, facing: { dx: 0, dy: 1 } }]);
+    expect(figure.rotation.y).toBe(0); // the state frame does not snap the figure
+    platform.updateMotion(0.05);
+    expect(figure.rotation.y).toBeLessThan(0);
+    expect(figure.rotation.y).toBeGreaterThan(-Math.PI / 2);
+
+    for (let frame = 0; frame < 60; frame += 1) platform.updateMotion(0.1);
+    expect(figure.rotation.y).toBeCloseTo(-Math.PI / 2);
+  });
+});
