@@ -1,3 +1,4 @@
+
 export type GamePlayer = {
   id: string;
   name: string;
@@ -16,6 +17,8 @@ export type GameTask = {
   status: TaskStatus;
   progress: number;
   section?: "engine" | "electrical" | "control" | "passenger" | "rear";
+  /** Current server-authoritative brake calibration step (0 to 3). */
+  calibrationStep?: number;
 };
 
 export type GameOutcome = {
@@ -42,11 +45,18 @@ export interface GameStateAdapter {
   subscribe(listener: (snapshot: GameClientSnapshot) => void): () => void;
 }
 
+/** The actions used by the server-authoritative brake calibration puzzle. */
+export type BrakeCalibrationAction =
+  | "apply-pressure"
+  | "hold-pressure"
+  | "release-pressure";
+
 /** What a player can send to the room. The same shape as `TrainInput` in shared/game.ts. */
 export type GameInput =
   | { type: "move"; x: number; z: number }
   | { type: "start" }
-  | { type: "repair" };
+  | { type: "repair" }
+  | { type: "brake-calibrate"; action: BrakeCalibrationAction };
 
 export interface GameInputSender {
   sendInput(input: GameInput): void;
