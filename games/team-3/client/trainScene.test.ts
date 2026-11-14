@@ -55,6 +55,14 @@ describe("the train", () => {
     expect(train.mapGroup.children.filter((child) => child.userData.kind === "door")).toHaveLength(2);
   });
 
+  it("keeps the train and everything on it in one group, so the hull can roll", () => {
+    const train = build();
+    expect(train.hullGroup.children).toEqual(
+      expect.arrayContaining([train.mapGroup, train.itemsGroup, train.hazardsGroup, train.playersGroup]),
+    );
+    expect(train.hullGroup.rotation.z).toBe(0);
+  });
+
   it("puts the camera above the train, looking down at an angle", () => {
     const train = build();
     expect(train.camera.position.y).toBeGreaterThan(0);
