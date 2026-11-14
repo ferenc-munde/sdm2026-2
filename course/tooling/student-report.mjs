@@ -84,15 +84,26 @@ export function areaOf(path) {
  *   Collaboration 0-3: reviewed other people's PRs 5+ -> 2, 1-4 -> 1; +1 at least half of an equal
  *                      share of the team's merged work
  *   Points -> grade:   8-10 -> 5, 5-7 -> 4, 3-4 -> 3, 1-2 -> 2, 0 -> 1
+ *
+ * Late arrival: a student marked `"onTime": false` in the roster has to do twice as much for the same
+ * points. Every count threshold above is doubled (merged PRs 10+ -> 4, 4-9 -> 3, 2-3 -> 2, 1 or only
+ * open -> 1; at least 2 merged PRs / 2 issues opened / 2 assigned issues closed for the Process points;
+ * reviews 10+ -> 2, 2-9 -> 1; at least a full equal share). The rule ratios (half of the PRs, 80% of
+ * the issues) stay the same. A missing `onTime` counts as on time.
  */
+export function effortFactor(p) {
+  return p.onTime === false ? 2 : 1;
+}
+
 export function scoreOf(p, teamSize) {
-  const delivery = p.prsMerged >= 5 ? 4 : p.prsMerged >= 2 ? 3 : p.prsMerged === 1 ? 2 : p.prsOpened > 0 ? 1 : 0;
+  const f = effortFactor(p);
+  const delivery = p.prsMerged >= 5 * f ? 4 : p.prsMerged >= 2 * f ? 3 : p.prsMerged >= f ? 2 : p.prsOpened > 0 ? 1 : 0;
   let process = 0;
-  if (p.prsMerged > 0 && (p.prsJudged === 0 || p.prsOk * 2 >= p.prsJudged)) process++;
-  if (p.issuesOpened > 0 && (p.issuesJudged === 0 || p.issuesOk * 5 >= p.issuesJudged * 4)) process++;
-  if (p.issuesAssignedClosed > 0) process++;
-  let collaboration = p.reviewsGiven >= 5 ? 2 : p.reviewsGiven >= 1 ? 1 : 0;
-  if (teamSize > 0 && p.share * teamSize * 2 >= 1) collaboration++;
+  if (p.prsMerged >= f && (p.prsJudged === 0 || p.prsOk * 2 >= p.prsJudged)) process++;
+  if (p.issuesOpened >= f && (p.issuesJudged === 0 || p.issuesOk * 5 >= p.issuesJudged * 4)) process++;
+  if (p.issuesAssignedClosed >= f) process++;
+  let collaboration = p.reviewsGiven >= 5 * f ? 2 : p.reviewsGiven >= f ? 1 : 0;
+  if (teamSize > 0 && p.share * teamSize * 2 >= f) collaboration++;
   const points = delivery + process + collaboration;
   const grade = points >= 8 ? 5 : points >= 5 ? 4 : points >= 3 ? 3 : points >= 1 ? 2 : 1;
   return { delivery, process, collaboration, points, grade };
@@ -128,8 +139,8 @@ function teamOrder(a, b) {
   return rank(a).localeCompare(rank(b));
 }
 
-const emptyPerson = (login, name, team) => ({
-  login, name, team,
+const emptyPerson = (login, name, team, onTime = true) => ({
+  login, name, team, onTime,
   issuesAssigned: 0, issuesAssignedClosed: 0, issuesOpened: 0, issuesJudged: 0, issuesOk: 0,
   prsOpened: 0, prsMerged: 0, prsJudged: 0, prsOk: 0, reviewsGiven: 0, ruleProblems: [],
   linesAdded: 0, areaLines: {}, areas: [], share: 0,
@@ -139,14 +150,14 @@ const emptyPerson = (login, name, team) => ({
  * Builds the report from plain data, without any network access.
  * @param {{issues: object[], pulls: object[], reviews: Record<number, object[]>, files?: Record<number, object[]>}} data
  *        GitHub REST shapes; `files` holds the changed files of each merged work PR.
- * @param {{instructors: string[], students: {login: string, name: string, nickname?: string, team: string}[]}} roster
+ * @param {{instructors: string[], students: {login: string, name: string, nickname?: string, team: string, onTime?: boolean}[]}} roster
  */
 export function buildReport(data, roster) {
   const instructors = new Set(roster.instructors.map((l) => l.toLowerCase()));
   const people = new Map();
   for (const s of roster.students) {
     if (!s.login) continue;
-    people.set(s.login.toLowerCase(), emptyPerson(s.login, s.name, s.team || "(no team)"));
+    people.set(s.login.toLowerCase(), emptyPerson(s.login, s.name, s.team || "(no team)", s.onTime !== false));
   }
   // Someone active in the repository but not in the roster still shows up, so nobody is lost.
   const person = (login) => {
@@ -249,15 +260,16 @@ export function toMarkdown(report, repo) {
     "(promotion and sync PRs between integration branches are left out). Reviews: other people's PRs reviewed.",
     "Share: part of the team's lines added in merged work PRs (generated files left out). Grade: proposal, 0-10 points -> 1-5.",
     "Rule problems: issues and PRs judged by the rules in force when they were created (see RULES in the script).",
+    "On time: no = arrived late, every point threshold is doubled for this student.",
     "",
   );
   for (const { team, members } of report) {
     lines.push(`## ${team}`, "");
-    lines.push("| Student | GitHub | Issues assigned (closed / all) | Issues opened | PRs opened | PRs merged | Reviews given | Lines added | Share | Rule problems | Points | Grade |");
-    lines.push("|---|---|---|---|---|---|---|---|---|---|---|---|");
+    lines.push("| Student | GitHub | On time | Issues assigned (closed / all) | Issues opened | PRs opened | PRs merged | Reviews given | Lines added | Share | Rule problems | Points | Grade |");
+    lines.push("|---|---|---|---|---|---|---|---|---|---|---|---|---|");
     for (const m of members) {
       lines.push(
-        `| ${m.name || "–"} | ${m.login} | ${m.issuesAssignedClosed} / ${m.issuesAssigned} | ${m.issuesOpened} | ${m.prsOpened} | ${m.prsMerged} | ${m.reviewsGiven} | ${m.linesAdded} | ${Math.round(m.share * 100)}% | ${m.ruleProblems.length} | ${m.score.points} | ${m.score.grade} |`,
+        `| ${m.name || "–"} | ${m.login} | ${m.onTime ? "yes" : "no (×2)"} | ${m.issuesAssignedClosed} / ${m.issuesAssigned} | ${m.issuesOpened} | ${m.prsOpened} | ${m.prsMerged} | ${m.reviewsGiven} | ${m.linesAdded} | ${Math.round(m.share * 100)}% | ${m.ruleProblems.length} | ${m.score.points} | ${m.score.grade} |`,
       );
     }
     lines.push("");

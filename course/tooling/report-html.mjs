@@ -33,7 +33,7 @@ function teamSection({ team, linesAdded, prsMerged, members }) {
       const s = m.score;
       return `
       <article class="student">
-        <div class="who"><b>${esc(m.name || m.login)}</b><small>@${esc(m.login)}${m.areas.length ? ` · ${esc(m.areas.slice(0, 2).join(", "))}` : ""}</small></div>
+        <div class="who"><b>${esc(m.name || m.login)}</b><small>@${esc(m.login)}${m.onTime === false ? ` · <span class="late">late: ×2 effort</span>` : ""}${m.areas.length ? ` · ${esc(m.areas.slice(0, 2).join(", "))}` : ""}</small></div>
         <div class="share">
           <div class="row"><span class="pct num">${pct(m.share)}</span><span class="num lines">${num(m.linesAdded)} lines</span></div>
           <div class="track"><span style="width:${(m.share * 100).toFixed(2)}%;background:${color(i)}"></span></div>
@@ -42,7 +42,7 @@ function teamSection({ team, linesAdded, prsMerged, members }) {
         <div class="summary"><p>${esc(m.summary)}</p>${m.ruleProblems?.length
           ? `<p class="rules" title="${esc(m.ruleProblems.join("\n"))}">${m.ruleProblems.length} rule ${m.ruleProblems.length === 1 ? "problem" : "problems"}: ${esc(m.ruleProblems.slice(0, 3).join("; "))}${m.ruleProblems.length > 3 ? " …" : ""}</p>`
           : ""}</div>
-        <div class="grade" title="Delivery ${s.delivery}/4 · Process ${s.process}/3 · Collaboration ${s.collaboration}/3">
+        <div class="grade" title="Delivery ${s.delivery}/4 · Process ${s.process}/3 · Collaboration ${s.collaboration}/3${m.onTime === false ? " · late arrival: thresholds doubled" : ""}">
           <span class="chip g${s.grade}">${s.grade}</span><small>${s.points}/10 points<br>${GRADE_WORDS[s.grade]}</small>
         </div>
       </article>`;
@@ -140,6 +140,7 @@ nav a:hover, nav a:focus-visible { border-color: var(--accent); outline: none; }
 .summary { font-size: 0.93rem; min-width: 0; display: grid; gap: 4px; }
 .summary p { margin: 0; }
 .summary .rules { font-size: 0.8rem; color: var(--g2); }
+.who .late { color: var(--g2); font-weight: 600; }
 .grade { display: grid; justify-items: center; gap: 4px; cursor: help; }
 .chip { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; color: var(--chip-fg); }
 .grade small { font-size: 0.72rem; color: var(--muted); text-align: center; line-height: 1.25; }
@@ -188,6 +189,7 @@ footer { color: var(--muted); font-size: 0.82rem; }
           <tr><td>Process: PRs follow the rules · issues follow the rules · assigned issue closed</td><td class="num">+1 each</td></tr>
           <tr><td>Collaboration: reviews (5+ / 1–4) · at least half an equal share</td><td class="num">2 / 1 · +1</td></tr>
           <tr><td>Points → grade: 8–10 / 5–7 / 3–4 / 1–2 / 0</td><td class="num">5 / 4 / 3 / 2 / 1</td></tr>
+          <tr><td>Late arrival: every count above doubled (merged PRs 10+ / 4–9 / 2–3 / 1 or open, reviews 10+ / 2–9, a full equal share, 2 of each Process item)</td><td class="num">×2 effort</td></tr>
         </tbody>
       </table>
     </div>
