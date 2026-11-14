@@ -94,6 +94,10 @@ team-N/<issue>-<description>  →  Team_N_Feature  →  development  →  stagin
 - The work branch is deleted automatically when its pull request is merged (the repository setting "Automatically delete head branches" is on). Do not delete it by hand, and do not reuse it: start the next issue from a fresh branch.
 - Long-lived branches (`main`, `staging`, `development`, `Team_N_Feature`) are never deleted. They must stay protected so that promotion and sync PRs, which use them as their head branch, cannot remove them.
 
+## Grades
+
+When someone asks about their grade or points, run `node course/tooling/student-report.mjs --me` (or `--student <github-login>`) on an up-to-date `development` branch and explain its output. The rules are in [course/README.md](course/README.md#check-your-own-grade). Never commit the output: it has per-person numbers.
+
 ## Deployment
 
 Nothing is deployed yet. Railway belongs to the platform team: teams don't create or change Railway services, variables or domains; they open a `platform` issue instead. The target setup (one gateway, one service per game, the `development` branch deploys to the development environment, `main` to production) is in [server/ARCHITECTURE.md](server/ARCHITECTURE.md). Secrets live only in Railway variables, never in the repository.
