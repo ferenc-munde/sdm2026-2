@@ -6,6 +6,7 @@
 // There is no server here: no network, no clock and no Math.random(). The room passes in the
 // elapsed time and owns one seeded random source per room.
 
+import { hullRecoverySystem } from "./hullRecovery.ts";
 import { INTERACT_RANGE, PLAYER_NAME_MAX_LENGTH, PLAYER_RADIUS } from "../constants.ts";
 import { journeySystem } from "../journey/journey.ts";
 import { breachSystem } from "../hazards/breach.ts";
@@ -74,7 +75,7 @@ export type RoomResult =
  * 2. thrown items fly (#29), right after movement
  * 3. journey: fuel, speed, distance and all continuous hull damage (#102)
  * 4. breaches, then 5. fires: repairs only, never damage (#111, #122)
- * 6. fire spread, after fires have aged this tick (#129)
+ * 6. fire spread, after fires have aged this tick (#129), then hull recovery while no breach or fire is open
  * 7. course trigger, then 8. course: the trigger starts the event the course rule then runs (#136, #127)
  * After these, `stepSession` runs the hazard director and the win/lose check.
  */
@@ -88,6 +89,7 @@ export function createRunSystems(train: TrainMap, steeringConsole: Station): Ste
     breachSystem,
     fireSystem,
     fireSpreadSystem(train.hazardSpots),
+    hullRecoverySystem,
     courseTriggerSystem(steeringConsole),
     courseSystem(steeringConsole),
   ];

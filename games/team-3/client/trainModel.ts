@@ -11,14 +11,17 @@ import {
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
+  PointLight,
   SphereGeometry,
   SRGBColorSpace,
+  TorusGeometry,
   type Material,
   type Object3D,
   type Texture,
 } from "three";
 import type { TrainMap } from "../shared/map/map.ts";
-import { PALETTE, mat, ownMat } from "./style.ts";
+import { LIGHTING, PALETTE, mat, ownMat } from "./style.ts";
+import { furnishingLayout } from "./trainFurnish.ts";
 
 /** How far the locomotive reaches in front of the first car, so the camera can frame it. */
 export const LOCOMOTIVE_LENGTH = 170;
@@ -144,6 +147,43 @@ export function buildTrainBody(map: TrainMap): TrainBody {
       bracket.userData = { kind: "trainDetail", carDetail: "lampBracket", car: car.index };
     }
 
+    // Passenger furnishing (#437): benches on the far side, a luggage rack above the windows and
+    // a few cases. Decoration only, no collision; the layout skips stations and hazard spots.
+    const spots = [
+      ...map.stations.map((station) => station.position),
+      ...map.hazardSpots.map((spot) => spot.position),
+    ];
+    const benchWood = mat(PALETTE.wood, { roughness: 0.75 });
+    const benchPad = mat(PALETTE.paintDark, { roughness: 0.7 });
+    const caseColors = [PALETTE.overalls, PALETTE.woodDark, PALETTE.iron];
+    for (const spot of furnishingLayout(car, spots)) {
+      const x = car.x + spot.dx;
+      const z = car.y + spot.dz;
+      if (spot.kind === "bench") {
+        const bench = new Group();
+        bench.name = `bench-${car.index}-${Math.round(spot.dx)}`;
+        bench.position.set(x, 0, z);
+        bench.userData = { kind: "trainDetail", carDetail: "bench", car: car.index };
+        const seat = new Mesh(new BoxGeometry(64, 5, 26), benchWood);
+        seat.position.y = 14;
+        const pad = new Mesh(new BoxGeometry(58, 3, 20), benchPad);
+        pad.position.y = 18;
+        const back = new Mesh(new BoxGeometry(64, 26, 4), benchWood);
+        back.position.set(0, 26, -12);
+        bench.add(seat, pad, back);
+        bench.traverse((part) => { if (part instanceof Mesh) part.castShadow = false; });
+        group.add(bench);
+      } else {
+        const box = add(group, new BoxGeometry(18, 12, 12), mat(caseColors[Math.abs(Math.round(spot.dx)) % caseColors.length]!, { roughness: 0.7 }), x, 6, z, `case-${car.index}-${Math.round(spot.dx)}`);
+        box.userData = { kind: "trainDetail", carDetail: "suitcase", car: car.index };
+        box.castShadow = false;
+      }
+    }
+    // A thin brass luggage rack along the far windows.
+    const rack = add(group, new BoxGeometry(car.width - 70, 2.5, 22), brass, car.x, FAR_WALL_HEIGHT - 18, far + 20, `car-rack-${car.index}`);
+    rack.userData = { kind: "trainDetail", carDetail: "rack", car: car.index };
+    rack.castShadow = false;
+
     const plate = add(group, new BoxGeometry(18, 13, 1.6), brass, left + 26, 20, far + 6.4, `car-plate-${car.index}`);
     plate.userData = { kind: "trainDetail", carDetail: "plate", car: car.index };
     const numberTexture = plateTexture(car.index + 1);
@@ -189,6 +229,28 @@ export function buildTrainBody(map: TrainMap): TrainBody {
   for (const dx of [-45, 0, 45]) {
     for (const side of [-1, 1]) wheels.push(wheel(loco, cx + 15 + dx, first.y + side * (first.depth / 2 - 30), dx === 0 ? 20 : 16));
   }
+
+  // Locomotive details (visual polish): a red buffer beam with two buffers, brass handrails along
+  // the boiler, a brass ring on the smokebox door, a whistle by the dome, a lamp housing, and a
+  // warm headlamp glow. Shared geometry; drawing only.
+  const front = nose - LOCOMOTIVE_LENGTH;
+  add(loco, new BoxGeometry(6, 14, first.depth - 70), paint, front + 2, 10, first.y, "bufferBeam");
+  const bufferGeometry = new CylinderGeometry(4, 4, 10, 10);
+  for (const side of [-1, 1]) {
+    const buffer = add(loco, bufferGeometry, iron, front - 4, 10, first.y + side * (first.depth / 2 - 60), "buffer");
+    buffer.rotation.z = Math.PI / 2;
+    const rail = add(loco, new CylinderGeometry(1.2, 1.2, LOCOMOTIVE_LENGTH - 60, 6), brass, cx + 10, 58, first.y + side * 41, "handrail");
+    rail.rotation.z = Math.PI / 2;
+  }
+  const doorRing = add(loco, new TorusGeometry(30, 2.2, 6, 20), brass, front + 20, 40, first.y, "smokeboxRing");
+  doorRing.rotation.y = Math.PI / 2;
+  add(loco, new CylinderGeometry(2.2, 2.6, 12, 8), brass, cx + 44, 88, first.y, "whistle");
+  add(loco, new BoxGeometry(10, 14, 14), iron, front + 22, 60, first.y, "lampHousing");
+  const headlamp = new PointLight(LIGHTING.headlamp.color, LIGHTING.headlamp.intensity, LIGHTING.headlamp.distance, 2);
+  headlamp.name = "headlamp";
+  headlamp.position.set(front + 8, 60, first.y);
+  headlamp.castShadow = false;
+  loco.add(headlamp);
 
   return { group, wheels, chimneyTop: { x: chimneyX, y: 120, z: first.y } };
 }
