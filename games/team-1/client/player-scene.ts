@@ -104,11 +104,19 @@ export function mountTrainScene(
   resize();
 
   let frame = 0;
-  const draw = () => {
+  let lastFrameAt = performance.now();
+  const draw = (now: number) => {
+    const elapsedSeconds = Math.min(100, Math.max(0, now - lastFrameAt)) / 1000;
+    lastFrameAt = now;
+    const smoothing = 1 - Math.exp(-14 * elapsedSeconds);
+    for (const group of playerMeshes.values()) {
+      const target = group.userData.targetPosition as THREE.Vector3 | undefined;
+      if (target) group.position.lerp(target, smoothing);
+    }
     renderer.render(scene, camera);
     frame = requestAnimationFrame(draw);
   };
-  draw();
+  frame = requestAnimationFrame(draw);
 
   return {
     update(snapshot) {
@@ -128,11 +136,14 @@ export function mountTrainScene(
           playerMeshes.set(player.id, group);
           scene.add(group);
         }
-        group.position.set(
-          -TRAIN_LAYOUT.length / 2 + PLAYER_INSET.length + player.x * (TRAIN_LAYOUT.length - PLAYER_INSET.length * 2),
-          0,
-          -TRAIN_LAYOUT.width / 2 + PLAYER_INSET.width + player.z * (TRAIN_LAYOUT.width - PLAYER_INSET.width * 2),
-        );
+        const targetX = -TRAIN_LAYOUT.length / 2 + PLAYER_INSET.length + player.x * (TRAIN_LAYOUT.length - PLAYER_INSET.length * 2);
+        const targetZ = -TRAIN_LAYOUT.width / 2 + PLAYER_INSET.width + player.z * (TRAIN_LAYOUT.width - PLAYER_INSET.width * 2);
+        const targetPosition = group.userData.targetPosition as THREE.Vector3 | undefined;
+        if (targetPosition) targetPosition.set(targetX, 0, targetZ);
+        else {
+          group.position.set(targetX, 0, targetZ);
+          group.userData.targetPosition = new THREE.Vector3(targetX, 0, targetZ);
+        }
         group.visible = true;
         const material = (group.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial;
         material.color.set(player.color);
