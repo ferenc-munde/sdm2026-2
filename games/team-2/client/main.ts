@@ -9,7 +9,7 @@ import { createInputAdapter } from "./input.ts";
 import { mountLobby } from "./lobby";
 import { mountGameRules } from "./rules";
 import { openTaskModal, closeTaskModal, showStationPrompt, showTaskToast, type OpenTask } from "./task-modal";
-import { getAudioSettings, playAmbient, playButtonInteraction, playLobbyMusic, playPuzzleSuccess, playTrainAmbience, playWarning, setAudioVolume, stopAmbient, stopLobbyMusic, stopTrainAmbience, taskSpawnPing, toggleAudioMute, unlockAudio } from "./audio";
+import { getAudioSettings, playAmbient, playButtonInteraction, playLobbyMusic, playPuzzleAction, playPuzzleSuccess, playTrainAmbience, playWarning, setAudioVolume, stopAmbient, stopLobbyMusic, stopTrainAmbience, taskSpawnPing, toggleAudioMute, unlockAudio } from "./audio";
 import "./hud.css";
 import "./styles.css";
 
@@ -86,7 +86,7 @@ function openTask(task: OpenTask): void {
   unlockAudio();
   playAmbient(task.type);
   openTaskModal(task, (amount) => {
-    playPuzzleSuccess();
+    playPuzzleSuccess(task.minigame);
     session.send({ type: "progress", taskId: task.id, amount });
   }, { onClosed: () => stopAmbient() });
 }
@@ -220,6 +220,11 @@ document.addEventListener("click", (event) => {
   if (!clickedButton || clickedButton.disabled) return;
   unlockAudio();
   if (clickedButton.closest(".sound-controls")) return;
+  const puzzleControl = target.closest<HTMLElement>(".ltm-crank, .ltm-node, .ltm-tile");
+  if (puzzleControl) {
+    playPuzzleAction(puzzleControl.classList.contains("ltm-crank") ? "crank" : puzzleControl.classList.contains("ltm-node") ? "wires" : "panel");
+    return;
+  }
   playButtonInteraction();
 }, true);
 

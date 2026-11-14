@@ -112,7 +112,7 @@ export function playLobbyMusic(): void {
     const bus = audio.createGain();
     bus.gain.value = 0.0001;
     bus.connect(output);
-    bus.gain.linearRampToValueAtTime(0.075, audio.currentTime + 1.8);
+    bus.gain.linearRampToValueAtTime(0.26, audio.currentTime + 1.8);
 
     const phrase = [392, 440, 523.25, 440, 349.23, 392, 440, 392];
     let index = 0;
@@ -126,7 +126,7 @@ export function playLobbyMusic(): void {
       note.type = "sine";
       note.frequency.value = phrase[index % phrase.length]!;
       envelope.gain.setValueAtTime(0.0001, start);
-      envelope.gain.exponentialRampToValueAtTime(0.11, start + 0.24);
+      envelope.gain.exponentialRampToValueAtTime(0.2, start + 0.24);
       envelope.gain.exponentialRampToValueAtTime(0.0001, start + 1.25);
       note.connect(envelope);
       envelope.connect(bus);
@@ -178,11 +178,19 @@ export function playButtonInteraction(): void {
   playToneSequence([{ frequency: 560, offset: 0, duration: 0.045, gain: 0.09 }]);
 }
 
-/** Short rising chime for completing a repair minigame. */
-export function playPuzzleSuccess(): void {
+/** Small tactile feedback shaped for each puzzle control. */
+export function playPuzzleAction(minigame: string): void {
+  const note = minigame === "crank" ? 235 : minigame === "wires" ? 740 : 470;
+  playToneSequence([{ frequency: note, offset: 0, duration: 0.055, gain: 0.075 }]);
+}
+
+/** Short, puzzle-appropriate cue for completing a repair minigame. */
+export function playPuzzleSuccess(minigame: string): void {
+  const first = minigame === "crank" ? 392 : minigame === "wires" ? 659 : 523;
+  const second = minigame === "crank" ? 523 : minigame === "wires" ? 880 : 659;
   playToneSequence([
-    { frequency: 523, offset: 0, duration: 0.17, gain: 0.1 },
-    { frequency: 659, offset: 0.16, duration: 0.22, gain: 0.11 },
+    { frequency: first, offset: 0, duration: 0.14, gain: 0.1 },
+    { frequency: second, offset: 0.15, duration: 0.19, gain: 0.11 },
   ]);
 }
 
@@ -309,21 +317,10 @@ function rumble(): Patch["build"] {
 
 /** Short ping when a task spawns, so the crew notices a new job. */
 export function taskSpawnPing(): void {
-  if (!ctx || !master) return;
-  const time = ctx.currentTime;
-  for (const [offset, frequency] of [[0, 880], [0.12, 1320]] as const) {
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.value = frequency;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, time + offset);
-    gain.gain.exponentialRampToValueAtTime(0.2, time + offset + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + offset + 0.18);
-    osc.connect(gain);
-    gain.connect(master);
-    osc.start(time + offset);
-    osc.stop(time + offset + 0.2);
-  }
+  playToneSequence([
+    { frequency: 659, offset: 0, duration: 0.1, gain: 0.08 },
+    { frequency: 784, offset: 0.13, duration: 0.12, gain: 0.075 },
+  ]);
 }
 
 /** Crossfade to the loop for `kind` (task type or hazard type). */
