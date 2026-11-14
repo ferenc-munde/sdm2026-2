@@ -75,8 +75,8 @@ pnpm dev:client   # only the client
 
 1. Run `pnpm dev`.
 2. Open `http://127.0.0.1:5173/` in two tabs.
-3. In both tabs type a different name, pick the **same crew size** (for example 2) and press **Create / Join Game**.
-4. With a crew of 2 the lobby departs as soon as the second player joins. With a larger crew, the host presses **SKIP THE TIMER**.
+3. In the first tab, enter a name, choose a crew size, and press **Create Room**. In the other tab, enter a name and the host's room code, then press **Join Room**.
+4. With a crew of 2 the lobby departs as soon as the second player joins. With a larger crew, the host can press **SKIP THE TIMER**.
 5. Both tabs are now in the same game room. The status line at the top shows `Room XXXX · 2 crew aboard`. Move with WASD or the arrow keys, hold Shift to run. Each tab shows two discs; your own has a white outline.
 
 Other ways to open the client:
