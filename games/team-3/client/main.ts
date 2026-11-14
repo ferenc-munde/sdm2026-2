@@ -6,6 +6,7 @@
 // a mock waiting room, and buttons for the end screens and sounds, with no server needed.
 
 import { createConductor } from "./conductor.ts";
+import { COURSE_FX_SECONDS, courseFailed, courseFx, failureDirection } from "./courseFx.ts";
 import { createHelp } from "./help.ts";
 import { createCourseWarning } from "./courseWarning.ts";
 import { WebGLRenderer } from "three";
@@ -221,6 +222,41 @@ const addDemoButton = (label: string, phase: Phase): void => {
 };
 addDemoButton("Show win screen", "won");
 addDemoButton("Show lose screen", "lost");
+
+// Course-hazard feedback (#219): a failed event shakes the camera and rolls the hull.
+let fxStart: number | null = null;
+let fxDirection: 1 | -1 = 1;
+let fxBase: { x: number; y: number; z: number } | null = null;
+
+function triggerCourseFx(direction: 1 | -1): void {
+  fxStart = performance.now();
+  fxDirection = direction;
+  fxBase = { x: train.camera.position.x, y: train.camera.position.y, z: train.camera.position.z };
+}
+
+function applyCourseFx(time: number): void {
+  if (fxStart === null) return;
+  const elapsed = (time - fxStart) / 1000;
+  const view = courseFx(elapsed, fxDirection);
+  if (fxBase) train.camera.position.set(fxBase.x + view.shakeX, fxBase.y + view.shakeY, fxBase.z);
+  // The train runs along x, so a sideways lurch (the rules push across the track) is a roll around x.
+  train.hullGroup.rotation.x = view.tilt;
+  if (elapsed >= COURSE_FX_SECONDS) {
+    fxStart = null;
+    train.hullGroup.rotation.x = 0;
+    resize();
+  }
+}
+
+const courseButton = document.createElement("button");
+courseButton.type = "button";
+courseButton.textContent = "Course fail";
+courseButton.style.cssText =
+  "padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.18);" +
+  "background:rgba(16,16,24,.8);color:#e6e6ee;cursor:pointer;font:inherit";
+courseButton.addEventListener("click", () => triggerCourseFx(1));
+demoBar.append(courseButton);
+
 if (demo) document.body.append(demoBar);
 
 // One button per sound, so every cue can be checked by hand.
@@ -377,7 +413,7 @@ async function leaveLive(): Promise<void> {
 }
 
 /** Draws one frame of the real room and keeps the screens in step with its phase. */
-function drawLive(delta: number): void {
+function drawLive(delta: number, time: number): void {
   const live = connection!;
   const state = live.view();
   const notice = live.notice();
@@ -431,7 +467,11 @@ function drawLive(delta: number): void {
   }
   courseWarning.update(state);
   conductor.update(state);
+  if (liveState && liveState.phase !== "lobby" && courseFailed(liveState, state)) {
+    triggerCourseFx(failureDirection(liveState, state));
+  }
   liveState = state;
+  applyCourseFx(time);
   renderer.render(train.scene, train.camera);
 }
 
@@ -445,7 +485,7 @@ const walk = (time: number): void => {
   lastTime = time;
 
   if (connection) {
-    drawLive(delta);
+    drawLive(delta, time);
     requestAnimationFrame(walk);
     return;
   }
@@ -519,6 +559,9 @@ const walk = (time: number): void => {
     }
     courseWarning.update(demoState);
     conductor.update(demoState);
+    if (previousDemoState && courseFailed(previousDemoState, demoState)) {
+      triggerCourseFx(failureDirection(previousDemoState, demoState));
+    }
     previousDemoState = demoState;
 
     if (progress >= 1) {
@@ -531,6 +574,7 @@ const walk = (time: number): void => {
   }
 
 
+  applyCourseFx(time);
   renderer.render(train.scene, train.camera);
   requestAnimationFrame(walk);
 };

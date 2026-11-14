@@ -96,6 +96,11 @@ export interface TrainScene {
   hazardsGroup: Group;
   /** The floor, walls, doors and stations. */
   mapGroup: Group;
+  /**
+   * The train and everything on it (map, items, hazards, players) without the
+   * camera and lights. Tilt this for the course-hazard hull roll (#219).
+   */
+  hullGroup: Group;
   map: TrainMap;
   updateState(world: RenderWorld): void;
   dispose(): void;
@@ -397,20 +402,26 @@ export function buildTrainScene(
   sun.position.set(mapCentreX(map) - 300, 900, 420);
   scene.add(sun);
 
+  // One group for the hull and everything standing on it, so the course-hazard
+  // feedback can roll the train without moving the camera (#219).
+  const hullGroup = new Group();
+  hullGroup.name = "hull";
+  scene.add(hullGroup);
+
   const mapGroup = buildMapGroup(map);
-  scene.add(mapGroup);
+  hullGroup.add(mapGroup);
 
   const itemsGroup = new Group();
   itemsGroup.name = "items";
-  scene.add(itemsGroup);
+  hullGroup.add(itemsGroup);
 
   const hazardsGroup = new Group();
   hazardsGroup.name = "hazards";
-  scene.add(hazardsGroup);
+  hullGroup.add(hazardsGroup);
 
   const playersGroup = new Group();
   playersGroup.name = "players";
-  scene.add(playersGroup);
+  hullGroup.add(playersGroup);
 
   const clear = (group: Group): void => {
     for (const child of [...group.children]) {
@@ -451,6 +462,7 @@ export function buildTrainScene(
     itemsGroup,
     hazardsGroup,
     mapGroup,
+    hullGroup,
     map,
     updateState,
     dispose: () => {

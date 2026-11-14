@@ -1,10 +1,11 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "builder": "RAILPACK"
+    "builder": "RAILPACK",
+    "buildCommand": "pnpm --filter \"./games/${GAME:?set the GAME variable, for example team-1}\" run build"
   },
   "deploy": {
-    "startCommand": "cd server/host && pnpm dlx vite-node@3.2.4 src/smoke-server.ts",
+    "startCommand": "COMMIT_SHA=\"$RAILWAY_GIT_COMMIT_SHA\" pnpm --filter \"./games/${GAME:?set the GAME variable, for example team-1}\" run server",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",
