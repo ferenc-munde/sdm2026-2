@@ -39,7 +39,8 @@ const STYLES = `
 .ltm-tile{width:64px;height:64px;border-radius:6px;border:2px solid #323d36;background:#232a29;cursor:pointer}
 .ltm-tile.ltm-on{background:#e4b552;border-color:#8a6a1e}
 .ltm-prompt{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);background:#1d2523;border:1px solid #e4b552;border-radius:8px;padding:6px 14px;color:#fff1ca;font-family:monospace;font-size:13px;z-index:50}
-.ltm-toast{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:#1d2523;border:1px solid #71a98d;border-radius:8px;padding:6px 14px;color:#fff1ca;font-family:monospace;font-size:13px;z-index:50;opacity:0;transition:opacity .3s}
+.ltm-toasts{position:fixed;left:50%;top:14px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;z-index:50}
+.ltm-toast{background:#1d2523;border:1px solid #71a98d;border-radius:8px;padding:6px 14px;color:#fff1ca;font-family:monospace;font-size:13px;opacity:0;transition:opacity .3s}
 `;
 
 let styleInjected = false;
@@ -154,11 +155,20 @@ export function showStationPrompt(text: string | null): void {
 /** A short-lived "new task" notice at the top of the scene. */
 export function showTaskToast(text: string): void {
   injectStyles();
+  let stack = document.body.querySelector<HTMLElement>(".ltm-toasts");
+  if (!stack) {
+    stack = document.createElement("div");
+    stack.className = "ltm-toasts";
+    document.body.append(stack);
+  }
   const toast = document.createElement("div");
   toast.className = "ltm-toast";
   toast.textContent = text;
-  document.body.append(toast);
+  stack.append(toast);
   window.requestAnimationFrame(() => { toast.style.opacity = "1"; });
   window.setTimeout(() => { toast.style.opacity = "0"; }, 2600);
-  window.setTimeout(() => { toast.remove(); }, 3100);
+  window.setTimeout(() => {
+    toast.remove();
+    if (!stack!.childElementCount) stack!.remove();
+  }, 3100);
 }

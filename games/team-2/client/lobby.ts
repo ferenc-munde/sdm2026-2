@@ -215,8 +215,6 @@ export function mountLobby(
 				: await client.joinById<LobbyRoomView>(roomCode, { name });
 			playerName = name;
 			error.textContent = "";
-			setup.hidden = true;
-			waiting.hidden = false;
 			room.onStateChange(sync);
 			room.onMessage("match-started", (match: StartedMatch) => startMatch(match));
 			room.onMessage(GAME_ROOM_MESSAGE, (message: GameRoomMessage) => resolveGameCode(message.code));
@@ -263,7 +261,17 @@ export function mountLobby(
 
 	function sync(state: LobbyRoomView): void {
 		// Render the authoritative room snapshot; the browser never decides when play starts.
-		const players = Array.from(state.players.entries())
+		// The SDK decodes the room state asynchronously: the join can resolve before the first
+		// snapshot lands, so skip empty states — onStateChange re-runs sync with the real one.
+		if (!state?.players) return;
+		if (!matchStarted) {
+			setup.hidden = true;
+			waiting.hidden = false;
+		}
+		const playerEntries = state.players instanceof Map
+			? Array.from(state.players.entries())
+			: Object.entries(state.players as unknown as Record<string, LobbyPlayerView>);
+		const players = playerEntries
 			.map(([sessionId, player]) => ({ sessionId, ...player }))
 			.sort((a, b) => a.slot - b.slot);
 		count.textContent = state.playerCount + " / " + state.teamSize + " PLAYERS";

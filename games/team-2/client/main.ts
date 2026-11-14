@@ -185,7 +185,16 @@ function syncMode() {
   }
   update();
 }
-mode.addEventListener("change", syncMode);
+mode.addEventListener("change", () => {
+  // The scene preview renders example data: an open lobby would only cover it.
+  if (mode.value === "preview") {
+    lobby?.destroy();
+    lobby = undefined;
+  } else {
+    mountLobbyIfNetworked();
+  }
+  syncMode();
+});
 
 const { cleanup: cleanupInput, refreshMovement } = createInputAdapter({
   send: (input) => session.send(input),
@@ -245,6 +254,23 @@ reset(); syncMode();
 
 let lobby: ReturnType<typeof mountLobby> | undefined;
 const directCode = params.get("room");
+/** Mount the lobby for networked play; a no-op when offline, in a direct room, already mounted, or seated. */
+function mountLobbyIfNetworked(): void {
+	if (offline || directCode || lobby || online) return;
+	// Lobby creation/joining remains behind player entry and only connects on form submission.
+	// The host creates the game room and shares its code; the rest of the crew joins that room.
+	lobby = mountLobby(document.body, (match) => {
+		void enterGameRoom(async () => {
+			if (match.isHost) {
+				const hosted = await hostGame(server, match.name);
+				match.shareGameCode(hosted.code);
+				return hosted;
+			}
+			const code = await withTimeout(match.gameCode, GAME_CODE_TIMEOUT_MS, "the host did not open a game room");
+			return joinGame(server, code, match.name);
+		}).finally(() => match.leaveLobby());
+	}, server.http);
+}
 function enterPlayerFlow(): void {
 	if (offline) {
 		// Preserve the explicit offline demo mode, but don't start it before the rules are accepted.
@@ -254,19 +280,7 @@ function enterPlayerFlow(): void {
 		// Preserve direct room-code links; they still wait until the player continues past the rules.
 		void enterGameRoom(() => joinGame(server, directCode));
 	} else {
-		// Lobby creation/joining remains behind player entry and only connects on form submission.
-		// The host creates the game room and shares its code; the rest of the crew joins that room.
-		lobby = mountLobby(document.body, (match) => {
-			void enterGameRoom(async () => {
-				if (match.isHost) {
-					const hosted = await hostGame(server, match.name);
-					match.shareGameCode(hosted.code);
-					return hosted;
-				}
-				const code = await withTimeout(match.gameCode, GAME_CODE_TIMEOUT_MS, "the host did not open a game room");
-				return joinGame(server, code, match.name);
-			}).finally(() => match.leaveLobby());
-		}, server.http);
+		mountLobbyIfNetworked();
 	}
 }
 // Initial briefing and persistent help share one rules source and one fixed button.
