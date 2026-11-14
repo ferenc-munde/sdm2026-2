@@ -8,7 +8,7 @@ import { hostRoom, joinRoomByCode, JoinError, type GameConnection, type ServerAd
 import type { TrainState } from "../shared/game";
 import { sectionAt } from "../shared/train-layout";
 import { MAX_NAME_LENGTH, type Phase } from "../shared/constants";
-import type { GameClientSnapshot, GameInput, GameTask, LiveGameStateAdapter } from "./game-state-adapter.mjs";
+import type { GameClientSnapshot, GameInput, GamePlayer, GameTask, LiveGameStateAdapter } from "./game-state-adapter.mjs";
 import { SessionError, type LobbyPlayer, type LobbySession, type SessionAdapter, type SessionEvent } from "./session-adapter.mjs";
 
 type Connection = GameConnection<TrainState, GameInput>;
@@ -23,6 +23,59 @@ const OUTCOME_MESSAGES: Record<Phase, string> = {
   victory: "Your crew brought the Night Line safely through.",
   failure: "The train lost power before reaching the station.",
 };
+
+type PlayerMotion = {
+  x: number;
+  z: number;
+  direction: NonNullable<GamePlayer["direction"]>;
+  isMoving: boolean;
+};
+
+export class PlayerMotionTracker {
+  private players = new Map<string, PlayerMotion>();
+  private phase: Phase | undefined;
+  private runTicks = 0;
+  private suspended = false;
+
+  update(state: TrainState): void {
+    const sameRun = !this.suspended && this.phase === "playing" && state.phase === "playing" && state.runTicks >= this.runTicks;
+    const tickAdvanced = state.runTicks > this.runTicks;
+    const next = new Map<string, PlayerMotion>();
+    state.players.forEach((player, id) => {
+      const previous = this.players.get(id);
+      let direction = previous?.direction ?? "down";
+      if (player.connected && state.phase === "playing" && (player.moveX !== 0 || player.moveZ !== 0)) {
+        direction = Math.abs(player.moveZ) > Math.abs(player.moveX)
+          ? (player.moveZ < 0 ? "up" : "down")
+          : (player.moveX < 0 ? "left" : "right");
+      }
+      const isMoving = Boolean(player.connected && previous && sameRun && (
+        tickAdvanced ? player.x !== previous.x || player.z !== previous.z : previous.isMoving
+      ));
+      next.set(id, { x: player.x, z: player.z, direction, isMoving });
+    });
+    this.players = next;
+    this.phase = state.phase;
+    this.runTicks = state.runTicks;
+    this.suspended = false;
+  }
+
+  get(id: string): PlayerMotion | undefined {
+    return this.players.get(id);
+  }
+
+  suspend(): void {
+    this.suspended = true;
+    for (const player of this.players.values()) player.isMoving = false;
+  }
+
+  clear(): void {
+    this.players.clear();
+    this.phase = undefined;
+    this.runTicks = 0;
+    this.suspended = false;
+  }
+}
 
 /** Maps the synced room state to the snapshot the HUD and the scene draw. */
 export function toSnapshot(state: TrainState | undefined, connectionState: ConnectionState, localPlayerId?: string): GameClientSnapshot {
@@ -116,6 +169,7 @@ export class RoomClient {
   /** The players the lobby has been told about, by id. */
   private known = new Map<string, LobbyPlayer>();
   private lastSnapshot = "";
+  private readonly motion = new PlayerMotionTracker();
   private readonly sessionListeners = new Set<(event: SessionEvent) => void>();
   private readonly snapshotListeners = new Set<(snapshot: GameClientSnapshot) => void>();
 
@@ -155,11 +209,20 @@ export class RoomClient {
   }
 
   getSnapshot(): GameClientSnapshot {
-    return toSnapshot(
+    const snapshot = toSnapshot(
       this.connection?.state(),
       this.connectionState,
       this.connection?.sessionId,
     );
+    snapshot.players = snapshot.players.map((player) => {
+      const motion = this.motion.get(player.id);
+      return {
+        ...player,
+        direction: motion?.direction ?? "down",
+        isMoving: this.connectionState === "connected" && player.connected && (motion?.isMoving ?? false),
+      };
+    });
+    return snapshot;
   }
 
   sendInput(input: GameInput): void {
@@ -195,6 +258,7 @@ export class RoomClient {
     }
 
     this.connectionState = "connected";
+    this.motion.update(connection.state());
     this.known = this.lobbyPlayers(connection);
 
     const live = connection;
@@ -251,6 +315,7 @@ export class RoomClient {
   private handleState(connection: Connection): void {
     if (this.connection !== connection) return;
 
+    this.motion.update(connection.state());
     const current = this.lobbyPlayers(connection);
     const events: SessionEvent[] = [];
 
@@ -280,6 +345,7 @@ export class RoomClient {
   private setConnectionState(connection: Connection, next: ConnectionState): void {
     if (this.connection !== connection) return;
 
+    if (next !== "connected") this.motion.suspend();
     this.connectionState = next;
     this.publish();
   }
@@ -296,6 +362,7 @@ export class RoomClient {
     this.connectionState = "disconnected";
     this.known = new Map();
     this.lastSnapshot = "";
+    this.motion.clear();
   }
 
   /** Tells the HUD about the new snapshot. The server's tick counter changes 20 times a second, the snapshot does not. */

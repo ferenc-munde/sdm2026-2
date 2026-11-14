@@ -56,6 +56,7 @@ export class Player {
     // Update movement
     const delta = this.movement.update(deltaTime);
     const newPos = this.movement.applyMovement(this.x, this.y, delta.x, delta.y);
+    this.isMoving = newPos.x !== this.x || newPos.y !== this.y;
     this.x = newPos.x;
     this.y = newPos.y;
 
@@ -64,9 +65,6 @@ export class Player {
     if (newDirection) {
       this.direction = newDirection;
     }
-
-    // Update movement state
-    this.isMoving = this.inputHandler.isMoving();
 
     // Update animator
     this.animator.setDirection(this.direction);
