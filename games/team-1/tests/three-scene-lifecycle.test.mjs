@@ -122,6 +122,83 @@ try {
     assert.deepEqual(markers, ["engine", "electrical", "control", "passenger", "rear"]);
   });
 
+  test("builds a distinct labelled station for each existing repair task", () => {
+    const scene = createHarness();
+    try {
+      scene.train.update(createPreviewSnapshot());
+      const expectedDetails = new Map([
+        ["boiler", "station-gauge"],
+        ["wiring", "station-switch"],
+        ["instruments", "station-gauge"],
+        ["passenger-lights", "station-lamp"],
+        ["brakes", "station-brake-lever"],
+      ]);
+
+      for (const [taskId, detailRole] of expectedDetails) {
+        const station = scene.scene.getObjectByName(`repair-station-${taskId}`);
+        assert.ok(station, `${taskId} station should be in the train scene`);
+        assert.equal(station.userData.taskId, taskId, "the station reuses the authoritative task id");
+        const roles = [];
+        station.traverse((object) => roles.push(object.userData.role));
+        assert.ok(roles.includes("station-label"), `${taskId} station should have a readable task label`);
+        assert.ok(roles.includes("station-progress-led"), `${taskId} station should show task progress`);
+        assert.ok(roles.includes(detailRole), `${taskId} station should have distinct equipment`);
+      }
+    } finally {
+      scene.train.dispose();
+    }
+  });
+
+  test("reflects shared progress, brake calibration steps, and local repair readiness", () => {
+    const scene = createHarness();
+    try {
+      const snapshot = createPreviewSnapshot([{ id: "p1", name: "Engineer", connected: true }]);
+      snapshot.localPlayerId = "p1";
+      snapshot.players[0].section = "electrical";
+      const wiring = snapshot.tasks.find((task) => task.id === "wiring");
+      wiring.status = "in-progress";
+      wiring.progress = 50;
+      const brakes = snapshot.tasks.find((task) => task.id === "brakes");
+      brakes.status = "in-progress";
+      brakes.progress = 67;
+      brakes.calibrationStep = 2;
+      scene.train.update(snapshot);
+
+      const wiringStation = scene.scene.getObjectByName("repair-station-wiring");
+      const wiringProgress = [];
+      wiringStation.traverse((object) => {
+        if (object.userData.role === "station-progress-led" && object.userData.lit) wiringProgress.push(object);
+      });
+      assert.equal(wiringStation.userData.status, "in-progress");
+      assert.equal(wiringStation.userData.progress, 50);
+      assert.equal(wiringStation.userData.canRepair, true);
+      assert.equal(wiringProgress.length, 5, "five of ten progress lights reflect 50% shared progress");
+
+      const brakeStation = scene.scene.getObjectByName("repair-station-brakes");
+      assert.equal(brakeStation.userData.calibrationStep, 2);
+      const completedBrakeSteps = [];
+      brakeStation.traverse((object) => {
+        if (object.userData.role === "station-brake-step" && object.material.color.getHexString() === "78d6a0") {
+          completedBrakeSteps.push(object);
+        }
+      });
+      assert.equal(completedBrakeSteps.length, 2, "two completed calibration steps show green");
+
+      wiring.status = "complete";
+      wiring.progress = 100;
+      scene.train.update(snapshot);
+      assert.equal(wiringStation.userData.status, "complete");
+      assert.equal(wiringStation.userData.canRepair, false, "a completed task no longer shows the repair-ready state");
+      const allWiringProgress = [];
+      wiringStation.traverse((object) => {
+        if (object.userData.role === "station-progress-led" && object.userData.lit) allWiringProgress.push(object);
+      });
+      assert.equal(allWiringProgress.length, 10);
+    } finally {
+      scene.train.dispose();
+    }
+  });
+
   test("keeps the remaining avatar and marker colors synchronized after roster changes", () => {
     const scene = createHarness();
     try {
@@ -139,6 +216,51 @@ try {
     } finally {
       scene.train.dispose();
     }
+  });
+
+  test("animates walking, retains facing, and returns to idle", () => {
+    const scene = createHarness();
+    try {
+      const snapshot = createPreviewSnapshot([{ id: "p1", name: "Engineer", connected: true }]);
+      snapshot.players[0].direction = "left";
+      snapshot.players[0].isMoving = true;
+      scene.train.update(snapshot);
+      const avatar = scene.avatars()[0];
+      assert.equal(avatar.children[3].position.x, -0.2);
+      assert.equal(avatar.children[3].position.z, 0);
+      const startX = avatar.position.x;
+      const railway = scene.scene.userData.railwayMotion;
+      const startDistance = railway.userData.travelDistance ?? 0;
+      snapshot.players[0].position.x = 0.75;
+      scene.train.update(snapshot);
+      const [id, callback] = pendingFrames.entries().next().value;
+      pendingFrames.delete(id);
+      const frameTime = Math.ceil(performance.now() / (Math.PI * 120)) * Math.PI * 120 + Math.PI * 60;
+      callback(frameTime);
+      assert.ok(avatar.children[0].position.y > 0.54);
+      assert.ok(avatar.position.x > startX);
+      assert.ok(railway.userData.travelDistance > startDistance);
+      snapshot.players[0].isMoving = false;
+      scene.train.update(snapshot);
+      const [nextId, nextCallback] = pendingFrames.entries().next().value;
+      pendingFrames.delete(nextId);
+      nextCallback(frameTime + 16);
+      assert.equal(avatar.children[0].position.y, 0.54);
+      assert.equal(avatar.children[3].position.x, -0.2);
+    } finally {
+      scene.train.dispose();
+    }
+  });
+
+  test("removes and disposes a remaining player once on scene teardown", () => {
+    const scene = createHarness();
+    scene.train.update(createPreviewSnapshot([{ id: "p1", name: "Engineer", connected: true }]));
+    const avatar = scene.avatars()[0];
+    let disposed = 0;
+    avatar.children[0].material.addEventListener("dispose", () => disposed++);
+    scene.train.dispose();
+    assert.equal(avatar.parent, null);
+    assert.equal(disposed, 1);
   });
 
   test("disposes per-player materials and marker geometry on removal, then shared geometry at scene teardown", () => {
