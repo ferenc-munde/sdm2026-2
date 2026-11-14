@@ -28,6 +28,19 @@ function playerGroups(layer: THREE.Group): THREE.Object3D[] {
 	return layer.children.filter((child) => child.userData.playerId !== undefined);
 }
 
+function facePlayer(dx: number, dy: number) {
+	const layer = new THREE.Group();
+	const visuals = createPlayerVisuals(layer);
+	const player = playerAt(100, 100);
+	const players = new Map([["player-1", player]]);
+	visuals.update(players);
+	player.x += dx;
+	player.y += dy;
+	visuals.update(players);
+	const playerGroup = namedGroup(layer, "player-player-1");
+	return { character: namedGroup(playerGroup, "crew-character"), playerGroup, visuals };
+}
+
 afterEach(() => {
 	vi.restoreAllMocks();
 });
@@ -132,22 +145,14 @@ describe("player visuals", () => {
 		{ direction: "left", dx: -5, dy: 0 },
 		{ direction: "right", dx: 5, dy: 0 },
 	] as const)("faces $direction while keeping the character upright", ({ direction, dx, dy }) => {
-		const layer = new THREE.Group();
-		const visuals = createPlayerVisuals(layer);
-		const player = playerAt(100, 100);
-		const players = new Map([["player-1", player]]);
-		visuals.update(players);
-
-		const playerGroup = namedGroup(layer, "player-player-1");
-		const character = namedGroup(playerGroup, "crew-character");
-		player.x += dx;
-		player.y += dy;
-		visuals.update(players);
+		const { character, playerGroup, visuals } = facePlayer(dx, dy);
 
 		expect(character.userData.facing).toBe(direction);
 		expect(character.rotation.x).toBe(0);
 		expect(character.rotation.y).toBe(0);
 		expect(character.rotation.z).toBe(0);
+		expect(playerGroup.rotation.x).toBe(0);
+		expect(playerGroup.rotation.y).toBe(0);
 		expect(playerGroup.rotation.z).toBe(0);
 		expect(namedMesh(character, "crew-head").position.y)
 			.toBeGreaterThan(namedMesh(character, "crew-torso").position.y);
@@ -160,29 +165,52 @@ describe("player visuals", () => {
 		const hair = namedMesh(character, "back-hair");
 		switch (direction) {
 			case "up":
-				expect(leftEye.visible).toBe(true);
-				expect(rightEye.visible).toBe(true);
-				expect(nose.visible).toBe(true);
-				expect(hair.visible).toBe(false);
-				break;
-			case "down":
 				expect(leftEye.visible).toBe(false);
 				expect(rightEye.visible).toBe(false);
 				expect(nose.visible).toBe(false);
 				expect(hair.visible).toBe(true);
 				break;
+			case "down":
+				expect(leftEye.visible).toBe(true);
+				expect(rightEye.visible).toBe(true);
+				expect(nose.visible).toBe(true);
+				expect(nose.position.y).toBeLessThan(namedMesh(character, "crew-head").position.y);
+				expect(hair.visible).toBe(false);
+				break;
 			case "left":
 				expect(leftEye.visible).toBe(true);
 				expect(rightEye.visible).toBe(false);
+				expect(nose.visible).toBe(true);
 				expect(nose.position.x).toBeLessThan(0);
+				expect(hair.visible).toBe(false);
 				break;
 			case "right":
 				expect(leftEye.visible).toBe(false);
 				expect(rightEye.visible).toBe(true);
+				expect(nose.visible).toBe(true);
 				expect(nose.position.x).toBeGreaterThan(0);
+				expect(hair.visible).toBe(false);
 				break;
 		}
 
+		visuals.destroy();
+	});
+
+	it("shows both eyes and the front of the face when moving down", () => {
+		const { character, visuals } = facePlayer(0, 5);
+		expect(namedMesh(character, "left-eye").visible).toBe(true);
+		expect(namedMesh(character, "right-eye").visible).toBe(true);
+		expect(namedMesh(character, "crew-nose").visible).toBe(true);
+		expect(namedMesh(character, "back-hair").visible).toBe(false);
+		visuals.destroy();
+	});
+
+	it("hides both eyes and the nose and shows the back of the head when moving up", () => {
+		const { character, visuals } = facePlayer(0, -5);
+		expect(namedMesh(character, "left-eye").visible).toBe(false);
+		expect(namedMesh(character, "right-eye").visible).toBe(false);
+		expect(namedMesh(character, "crew-nose").visible).toBe(false);
+		expect(namedMesh(character, "back-hair").visible).toBe(true);
 		visuals.destroy();
 	});
 
