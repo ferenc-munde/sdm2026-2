@@ -33,6 +33,8 @@ import type { ActionHighlight } from "./actionHighlight.ts";
 import {
   advanceWalk,
   crewPose,
+  easeAngle,
+  headingFor,
   smoothSpeed,
   speedBetween,
   wheelAngle,
@@ -46,7 +48,7 @@ import { applyCrewPose, buildCrewFigure, HOLD_POINT } from "./crewModel.ts";
 /** The crew are drawn a little larger than their collision circle so they read from the camera. */
 const CREW_SCALE = 1.35;
 import { buildBreachModel, buildFlame, buildItemModel, buildStationModel, FLAME_SCALE } from "./propModels.ts";
-import { PALETTE, mat, ownMat } from "./style.ts";
+import { LIGHTING, PALETTE, mat, ownMat } from "./style.ts";
 import { buildTrainBody, END_WALL_HEIGHT, FAR_WALL_HEIGHT, LOCOMOTIVE_LENGTH, NEAR_WALL_HEIGHT } from "./trainModel.ts";
 
 /** One distinct colour per seat, in the order the players joined. */
@@ -322,6 +324,7 @@ function buildPlayerGroup(
   }
 
   placePlayer(group, player);
+  group.rotation.y = headingFor(player.facing); // snap on spawn; later turns ease
   // Walk-cycle state (#294), kept on the group so a rebuilt figure starts fresh.
   group.userData.motion = { lastX: player.position.x, lastZ: player.position.y, speed: 0, phase: 0, seconds: 0 };
   return group;
@@ -346,12 +349,14 @@ function poseFigure(group: Object3D, pose: CrewPose): void {
   }
 }
 
-/** Moves a player figure to its position and turns it to face its walking direction. */
+/**
+ * Moves a player figure to its position and stores the heading it should turn toward. The turn is
+ * eased in `updateMotion` (#355); a newly built figure snaps to it so it never spins on spawn.
+ */
 function placePlayer(group: Object3D, player: RenderPlayer): void {
   group.position.set(player.position.x, 0, player.position.y);
   // Local +x points along `facing`; a player with no direction faces +x, as a newly built one does.
-  const facing = player.facing;
-  group.rotation.y = facing && (facing.dx !== 0 || facing.dy !== 0) ? -Math.atan2(facing.dy, facing.dx) : 0;
+  group.userData.targetHeading = headingFor(player.facing);
 }
 
 function buildHazardGroup(hazard: RenderHazard): Group {
@@ -527,10 +532,10 @@ export function buildTrainScene(
 
   // Evening light: a cool sky above, warm bounce from the ground, and a low warm sun that casts
   // shadows so the crew, props and walls sit on the floor instead of floating.
-  scene.add(new AmbientLight(0xffffff, 0.35));
-  scene.add(new HemisphereLight("#9fb6e0", "#4a3a26", 1.1));
-  const sun = new DirectionalLight("#ffe2b8", 2.6);
-  sun.position.set(mapCentreX(map) - 500, 900, 600);
+  scene.add(new AmbientLight(0xffffff, LIGHTING.ambient));
+  scene.add(new HemisphereLight(LIGHTING.skyColor, LIGHTING.groundColor, LIGHTING.hemisphere));
+  const sun = new DirectionalLight(LIGHTING.sunColor, LIGHTING.sunIntensity);
+  sun.position.set(mapCentreX(map) + LIGHTING.sunOffset.x, LIGHTING.sunOffset.y, LIGHTING.sunOffset.z);
   sun.target.position.set(mapCentreX(map) - (LOCOMOTIVE_LENGTH + 50) / 2, 0, 0);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -714,6 +719,11 @@ export function buildTrainScene(
       motion.lastZ = group.position.z;
       motion.phase = advanceWalk(motion.phase, motion.speed, dt);
       if (Number.isFinite(dt) && dt > 0) motion.seconds += dt;
+
+      // Turn toward the latest facing the short way round (#355).
+      const targetHeading =
+        typeof group.userData.targetHeading === "number" ? group.userData.targetHeading : group.rotation.y;
+      group.rotation.y = easeAngle(group.rotation.y, targetHeading, dt);
 
       const carrying = group.children.some((child) => child.userData.kind === "heldItem");
       const interacting = interactingPlayerId !== undefined && interactingPlayerId === group.userData.playerId;
