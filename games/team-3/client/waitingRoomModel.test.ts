@@ -46,6 +46,20 @@ describe("waitingView", () => {
     expect(waitingView(notLobby, "a").canDepart).toBe(false);
   });
 
+  it("shows the departure countdown to everyone and disables the button (#385)", () => {
+    const base = lobby(["a", "b"], 2);
+    const state: GameState = { ...base, lobby: { ...base.lobby, departingIn: 3.2 } };
+
+    const host = waitingView(state, "a");
+    expect(host.departIn).toBeCloseTo(3.2);
+    expect(host.canDepart).toBe(false);
+    expect(waitingHint(host)).toBe("Departing in 4…");
+
+    const crew = waitingView(state, "b");
+    expect(crew.departIn).toBeCloseTo(3.2);
+    expect(crew.canDepart).toBe(false);
+  });
+
   it("offers 2-4 and disables sizes below the players in the room", () => {
     const three = waitingView(lobby(["a", "b", "c"], 3), "a");
     expect(three.sizeOptions).toEqual([

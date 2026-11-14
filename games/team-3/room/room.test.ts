@@ -93,13 +93,14 @@ describe("The Last Train on @sdm/host", () => {
 
     sendHost({ type: "configureRoom", crewSize: 2 });
     sendHost({ type: "startGame" });
-    await waitFor(() => view(crewRoom)?.phase === "playing");
+    // The room counts down 5 s before departing (#385).
+    await waitFor(() => view(crewRoom)?.phase === "playing", 9000);
 
     // Walking on the train is seen by the other browser.
     const before = view(crewRoom)!.players[hostRoom.sessionId]!.position;
     sendHost({ type: "input", direction: { dx: 1, dy: 0 }, interacting: false });
     await waitFor(() => (view(crewRoom)!.players[hostRoom.sessionId]!.position.x > before.x + 5 ? true : null));
-  }, 20000);
+  }, 30000);
 
   it("refuses a malformed message with a notice instead of dropping the player", async () => {
     const { client } = await boot();

@@ -62,12 +62,12 @@ describe("integrated platform lobby", () => {
     expect(action.ok).toBe(true); if (!action.ok) return;
     lobby = { ...action.platform, session: at(action.platform.session, "host", map.objects.breach) };
     lobby = { ...lobby, session: ok(applyInput(lobby.session, "host", { direction: { dx: 0, dy: 0 }, interacting: true })) };
-    lobby = stepPlatformLobby(lobby, 3, map);
+    lobby = stepPlatformLobby(lobby, 3, map, train);
     expect(lobby.practice.breach).toBeNull();
     expect(platformLobbyView(lobby, map).journey).toEqual(lobby.session.state.journey);
-    lobby = stepPlatformLobby(lobby, 4.99, map);
+    lobby = stepPlatformLobby(lobby, 4.99, map, train);
     expect(lobby.practice.breach).toBeNull();
-    lobby = stepPlatformLobby(lobby, 0.01, map);
+    lobby = stepPlatformLobby(lobby, 0.01, map, train);
     expect(lobby.practice.breach?.id).toBe("practice-breach");
   });
 });
