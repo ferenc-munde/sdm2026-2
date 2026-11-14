@@ -1,3 +1,4 @@
+import { LOCOMOTIVE_LENGTH } from "./trainModel.ts";
 import { Color, Mesh, MeshStandardMaterial, Object3D, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import type { RenderPlayer } from "./renderPlayer.ts";
@@ -66,7 +67,8 @@ describe("the train", () => {
   it("puts the camera above the train, looking down at an angle", () => {
     const train = build();
     expect(train.camera.position.y).toBeGreaterThan(0);
-    expect(train.camera.position.x).toBeCloseTo(mapCentreX(train.map));
+    // Centred on the cars plus the locomotive in front of them (visual pass).
+    expect(train.camera.position.x).toBeCloseTo(mapCentreX(train.map) - (LOCOMOTIVE_LENGTH + 50) / 2);
 
     const direction = new Vector3();
     train.camera.getWorldDirection(direction);
@@ -95,7 +97,8 @@ describe("players and items", () => {
     expect(train.playersGroup.children).toHaveLength(2);
 
     const colours = train.playersGroup.children.map((group) => {
-      const body = group.children.find((child) => child.userData.kind === "playerBody");
+      let body: Object3D | undefined;
+      group.traverse((child) => { if (child.userData.kind === "playerBody") body = child; });
       expect(body).toBeInstanceOf(Mesh);
       return new Color(((body as Mesh).material as MeshStandardMaterial).color).getHexString();
     });
@@ -222,8 +225,8 @@ describe("updateState", () => {
   it("draws each crew member with a head and turns them to face where they walk (#217)", () => {
     const train = build({ players: [{ id: "a", name: "Ada", position: { x: 0, y: 0 }, facing: { dx: 0, dy: 1 } }] });
     const group = train.playersGroup.children[0]!;
-    expect(group.children.some((child) => child.name === "head")).toBe(true);
-    expect(group.children.some((child) => child.name === "facing")).toBe(true);
+    expect(group.getObjectByName("head")).toBeDefined();
+    expect(group.getObjectByName("facing")).toBeDefined();
     expect(group.rotation.y).toBeCloseTo(-Math.PI / 2);
   });
 });

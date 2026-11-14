@@ -67,7 +67,8 @@ describe("the platform scene", () => {
     expect(platform.playersGroup.children).toHaveLength(2);
 
     const colours = platform.playersGroup.children.map((group) => {
-      const body = group.children.find((child) => child.userData.kind === "playerBody");
+      let body: Object3D | undefined;
+      group.traverse((child) => { if (child.userData.kind === "playerBody") body = child; });
       expect(body).toBeInstanceOf(Mesh);
       return new Color(((body as Mesh).material as MeshStandardMaterial).color).getHexString();
     });

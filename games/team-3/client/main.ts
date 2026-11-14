@@ -9,7 +9,7 @@ import { createConductor } from "./conductor.ts";
 import { COURSE_FX_SECONDS, courseFailed, courseFx, failureDirection } from "./courseFx.ts";
 import { createHelp } from "./help.ts";
 import { createCourseWarning } from "./courseWarning.ts";
-import { WebGLRenderer } from "three";
+import { ACESFilmicToneMapping, PCFSoftShadowMap, WebGLRenderer } from "three";
 import { FUEL_MAX, HULL_MAX, LOW_FUEL_THRESHOLD, WIN_DISTANCE } from "../shared/constants.ts";
 import type { ClientMessage, InputMessage } from "../shared/messages.ts";
 import type { GameState, Phase } from "../shared/types.ts";
@@ -46,6 +46,11 @@ if (!container) throw new Error("#app is missing from index.html");
 
 const renderer = new WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// Real shadows and filmic colour (visual pass): the crew and props sit on the floor.
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = PCFSoftShadowMap;
+renderer.toneMapping = ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
 renderer.setSize(container.clientWidth, container.clientHeight);
 container.appendChild(renderer.domElement);
 
@@ -462,6 +467,7 @@ function drawLive(delta: number, time: number): void {
   });
   hud.update(hudView(state.journey));
   scenery.update(delta, state.phase === "playing" ? state.journey.speedFactor : 0);
+  train.setSpeed(state.phase === "playing" ? state.journey.speedFactor : 0);
   if (liveState && liveState.phase !== "lobby") {
     for (const name of eventsBetween(liveState, state)) sound.play(name);
   }
@@ -529,6 +535,7 @@ const walk = (time: number): void => {
     const journey = { fuel, hull, distance: progress * WIN_DISTANCE, speedFactor };
     hud.update(hudView(journey));
     scenery.update(delta, speedFactor);
+    train.setSpeed(speedFactor);
 
     // Sound cues come from diffing the states, exactly as they will in the room.
     const demoState: GameState = {

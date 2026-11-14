@@ -14,6 +14,8 @@ import {
   ConeGeometry,
   CylinderGeometry,
   DirectionalLight,
+  Fog,
+  HemisphereLight,
   Group,
   Mesh,
   MeshStandardMaterial,
@@ -28,6 +30,13 @@ import {
 import { createTrainMap, type TrainMap } from "../shared/map/map.ts";
 import type { Hazard, Item, ItemKind, StationKind } from "../shared/types.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
+import { applyCrewPose, buildCrewFigure, crewPose, HOLD_POINT } from "./crewModel.ts";
+
+/** The crew are drawn a little larger than their collision circle so they read from the camera. */
+const CREW_SCALE = 1.35;
+import { buildBreachModel, buildFlame, buildItemModel, buildStationModel, FLAME_SCALE } from "./propModels.ts";
+import { PALETTE, mat, ownMat } from "./style.ts";
+import { buildTrainBody, END_WALL_HEIGHT, FAR_WALL_HEIGHT, LOCOMOTIVE_LENGTH, NEAR_WALL_HEIGHT } from "./trainModel.ts";
 
 /** One distinct colour per seat, in the order the players joined. */
 export const PLAYER_COLORS = ["#e5484d", "#3e63dd", "#30a46c", "#f5d90a"] as const;
@@ -51,7 +60,7 @@ export interface RenderWorld {
 const FLOOR_THICKNESS = 8;
 const WALL_HEIGHT = 30;
 const DOOR_THICKNESS = 2;
-const LABEL_HEIGHT = 62;
+const LABEL_HEIGHT = 70;
 const HAZARD_BAR_HEIGHT = 46;
 const HAZARD_BAR_WIDTH = 44;
 
@@ -105,6 +114,8 @@ export interface TrainScene {
   updateState(world: RenderWorld): void;
   /** Animates fire flicker and breach steam; call every frame with the elapsed seconds. */
   updateEffects(seconds: number): void;
+  /** The train's speed factor (0–1) for the wheels and chimney smoke. */
+  setSpeed(speedFactor: number): void;
   dispose(): void;
 }
 
@@ -127,7 +138,9 @@ const CAMERA_MARGIN = 90;
  * whole train fits the viewport. Call it again on resize with the new aspect.
  */
 export function fitCameraToMap(camera: PerspectiveCamera, map: TrainMap, aspect: number): void {
-  const centreX = mapCentreX(map);
+  // Frame the cars plus the locomotive in front of the first one (visual pass).
+  // The cowcatcher and smokebox reach ~50 units past the locomotive's length.
+  const centreX = mapCentreX(map) - (LOCOMOTIVE_LENGTH + 50) / 2;
   const halfLength = map.cars.reduce((widest, car) => Math.max(widest, Math.abs(car.x - centreX) + car.width / 2), 0);
   const depth = map.cars.reduce((deepest, car) => Math.max(deepest, car.depth), 0);
 
@@ -157,16 +170,14 @@ function buildStation(kind: StationKind, position: { x: number; y: number }): Gr
   group.userData = { kind: "station", stationKind: kind };
   group.position.set(position.x, 0, position.y);
 
-  const color = new Color(STATION_COLORS[kind]);
-  const pad = new Mesh(new BoxGeometry(44, 6, 44), new MeshStandardMaterial({ color, roughness: 0.7 }));
-  pad.position.y = 3;
-  pad.userData = { kind: "stationPad", stationKind: kind };
-  group.add(pad);
-
-  const post = new Mesh(new BoxGeometry(12, 28, 12), new MeshStandardMaterial({ color, roughness: 0.5 }));
-  post.position.y = 20;
-  post.userData = { kind: "stationPost", stationKind: kind };
-  group.add(post);
+  // A low base in the station's colour keeps stations easy to tell apart; the model on it shows
+  // what the station is (visual pass).
+  const base = new Mesh(new BoxGeometry(46, 2, 46), mat(STATION_COLORS[kind], { roughness: 0.7 }));
+  base.position.y = 1;
+  base.receiveShadow = true;
+  base.userData = { kind: "stationPad", stationKind: kind };
+  group.add(base);
+  group.add(buildStationModel(kind));
 
   return group;
 }
@@ -175,29 +186,43 @@ function buildMapGroup(map: TrainMap): Group {
   const group = new Group();
   group.name = "train";
 
-  const floorMaterial = new MeshStandardMaterial({ color: new Color(FLOOR_COLOR), roughness: 0.95 });
-  const wallMaterial = new MeshStandardMaterial({ color: new Color(WALL_COLOR), roughness: 0.8 });
-  const doorMaterial = new MeshStandardMaterial({ color: new Color(DOOR_COLOR), roughness: 0.6 });
+  const floorMaterial = mat(PALETTE.wood, { roughness: 0.9 });
+  const wallMaterial = mat(PALETTE.paint, { roughness: 0.55 });
+  const capMaterial = mat(PALETTE.brass, { metalness: 0.5, roughness: 0.4 });
+  const doorMaterial = mat(PALETTE.ironLight, { metalness: 0.4, roughness: 0.5 });
 
   for (const car of map.cars) {
     const mesh = new Mesh(new BoxGeometry(car.width, FLOOR_THICKNESS, car.depth), floorMaterial);
     mesh.position.set(car.x, -FLOOR_THICKNESS / 2, car.y);
+    mesh.receiveShadow = true;
     mesh.name = `car-${car.index}`;
     mesh.userData = { kind: "car", index: car.index };
     group.add(mesh);
   }
 
+  // Cut-away carriage walls: the far side is a full wall, the near side stays low so the camera
+  // sees in, and the ends sit in between. Same positions as the rules' collision walls.
+  const trackCentre = map.cars.reduce((sum, car) => sum + car.y, 0) / Math.max(1, map.cars.length);
   for (const wall of map.walls) {
-    const mesh = new Mesh(new BoxGeometry(wall.width, WALL_HEIGHT, wall.depth), wallMaterial);
-    mesh.position.set(wall.x, WALL_HEIGHT / 2, wall.y);
+    const alongTrain = wall.width > wall.depth;
+    const height = !alongTrain ? END_WALL_HEIGHT : wall.y < trackCentre ? FAR_WALL_HEIGHT : NEAR_WALL_HEIGHT;
+    const mesh = new Mesh(new BoxGeometry(wall.width, height, wall.depth), wallMaterial);
+    mesh.position.set(wall.x, height / 2, wall.y);
     mesh.name = "wall";
     mesh.userData = { kind: "wall" };
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
     group.add(mesh);
+    const cap = new Mesh(new BoxGeometry(wall.width + 2, 2.5, wall.depth + 2), capMaterial);
+    cap.position.set(wall.x, height + 1.25, wall.y);
+    cap.userData = { kind: "trainDetail" };
+    group.add(cap);
   }
 
   for (const door of map.doors) {
     const mesh = new Mesh(new BoxGeometry(door.width, DOOR_THICKNESS, door.depth), doorMaterial);
     mesh.position.set(door.x, DOOR_THICKNESS / 2, door.y);
+    mesh.receiveShadow = true;
     mesh.name = `door-${door.fromCar}-${door.toCar}`;
     mesh.userData = { kind: "door", fromCar: door.fromCar, toCar: door.toCar };
     group.add(mesh);
@@ -238,10 +263,7 @@ export function createNameLabel(name: string): Object3D {
 }
 
 function buildItemMesh(item: RenderItem, scale = 1): Mesh {
-  const mesh = new Mesh(
-    new BoxGeometry(16 * scale, 12 * scale, 16 * scale),
-    new MeshStandardMaterial({ color: new Color(ITEM_COLORS[item.kind]), roughness: 0.6 }),
-  );
+  const mesh = buildItemModel(item.kind, scale);
   mesh.name = `item-${item.id}`;
   mesh.userData = { kind: "item", itemId: item.id, itemKind: item.kind };
   return mesh;
@@ -257,40 +279,14 @@ function buildPlayerGroup(
   group.name = `player-${player.id}`;
   group.userData = { kind: "player", playerId: player.id, name: player.name };
 
-  // A tiny crew member (#217): a colour-coded capsule body, a head, a nose that shows where they
-  // face, and a soft shadow on the floor so they read as standing in the car.
+  // A crew member (visual pass, #262): an engineer with cap and jacket in the player's colour,
+  // animated by `updateEffects` (walk, idle, carry).
   const color = new Color(PLAYER_COLORS[seat % PLAYER_COLORS.length] ?? PLAYER_COLORS[0]);
-  const shadow = new Mesh(
-    new CylinderGeometry(PLAYER_RADIUS * 1.15, PLAYER_RADIUS * 1.15, 0.5, 20),
-    new MeshStandardMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }),
-  );
-  shadow.position.y = 0.6;
-  shadow.name = "shadow";
-  group.add(shadow);
-
-  const bodyHeight = PLAYER_HEIGHT * 0.62;
-  const body = new Mesh(
-    new CapsuleGeometry(PLAYER_RADIUS * 0.85, bodyHeight - PLAYER_RADIUS * 1.7, 6, 16),
-    new MeshStandardMaterial({ color, roughness: 0.55 }),
-  );
-  body.position.y = bodyHeight / 2;
+  const { figure, body } = buildCrewFigure(color);
+  figure.scale.setScalar(CREW_SCALE);
   body.name = `body-${player.id}`;
   body.userData = { kind: "playerBody", playerId: player.id, seat };
-  group.add(body);
-
-  const headRadius = PLAYER_RADIUS * 0.62;
-  const head = new Mesh(
-    new SphereGeometry(headRadius, 16, 12),
-    new MeshStandardMaterial({ color: color.clone().lerp(new Color("#ffe0c4"), 0.65), roughness: 0.5 }),
-  );
-  head.position.y = bodyHeight + headRadius * 0.8;
-  head.name = "head";
-  group.add(head);
-
-  const nose = new Mesh(new BoxGeometry(5, 4, 4), new MeshStandardMaterial({ color: 0x20202a }));
-  nose.position.set(headRadius, head.position.y, 0);
-  nose.name = "facing";
-  group.add(nose);
+  group.add(figure);
 
   const label = labelFactory(player.name);
   label.position.y = LABEL_HEIGHT;
@@ -301,7 +297,7 @@ function buildPlayerGroup(
   if (held) {
     const mesh = buildItemMesh(held, 0.7);
     mesh.name = `held-${held.id}`;
-    mesh.position.set(PLAYER_RADIUS + 8, PLAYER_HEIGHT * 0.6, 0);
+    mesh.position.set(HOLD_POINT.x * CREW_SCALE, HOLD_POINT.y * CREW_SCALE, HOLD_POINT.z);
     mesh.userData = { ...mesh.userData, kind: "heldItem", heldBy: player.id };
     group.add(mesh);
   }
@@ -327,15 +323,20 @@ function buildHazardGroup(hazard: RenderHazard): Group {
   const material = new MeshStandardMaterial({ color, roughness: 0.5, emissive: color, emissiveIntensity: 0.35 });
 
   if (hazard.kind === "fire") {
-    const flame = new Mesh(new ConeGeometry(14, 28, 16), material);
-    flame.position.y = 16;
+    const flame = buildFlame();
+    flame.position.y = 31; // the scaled flame's base (the ember bed) sits on the floor
     flame.name = "fire";
     flame.userData = { kind: "hazardShape", hazardKind: hazard.kind };
     group.add(flame);
+  } else if (hazard.kind === "breach") {
+    const mark = buildBreachModel();
+    mark.name = "breach";
+    mark.userData = { kind: "hazardShape", hazardKind: hazard.kind };
+    group.add(mark);
   } else {
     const mark = new Mesh(new CylinderGeometry(18, 18, 4, 20), material);
     mark.position.y = 4;
-    mark.name = hazard.kind === "breach" ? "breach" : "course";
+    mark.name = "course";
     mark.userData = { kind: "hazardShape", hazardKind: hazard.kind };
     group.add(mark);
   }
@@ -478,17 +479,24 @@ export function buildTrainScene(
   const labelFactory = options.labelFactory ?? createNameLabel;
 
   const scene = new Scene();
-  scene.background = new Color("#1a2130");
+  scene.background = new Color(PALETTE.sky);
+  scene.fog = new Fog(PALETTE.fog, 2200, 5200);
 
   const camera = createCamera(map);
   scene.add(camera);
 
-  const ambient = new AmbientLight(0xffffff, 1.2);
-  scene.add(ambient);
-
-  const sun = new DirectionalLight(0xffffff, 2.2);
-  sun.position.set(mapCentreX(map) - 300, 900, 420);
-  scene.add(sun);
+  // Evening light: a cool sky above, warm bounce from the ground, and a low warm sun that casts
+  // shadows so the crew, props and walls sit on the floor instead of floating.
+  scene.add(new AmbientLight(0xffffff, 0.35));
+  scene.add(new HemisphereLight("#9fb6e0", "#4a3a26", 1.1));
+  const sun = new DirectionalLight("#ffe2b8", 2.6);
+  sun.position.set(mapCentreX(map) - 500, 900, 600);
+  sun.target.position.set(mapCentreX(map) - (LOCOMOTIVE_LENGTH + 50) / 2, 0, 0);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -950, right: 950, top: 500, bottom: -500, near: 100, far: 2400 });
+  sun.shadow.bias = -0.0008;
+  scene.add(sun, sun.target);
 
   // One group for the hull and everything standing on it, so the course-hazard
   // feedback can roll the train without moving the camera (#219).
@@ -498,6 +506,20 @@ export function buildTrainScene(
 
   const mapGroup = buildMapGroup(map);
   hullGroup.add(mapGroup);
+  const body = buildTrainBody(map);
+  hullGroup.add(body.group);
+
+  // Chimney smoke: a few puffs that rise, grow and fade, faster when the train goes faster.
+  const smoke: Mesh[] = [];
+  for (let index = 0; index < 6; index += 1) {
+    const puff = new Mesh(new SphereGeometry(9, 8, 6), ownMat(PALETTE.steam, { opacity: 0.5 }));
+    puff.userData = { phase: index / 6 };
+    smoke.push(puff);
+    hullGroup.add(puff);
+  }
+  let speedFactor = 0;
+  let lastSeconds: number | null = null;
+  let travelled = 0;
 
   const itemsGroup = new Group();
   itemsGroup.name = "items";
@@ -568,13 +590,55 @@ export function buildTrainScene(
 
   /** Fire flicker and rising breach steam; pure presentation, driven by the frame clock. */
   const updateEffects = (seconds: number): void => {
+    const dt = lastSeconds === null ? 0 : Math.min(0.1, Math.max(0, seconds - lastSeconds));
+    lastSeconds = seconds;
+    travelled += dt * speedFactor;
+
+    // Wheels turn with the train's speed (10 units/s of journey looks right at ~2 turns a second).
+    for (const wheel of body.wheels) wheel.rotation.y = -travelled * 12;
+
+    // Smoke rises from the chimney; more and faster with speed, a lazy wisp when stalled.
+    for (const puff of smoke) {
+      const phase = Number(puff.userData.phase) || 0;
+      const rise = (seconds * (0.35 + 0.5 * speedFactor) + phase) % 1;
+      puff.position.set(body.chimneyTop.x + rise * 160 * (0.3 + speedFactor), body.chimneyTop.y + rise * 120, body.chimneyTop.z);
+      puff.scale.setScalar(0.6 + rise * 2.2);
+      (puff.material as MeshStandardMaterial).opacity = 0.55 * (1 - rise);
+    }
+
+    // Crew: walk, idle and carry poses from how far each figure moved since the last frame.
+    for (const group of playersGroup.children) {
+      const previous = group.userData.lastPosition as { x: number; z: number } | undefined;
+      const moved = previous && dt > 0 ? Math.hypot(group.position.x - previous.x, group.position.z - previous.z) / dt : 0;
+      group.userData.lastPosition = { x: group.position.x, z: group.position.z };
+      const speed = (group.userData.speed = 0.7 * (Number(group.userData.speed) || 0) + 0.3 * moved);
+      const carrying = group.children.some((child) => child.userData.kind === "heldItem");
+      const figure = group.getObjectByName("crew");
+      if (figure) applyCrewPose(figure, crewPose(seconds + group.id, speed, carrying), carrying);
+    }
+
+    // Loose items bob and turn a little so they read as things to pick up.
+    for (const item of itemsGroup.children) {
+      item.position.y = 10 + Math.sin(seconds * 3 + item.id) * 1.5;
+      item.rotation.y = seconds * 0.8 + item.id;
+    }
+
+    // The firebox glows in time with the engine.
+    const glow = mapGroup.getObjectByName("fireboxGlow");
+    if (glow instanceof Mesh) (glow.material as MeshStandardMaterial).emissiveIntensity = 1.2 + 0.5 * Math.sin(seconds * 7);
+
     for (const group of hazardsGroup.children) {
       const kind = group.userData.hazardKind;
       if (kind === "fire") {
         const flame = group.children.find((child) => child.name === "fire");
         if (flame instanceof Mesh) {
+          for (const lick of flame.children) {
+            if (lick.name !== "flameLick") continue;
+            const phase = Number(lick.userData.phase) || 0;
+            lick.scale.y = 0.7 + 0.5 * (0.5 + 0.5 * Math.sin(seconds * 15 + phase * 6));
+          }
           const flicker = 1 + 0.08 * Math.sin(seconds * 11 + group.id);
-          flame.scale.set(flicker, 1 + 0.1 * Math.sin(seconds * 9), flicker);
+          flame.scale.set(FLAME_SCALE * flicker, FLAME_SCALE * (1 + 0.1 * Math.sin(seconds * 9)), FLAME_SCALE * flicker);
           const material = flame.material;
           if (material instanceof MeshStandardMaterial) {
             material.emissiveIntensity = 0.3 + 0.2 * (0.5 + 0.5 * Math.sin(seconds * 13));
@@ -607,6 +671,9 @@ export function buildTrainScene(
     map,
     updateState,
     updateEffects,
+    setSpeed: (factor: number) => {
+      speedFactor = Number.isFinite(factor) ? Math.min(1, Math.max(0, factor)) : 0;
+    },
     dispose: () => {
       drawnPlayers.clear();
       drawnItems.clear();
