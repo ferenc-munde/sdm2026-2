@@ -85,7 +85,9 @@ export function mountTrainScene(
     const height = canvas.clientHeight;
     if (width === 0 || height === 0) return;
     const aspect = width / height;
-    const layoutPadding = 1.5;
+    // Tighter framing gives the train more of the available canvas while retaining
+    // a small margin at both laptop and narrow viewport aspect ratios.
+    const layoutPadding = 0.45;
     const viewHeight = Math.max(
       TRAIN_LAYOUT.width + layoutPadding * 2,
       (TRAIN_LAYOUT.length + layoutPadding * 2) / aspect,

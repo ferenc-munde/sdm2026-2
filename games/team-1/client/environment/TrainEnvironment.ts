@@ -404,6 +404,32 @@ function addWalls(environment: THREE.Group): void {
   }
 }
 
+function addRepairMarkers(environment: THREE.Group): void {
+  sections.forEach((definition, index) => {
+    const marker = new THREE.Group();
+    marker.name = `repair-area-${definition.id}`;
+    marker.position.set(-TRAIN_LENGTH / 2 + SECTION_LENGTH * (index + 0.5), 0, 0);
+    marker.userData.role = "repair-area";
+    marker.userData.sectionId = definition.id;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.66, 0.78, 32),
+      new THREE.MeshBasicMaterial({ color: "#e8bd72", transparent: true, opacity: 0.82, side: THREE.DoubleSide }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.07;
+    ring.userData.role = "repair-area-marker";
+    marker.add(ring);
+    const beacon = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.035, 0.035, 0.32, 8),
+      new THREE.MeshStandardMaterial({ color: "#e8bd72", emissive: "#7c4f1d", emissiveIntensity: 0.7 }),
+    );
+    beacon.position.set(0, 0.22, 0);
+    beacon.userData.role = "repair-area-beacon";
+    marker.add(beacon);
+    environment.add(marker);
+  });
+}
+
 export function createTrainEnvironment(): THREE.Group {
   const environment = new THREE.Group();
   environment.name = "train-environment";
@@ -425,5 +451,6 @@ export function createTrainEnvironment(): THREE.Group {
   });
 
   addWalls(environment);
+  addRepairMarkers(environment);
   return environment;
 }

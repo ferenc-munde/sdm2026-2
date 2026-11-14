@@ -64,6 +64,7 @@ export function mountGameplayView(root: HTMLElement, adapter: GameStateAdapter, 
     const condition = root.querySelector<HTMLElement>("#condition-value")!;
     condition.textContent = `${Math.round(snapshot.trainCondition)}%`;
     condition.dataset.band = band;
+    root.querySelector<HTMLElement>(".condition-block")!.dataset.band = band;
     root.querySelector<HTMLElement>("#condition-meter")!.setAttribute("aria-valuenow", String(Math.min(100, Math.max(0, snapshot.trainCondition))));
     const fill = root.querySelector<HTMLElement>("#condition-fill")!;
     fill.style.width = `${Math.min(100, Math.max(0, snapshot.trainCondition))}%`;
