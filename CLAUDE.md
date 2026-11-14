@@ -102,7 +102,7 @@ When someone asks about their grade or points, run `node course/tooling/student-
 
 ## Deployment
 
-Nothing is deployed yet. Railway belongs to the platform team: teams don't create or change Railway services, variables or domains; they open a `platform` issue instead. The target setup (one gateway, one service per game, the `development` branch deploys to the development environment, `main` to production) is in [server/ARCHITECTURE.md](server/ARCHITECTURE.md). Secrets live only in Railway variables, never in the repository.
+Production is live at <https://sdm2026.online/>: Team 1, Team 2 and Team 3 are served under `/team-1/`, `/team-2/` and `/team-3/`. The Railway-generated address <https://sdm2026-2-production.up.railway.app/> is a fallback. Railway belongs to the platform team: teams don't create or change Railway services, variables or domains; they open a `platform` issue instead. The environments and deployment setup are documented in [server/ARCHITECTURE.md](server/ARCHITECTURE.md). Secrets live only in Railway variables, never in the repository.
 
 ## Never
 

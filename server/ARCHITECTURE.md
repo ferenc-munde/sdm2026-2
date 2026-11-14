@@ -18,8 +18,8 @@ What has been done so far:
 | `@sdm/core` | Done: contract (`shared`), simulation contract (`sim`), `Simulation` with replays that re-run to the same state hash (`server`), connection helpers for the browser (`client`). Not built: prediction, interpolation and debug tools in the client core |
 | `@sdm/host` | Done: `startGameServer()`, `createGameRoom()`, `/health`, join by code, replays, bug reports, stats, structured logs, input limits, serving the built client. Not built: storage that survives a restart (replays and bug reports are kept in memory), access control for `/api/stats` and the replay routes |
 | `@sdm/template` | Not built: only the README exists |
-| `@sdm/gateway`, Railway environments | Done in the repository: `@sdm/gateway` serves every game under `/<game>/` on one address (HTTP and WebSocket). `railway.json` builds all clients with `--base=./` and starts the gateway with every game of the monorepo as its own process, so one Railway service and one domain serve `/team-1/`, `/team-2/`, `/team-3/` from `main`. The Railway project and its service are set up by the platform team and not recorded here |
-| Game teams | Building: Team 1, Team 2 and Team 3 each start their game on the platform host with a `server.ts` and a room in `room/` |
+| `@sdm/gateway`, Railway environments | Done in the repository: `@sdm/gateway` serves every game under `/<game>/` on one address (HTTP and WebSocket). `railway.json` builds all clients with `--base=./` and starts the gateway with every game of the monorepo as its own process. Production is live at `https://sdm2026.online/`; the Railway-generated fallback is `https://sdm2026-2-production.up.railway.app/`. The Railway project and service are managed by the platform team |
+| Game teams | Building: Team 1, Team 2 and Team 3 each start their game on the platform host with a `server.ts` and a room in `room/`. Their production pages are served at `/team-1/`, `/team-2/` and `/team-3/` on the public gateway |
 
 All three games already run on `@sdm/core` and `@sdm/host`. `@sdm/template` is the part the teams still wait for (Team 2 asked for it in issue #73). The build order is in [README.md](README.md#build-order).
 
@@ -130,9 +130,9 @@ The same rules, with the commit and pull request format, are in [../CLAUDE.md](.
 
 ## Environments (Railway)
 
-> **Not set up yet.** This is the target.
+Production is live at <https://sdm2026.online/>. The Railway-generated address, <https://sdm2026-2-production.up.railway.app/>, remains available as a fallback. The gateway health check is `GET /health`; each game's health check is available at `/team-N/health`.
 
-Railway project `sdm2026-2`, separate from Team 10's `sdm2026-1` project (see the instructors' setup issues). The gateway plus one service per game, one replica each.
+Railway project `sdm2026-2`, separate from Team 10's `sdm2026-1` project (see the instructors' setup issues). One gateway service builds and starts the monorepo's games as internal processes.
 
 | Environment | Deploys | `APP_ENV` |
 |---|---|---|
