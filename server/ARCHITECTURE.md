@@ -122,6 +122,7 @@ Rules:
 
 - **A feature branch goes into `development`.** `Team_N_Feature` is never merged into `staging` or `main` directly, and a team's work branch is never merged into anything but its own `Team_N_Feature`.
 - Nobody commits directly to `main`, `staging`, `development` or `Team_N_Feature`: they change only through merged pull requests.
+- Two repository rulesets enforce this. `main: only instructors promote` protects `main` (only the repository admin, an instructor, merges into it). `long-lived branches` protects `development`, `staging` and `Team_*_Feature`. Both forbid deleting and force-pushing these branches, so the automatic deletion of merged head branches never removes them.
 - `platform` and `team-instructor` have no feature branch. Their work branches start from `development` and their pull requests go into `development`.
 - A team keeps its `Team_N_Feature` up to date by merging `development` into it.
 
