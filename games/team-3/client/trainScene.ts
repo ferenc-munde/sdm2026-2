@@ -44,6 +44,7 @@ import {
 import type { StationStatuses } from "../shared/stations/status.ts";
 import { createHighlightRing } from "./highlightRing.ts";
 import { bendPoint, carIndexAt, chain, createBendState, restFronts } from "./trainBend.ts";
+import { RAIL_SIZE, SCENERY_Y, SLEEPER_SIZE, railOffset } from "./scenery.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import { applyCrewPose, buildCrewFigure, HOLD_POINT } from "./crewModel.ts";
 
@@ -646,6 +647,45 @@ export function buildTrainScene(
     o.userData.rest ??= { x: o.position.x, z: o.position.z, ry: o.rotation.y };
     return o.userData.rest as { x: number; z: number; ry: number };
   };
+  // The track under the train (#425): one rail section per car, from its front coupling to the next
+  // car's, plus long sections ahead of the locomotive and behind the last car. The sections end at
+  // the couplings the bend keeps joined, so the track stays joined at any angle. Shown only while
+  // the train is bent; then the scenery's straight rails are hidden. At straight both sets sit in
+  // exactly the same place, so the swap can't be seen.
+  const TRACK_REACH = 3000;
+  const trackGroup = new Group();
+  trackGroup.name = "trainTrack";
+  trackGroup.visible = false;
+  hullGroup.add(trackGroup);
+  {
+    const railMaterial = mat(PALETTE.rail, { metalness: 0.7, roughness: 0.3 });
+    const railY = SCENERY_Y + SLEEPER_SIZE.height / 2 + RAIL_SIZE.height / 2;
+    const offset = railOffset(map.cars[0]?.depth ?? 0);
+    const last = map.cars[map.cars.length - 1]!;
+    const stops = [fronts[0]!.x - TRACK_REACH, ...fronts.map((front) => front.x), last.x + last.width / 2 + TRACK_REACH];
+    for (let i = 0; i + 1 < stops.length; i++) {
+      const from = stops[i]!;
+      const to = stops[i + 1]!;
+      for (const side of [-1, 1]) {
+        const rail = new Mesh(new BoxGeometry(to - from, RAIL_SIZE.height, RAIL_SIZE.width), railMaterial);
+        rail.name = "trainRail";
+        rail.position.set((from + to) / 2, railY, side * offset);
+        trackGroup.add(rail);
+      }
+    }
+  }
+  let sceneryRails: Object3D[] | null = null;
+  /** Shows the train's own rails (and hides the scenery's) while the train is bent. */
+  const showBentTrack = (bent: boolean): void => {
+    sceneryRails ??= (() => {
+      const found: Object3D[] = [];
+      scene.traverse((o) => { if (o.name === "rail") found.push(o); });
+      return found;
+    })();
+    trackGroup.visible = bent;
+    for (const rail of sceneryRails) rail.visible = !bent;
+  };
+
   /** Moves (and for the train's own parts, turns) every drawn object with the car it stands in. */
   const applyBend = (dt: number): void => {
     const angles = bend.step(dt, curveActive);
@@ -661,6 +701,8 @@ export function buildTrainScene(
     };
     // Wheels only move with their car: their rotation.y is the roll that updateMotion advances.
     for (const o of [...mapGroup.children, ...body.group.children, ...hazardsGroup.children]) place(o, restOf(o), o.name !== "wheel");
+    for (const rail of trackGroup.children) place(rail, restOf(rail), true);
+    showBentTrack(!bend.isStraight());
     // Players and items: moved with their car; their own turning (heading, spin) stays theirs.
     for (const o of [...playersGroup.children, ...itemsGroup.children]) place(o, restOf(o), false);
     for (const puff of smoke) place(puff, { x: puff.position.x, z: puff.position.z, ry: 0 }, false);
