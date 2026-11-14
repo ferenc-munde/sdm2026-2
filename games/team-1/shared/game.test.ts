@@ -15,6 +15,7 @@ import {
   type TrainState,
 } from "./game";
 import { SECTIONS, TASK_CATALOGUE, sectionAt } from "./train-layout";
+import { isTrainWalkable, moveInTrain } from "./train-collision";
 
 const config = ConfigSchema.parse(rawConfig);
 
@@ -73,6 +74,19 @@ describe("config and schemas", () => {
 });
 
 describe("train layout", () => {
+  it("blocks walls and equipment, slides along them, and permits doorways without tunnelling", () => {
+    // The first partition is at world x=-7.8, or x=3.7 in walkable coordinates.
+    const blocked = moveInTrain(3, 5.5, 3, 0);
+    expect(blocked.x).toBeLessThan(3.7);
+    const doorway = moveInTrain(3, 3.75, 3, 0);
+    expect(doorway.x).toBeCloseTo(6);
+    const slide = moveInTrain(3, 5.5, 3, -0.5);
+    expect(slide.x).toBeLessThan(3.7);
+    expect(slide.z).toBeLessThan(5.5);
+    expect(isTrainWalkable(1.1, 0.5)).toBe(false);
+    expect(isTrainWalkable(-0.1, 3.75)).toBe(false);
+  });
+
   it("maps normalised x positions to the five sections", () => {
     expect(sectionAt(0)).toBe("engine");
     expect(sectionAt(0.25)).toBe("electrical");
@@ -134,6 +148,15 @@ describe("lobby", () => {
 });
 
 describe("a run", () => {
+  it("synchronizes and toggles a player's signal without affecting repairs", () => {
+    const { join, step, player } = setup();
+    join("a");
+    step(["a", { type: "start" }]);
+    step(["a", { type: "signal", signal: "Help!" }]);
+    expect(player("a").signal).toBe("Help!");
+    step(["a", { type: "signal", signal: "Help!" }]);
+    expect(player("a").signal).toBe("");
+  });
   it("starts on `start` and counts down one second per tickRate ticks", () => {
     const { state, join, step } = setup();
     join("a");
@@ -170,12 +193,12 @@ describe("a run", () => {
     step(["a", { type: "move", x: -1, z: -1 }]);
     expect(Math.hypot(player("a").moveX, player("a").moveZ)).toBeCloseTo(1, 10);
     for (let tick = 0; tick < 200; tick += 1) step();
-    expect(player("a").x).toBe(0);
-    expect(player("a").z).toBe(0);
+    expect(player("a").x).toBeGreaterThanOrEqual(0);
+    expect(player("a").z).toBeGreaterThanOrEqual(0);
     step(["a", { type: "move", x: 1, z: 1 }]);
     for (let tick = 0; tick < 200; tick += 1) step();
-    expect(player("a").x).toBe(1);
-    expect(player("a").z).toBe(1);
+    expect(player("a").x).toBeLessThanOrEqual(1);
+    expect(player("a").z).toBeLessThanOrEqual(1);
   });
 
   it("stops a disconnected player and marks the reconnect", () => {

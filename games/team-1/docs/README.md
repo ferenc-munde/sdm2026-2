@@ -55,6 +55,8 @@ Then open `http://localhost:5173/` in two tabs:
 2. Tab 2: type a name and that code, **Join session**. Both tabs now list both players.
 3. Either tab: **Board the train**. Both tabs switch to the train. Move with WASD or the arrow keys, repair with E while standing in the section named in the task.
 
+Optional generated background music is off until you activate the **Music off** button in the header. The music continues between the lobby and gameplay; use the same button to mute it.
+
 To run the two parts separately: `pnpm run dev:server` and `pnpm run dev:client`. The server port comes from `PORT` (default 2567). The client looks for the server on the page's host at port 2567; set `VITE_SERVER_URL` (for example in `.env.local`) to point it somewhere else.
 
 `http://localhost:5173/?mock` runs the old preview without any server (in-memory lobby, room `DEMO`, mock controls).

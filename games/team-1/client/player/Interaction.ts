@@ -15,7 +15,6 @@ export interface InteractionTarget {
 export type InteractionCallback = (target: InteractionTarget, player: any) => void;
 
 export class InteractionSystem {
-  private readonly handleKeyDown = (event: KeyboardEvent) => this.onKeyDown(event);
   private targets: Map<string, InteractionTarget> = new Map();
   private callbacks: Map<string, InteractionCallback[]> = new Map();
   private interactionRange: number;
@@ -23,14 +22,6 @@ export class InteractionSystem {
   constructor(interactionRange: number = 2) {
     this.interactionRange = interactionRange;
 
-    // Listen for E key
-    window.addEventListener('keydown', this.handleKeyDown);
-  }
-
-  private onKeyDown(event: KeyboardEvent): void {
-    if (event.key.toLowerCase() === 'e') {
-      this.attemptInteraction();
-    }
   }
 
   /**
@@ -79,7 +70,7 @@ export class InteractionSystem {
 
     this.targets.forEach((target) => {
       const distance = Math.hypot(target.x - playerX, target.y - playerY);
-      if (distance < closestDistance) {
+      if (distance <= closestDistance) {
         closest = target;
         closestDistance = distance;
       }
@@ -143,7 +134,6 @@ export class InteractionSystem {
    * Cleanup
    */
   destroy(): void {
-    window.removeEventListener('keydown', this.handleKeyDown);
     this.targets.clear();
     this.callbacks.clear();
   }

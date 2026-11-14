@@ -7,6 +7,7 @@ import { z } from "zod";
 import { BaseState, RoomSettingsSchema, type GameContext, type GameDefinition } from "@sdm/core/sim";
 import { GAME_ID, MAX_NAME_LENGTH, PLAYER_COLORS, type Phase } from "./constants";
 import { SECTION_TITLES, TASK_CATALOGUE, WALKABLE, sectionAt, type TaskDefinition } from "./train-layout";
+import { moveInTrain } from "./train-collision";
 
 export { GAME_ID, MAX_NAME_LENGTH, PLAYER_COLORS, type Phase };
 
@@ -22,6 +23,7 @@ export class PlayerState extends Schema {
   @type("number") z = 0.5;
   @type("number") moveX = 0;
   @type("number") moveZ = 0;
+  @type("string") signal = "";
 }
 
 export class TaskState extends Schema {
@@ -59,6 +61,7 @@ export const InputSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("move"), x: axis, z: axis }),
   z.object({ type: z.literal("start") }),
   z.object({ type: z.literal("repair") }),
+  z.object({ type: z.literal("signal"), signal: z.enum(["Ready", "Help!", "On my way"]) }),
   z.object({
     type: z.literal("brake-calibrate"),
     action: z.enum(BRAKE_SEQUENCE),
@@ -76,8 +79,6 @@ export const JoinOptionsSchema = z.object({
 export type JoinOptions = z.infer<typeof JoinOptionsSchema>;
 
 type Ctx = GameContext<TrainConfig>;
-
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 export function spawnPoint(seat: number): { x: number; z: number } {
   return { x: 0.18 + (seat % 4) * 0.2, z: 0.5 };
@@ -121,6 +122,7 @@ function resetRun(state: TrainState, ctx: Ctx): void {
     player.z = spawn.z;
     player.moveX = 0;
     player.moveZ = 0;
+    player.signal = "";
   });
 }
 
@@ -216,6 +218,8 @@ export const lastTrain: GameDefinition<TrainState, TrainConfig, TrainInput, Join
           resetRun(state, ctx);
           state.phase = "playing";
         }
+      } else if (input.type === "signal" && state.phase === "playing") {
+        player.signal = player.signal === input.signal ? "" : input.signal;
       } else if (state.phase === "playing" && !taskActionThisTick.has(playerId)) {
         taskActionThisTick.add(playerId);
 
@@ -232,8 +236,9 @@ export const lastTrain: GameDefinition<TrainState, TrainConfig, TrainInput, Join
     const distance = config.playerSpeed * secondsPerTick;
     state.players.forEach((player) => {
       if (!player.connected || (player.moveX === 0 && player.moveZ === 0)) return;
-      player.x = clamp(player.x + (player.moveX * distance) / WALKABLE.length, 0, 1);
-      player.z = clamp(player.z + (player.moveZ * distance) / WALKABLE.width, 0, 1);
+      const position = moveInTrain(player.x * WALKABLE.length, player.z * WALKABLE.width, player.moveX * distance, player.moveZ * distance);
+      player.x = position.x / WALKABLE.length;
+      player.z = position.z / WALKABLE.width;
     });
 
     state.runTicks += 1;

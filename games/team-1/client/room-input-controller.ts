@@ -9,9 +9,13 @@ import { InputHandler, isTextEntryTarget } from "./input/InputHandler";
 export class RoomInputController {
   private readonly keys = new InputHandler();
   private readonly handleKeyDown = (event: KeyboardEvent) => {
+    if (event.repeat || isTextEntryTarget(event.target)) return;
     if (event.key.toLowerCase() === "e" && !event.repeat && !isTextEntryTarget(event.target)) {
       this.sender.sendInput({ type: "repair" });
     }
+    const signals = { "1": "Ready", "2": "Help!", "3": "On my way" } as const;
+    const signal = signals[event.key as keyof typeof signals];
+    if (signal) this.sender.sendInput({ type: "signal", signal });
   };
   private readonly handleInactive = () => {
     this.keys.reset();
