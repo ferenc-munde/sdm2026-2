@@ -4,11 +4,21 @@ import {
 	advanceLobbyCountdown,
 	createLobbyState,
 	LOBBY_COUNTDOWN_SECONDS,
+	LOBBY_COUNTDOWN_URGENT_SECONDS,
+	isLobbyCountdownUrgent,
 	removeLobbyPlayer,
 	startLobby,
 } from "./lobby.ts";
 
 describe("multiplayer lobby rules", () => {
+	it("uses a two-minute wait and marks the final 30 seconds urgent", () => {
+		expect(LOBBY_COUNTDOWN_SECONDS).toBe(120);
+		expect(LOBBY_COUNTDOWN_URGENT_SECONDS).toBe(30);
+		expect(isLobbyCountdownUrgent(31)).toBe(false);
+		expect(isLobbyCountdownUrgent(30)).toBe(true);
+		expect(isLobbyCountdownUrgent(1)).toBe(true);
+	});
+
 	it("assigns the first player as host and tracks open slots", () => {
 		const state = createLobbyState(4);
 

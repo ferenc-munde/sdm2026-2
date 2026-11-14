@@ -175,6 +175,14 @@
 	background: linear-gradient(90deg, #40351f, #211e17);
 	color: #f4d17a;
 }
+#last-train-lobby-root .lobby-countdown.is-urgent {
+	border-color: #d7685c;
+	background: linear-gradient(90deg, #512a25, #291b19);
+	color: #ff7770;
+	box-shadow: 0 0 18px #d7685c28, inset 0 1px #ffffff12;
+}
+#last-train-lobby-root .lobby-countdown.is-urgent small { color: #f1aaa1; }
+#last-train-lobby-root .lobby-countdown.is-urgent strong { color: #ff7770; }
 #last-train-lobby-root .countdown-icon { font-size: 32px; line-height: 1; }
 #last-train-lobby-root .lobby-countdown small,
 #last-train-lobby-root .lobby-countdown strong { display: block; }

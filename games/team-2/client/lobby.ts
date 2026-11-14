@@ -1,5 +1,10 @@
 import { Client as ColyseusClient, type Room } from "@colyseus/sdk";
-import { GAME_ROOM_MESSAGE, LOBBY_ROOM_NAME, type GameRoomMessage } from "../shared/lobby.ts";
+import {
+	GAME_ROOM_MESSAGE,
+	isLobbyCountdownUrgent,
+	LOBBY_ROOM_NAME,
+	type GameRoomMessage,
+} from "../shared/lobby.ts";
 import "./lobby.css";
 
 interface LobbyPlayerView {
@@ -110,7 +115,7 @@ export function mountLobby(
 					</div>
 					<div class="lobby-countdown" aria-live="polite">
 						<span class="countdown-icon" aria-hidden="true">◷</span>
-						<div><small>TRAIN DEPARTS IN</small><strong data-countdown>00:30</strong></div>
+						<div><small>TRAIN DEPARTS IN</small><strong data-countdown>02:00</strong></div>
 					</div>
 					<div class="lobby-slots" data-player-slots></div>
 					<p class="lobby-wait-message" data-wait-message aria-live="polite">
@@ -154,6 +159,7 @@ export function mountLobby(
 	const roomCodeLabel = root.querySelector<HTMLElement>("[data-room-code]")!;
 	const count = root.querySelector<HTMLElement>("[data-player-count]")!;
 	const countdown = root.querySelector<HTMLElement>("[data-countdown]")!;
+	const countdownPanel = root.querySelector<HTMLElement>(".lobby-countdown")!;
 	const slots = root.querySelector<HTMLElement>("[data-player-slots]")!;
 	const waitMessage = root.querySelector<HTMLElement>("[data-wait-message]")!;
 	const roomError = root.querySelector<HTMLElement>("[data-room-error]")!;
@@ -262,6 +268,7 @@ export function mountLobby(
 			.sort((a, b) => a.slot - b.slot);
 		count.textContent = state.playerCount + " / " + state.teamSize + " PLAYERS";
 		countdown.textContent = formatTime(state.secondsRemaining);
+		countdownPanel.classList.toggle("is-urgent", isLobbyCountdownUrgent(state.secondsRemaining));
 		const isHost = state.hostSessionId === room?.sessionId;
 		roomCodePanel.hidden = !isHost;
 		if (isHost) roomCodeLabel.textContent = state.roomCode || room?.roomId || "Connecting…";

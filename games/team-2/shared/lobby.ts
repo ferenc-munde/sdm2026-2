@@ -9,7 +9,12 @@ export const gameRoomMessageSchema = z.object({ code: z.string().regex(/^[A-Za-z
 export type GameRoomMessage = z.infer<typeof gameRoomMessageSchema>;
 
 export const TEAM_SIZES = [2, 3, 4] as const;
-export const LOBBY_COUNTDOWN_SECONDS = 30;
+export const LOBBY_COUNTDOWN_SECONDS = 120;
+export const LOBBY_COUNTDOWN_URGENT_SECONDS = 30;
+
+export function isLobbyCountdownUrgent(secondsRemaining: number): boolean {
+	return secondsRemaining <= LOBBY_COUNTDOWN_URGENT_SECONDS;
+}
 
 export type TeamSize = (typeof TEAM_SIZES)[number];
 export type LobbyStatus = "waiting" | "running" | "cancelled";
