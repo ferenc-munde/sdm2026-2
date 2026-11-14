@@ -520,6 +520,34 @@ describe("taking a sharp curve (#384)", () => {
       expect(f.position.z).toBeCloseTo(rest[i]!.z, 9);
     });
   });
+
+  it("keeps the wheels rolling while the cars are bent", () => {
+    const train = build({ players, items, hazards: [...hazards, course] });
+    const wheel = train.scene.getObjectByName("trainBody")!.children.find((c) => c.name === "wheel")!;
+    let t = 0;
+    for (let i = 0; i < 40; i++) {
+      train.updateMotion(0.05, 1);
+      train.updateEffects((t += 0.05));
+    }
+    const before = wheel.rotation.y;
+    for (let i = 0; i < 10; i++) {
+      train.updateMotion(0.05, 1);
+      train.updateEffects((t += 0.05));
+    }
+    expect(wheel.rotation.y).toBeGreaterThan(before + 0.5);
+  });
+
+  it("moves the action ring with the bent car", () => {
+    const train = build({ players, items, hazards: [...hazards, course] });
+    const ring = train.scene.getObjectByName("action-highlight")!;
+    const spot = { x: 300, y: 40 };
+    let t = 0;
+    for (let i = 0; i < 80; i++) {
+      train.updateHighlight({ position: spot, tone: "station" }, t);
+      train.updateEffects((t += 0.05));
+    }
+    expect(Math.hypot(ring.position.x - spot.x, ring.position.z - spot.y)).toBeGreaterThan(5);
+  });
 });
 
 describe("item shadows and held shine (#357)", () => {

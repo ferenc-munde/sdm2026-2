@@ -659,10 +659,13 @@ export function buildTrainScene(
       o.position.z = p.z;
       if (turnIt) o.rotation.y = rest.ry + (poses[car]?.angle ?? 0);
     };
-    for (const o of [...mapGroup.children, ...body.group.children, ...hazardsGroup.children]) place(o, restOf(o), true);
+    // Wheels only move with their car: their rotation.y is the roll that updateMotion advances.
+    for (const o of [...mapGroup.children, ...body.group.children, ...hazardsGroup.children]) place(o, restOf(o), o.name !== "wheel");
     // Players and items: moved with their car; their own turning (heading, spin) stays theirs.
     for (const o of [...playersGroup.children, ...itemsGroup.children]) place(o, restOf(o), false);
     for (const puff of smoke) place(puff, { x: puff.position.x, z: puff.position.z, ry: 0 }, false);
+    // The action ring (#331) was just placed on the straight train by updateHighlight; follow the bend.
+    if (actionRing.group.visible) place(actionRing.group, { x: actionRing.group.position.x, z: actionRing.group.position.z, ry: 0 }, false);
   };
 
   const drawnPlayers = new Map<string, Drawn<Group>>();
