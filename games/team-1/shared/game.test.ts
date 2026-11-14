@@ -253,6 +253,37 @@ describe("a run", () => {
     expect(state.phase).toBe("playing");
   });
 
+  it("wins a one-task run when the selected task is completed brake calibration", () => {
+    // `start` deals a fresh task set, so find a deterministic seed for the second deal.
+    const seed = Array.from({ length: 256 }, (_, index) => index + 1).find((candidate) => {
+      const trial = setup({ taskCount: 1 }, candidate);
+      trial.join("a");
+      trial.step(["a", { type: "start" }]);
+      return trial.state.tasks.at(0)?.id === "brakes";
+    });
+    if (seed === undefined) throw new Error("no seed selected the brakes task");
+
+    const { state, join, step, player } = setup({ taskCount: 1 }, seed);
+    join("a");
+    step(["a", { type: "start" }]);
+    const brakes = state.tasks.at(0);
+    if (!brakes) throw new Error("no task was dealt");
+    expect(brakes.id).toBe("brakes");
+
+    player("a").x = 0.95;
+    step(["a", { type: "brake-calibrate", action: "apply-pressure" }]);
+    expect(brakes.progress).toBe(33);
+    expect(state.phase).toBe("playing");
+
+    step(["a", { type: "brake-calibrate", action: "hold-pressure" }]);
+    expect(brakes.progress).toBe(67);
+    expect(state.phase).toBe("playing");
+
+    step(["a", { type: "brake-calibrate", action: "release-pressure" }]);
+    expect(brakes.progress).toBe(100);
+    expect(state.phase).toBe("victory");
+  });
+
   it("resets brake calibration after an incorrect action", () => {
     const { state, join, step, player } = setup({
       taskCount: TASK_CATALOGUE.length,
@@ -402,3 +433,4 @@ describe("determinism", () => {
     expect(run(7)).toBe(run(7));
   });
 });
+
