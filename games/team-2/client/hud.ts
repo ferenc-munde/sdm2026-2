@@ -1,4 +1,5 @@
 import { journeyView } from "./journey-view";
+import { taskColor } from "./train-map";
 // Only the latest HUD may own the global safe-area value.
 let hudOffsetOwner: symbol | undefined;
 
@@ -7,6 +8,8 @@ export interface HudTask {
   title: string;
   current: number;
   target: number;
+  /** Task type; tints the row chip to match the station beacon colour. */
+  type?: string;
 }
 
 export interface HudJourney {
@@ -29,31 +32,6 @@ export function createHud(container: HTMLElement) {
   const empty = document.createElement("p");
   empty.textContent = "No active tasks. Stay ready, crew.";
   panel.append(heading, list, empty);
-  const gauges = document.createElement("div");
-  gauges.className = "train-hud-gauges";
-  function createGauge(name: string, initial: number) {
-    const label = document.createElement("label");
-    const caption = document.createElement("span");
-    const bar = document.createElement("progress");
-    bar.max = 100;
-    bar.setAttribute("aria-label", name);
-    label.append(caption, bar);
-    gauges.append(label);
-    function update(value: number) {
-      const percent = Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0;
-      bar.value = percent;
-      caption.textContent = `${name}: ${Math.round(percent)}%`;
-      const danger = name === "Power" ? percent < 15 : percent >= 100;
-      label.classList.toggle("is-danger", danger);
-      if (danger) caption.textContent += " !";
-      label.title = danger ? name === "Power" ? "Low power" : "Pressure overload" : name;
-      bar.setAttribute("aria-valuetext", `${Math.round(percent)}%${danger ? `, ${label.title}` : ""}`);
-    }
-    update(initial);
-    return update;
-  }
-  const updatePower = createGauge("Power", 100);
-  const updatePressure = createGauge("Pressure", 0);
   container.append(panel);
   const rows = new Map<string, HTMLLIElement>();
   const journey = document.createElement("section");
@@ -99,7 +77,7 @@ export function createHud(container: HTMLElement) {
   const topbar = document.createElement("header");
   topbar.className = "train-topbar";
   topbar.setAttribute("aria-label", "Train status");
-  topbar.append(journey, timeMetric, gauges);
+  topbar.append(journey, timeMetric);
   const result = document.createElement("section");
   result.className = "train-result";
   result.setAttribute("role", "status");
@@ -141,10 +119,8 @@ export function createHud(container: HTMLElement) {
       resultTitle.textContent = values.phase === "won" ? "Docked Safe" : "Journey Lost";
       resultText.textContent = values.reason || (values.phase === "won" ? "The crew made it to the station." : "The train did not reach safety.");
     },
-    updateGauges(values: { power: number; pressure: number }) {
-      updatePower(values.power);
-      updatePressure(values.pressure);
-    },
+    // Compatibility for the standalone preview; gauges are no longer displayed.
+    updateGauges(_values: { power: number; pressure: number }) {},
     updateTasks(tasks: Iterable<HudTask>) {
       const seen = new Set<string>();
       for (const task of tasks) {
@@ -157,7 +133,10 @@ export function createHud(container: HTMLElement) {
         }
         const done = task.current >= task.target;
         row.classList.toggle("is-complete", done);
-        row.textContent = `${done ? "✓" : "○"} ${task.title} — ${task.current}/${task.target}`;
+        row.textContent = "";
+        const chip = document.createElement("span");
+        chip.style.cssText = `display:inline-block;width:8px;height:8px;border-radius:4px;margin-right:6px;background:${taskColor(task.type ?? "")}`;
+        row.append(chip, document.createTextNode(`${done ? "✓" : "○"} ${task.title} — ${task.current}/${task.target}`));
       }
       for (const [id, row] of rows) {
         if (!seen.has(id)) {

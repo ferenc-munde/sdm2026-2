@@ -3,7 +3,11 @@
   "patchRate": 20,
   "maxPlayers": 4,
   "reconnectSeconds": 30,
-  "timeLimitSeconds": 300,
+  "timeLimitSeconds": 240,
   "walkSpeed": 120,
-  "runSpeed": 200
+  "runSpeed": 200,
+  "cruiseTravelSeconds": 200,
+  "taskSpeedDrag": 0.2,
+  "hazardSpeedDrag": 0.08,
+  "maxSpeedDrag": 0.85
 }

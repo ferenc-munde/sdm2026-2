@@ -15,7 +15,7 @@ export const rooms = {
   `shared/game.ts` (root `CLAUDE.md`, `server/CLAUDE.md`). Game rules go in
   `shared/`, not here.
 - **The lobby room is the team's own Colyseus room** (`lobby-room.ts`): name,
-  crew size, countdown, host departure. It holds no game rules. Players create
+  crew size, automatic start when full, and host departure. It holds no game rules. Players create
   private rooms or join them by the server-issued room code. After departure
   it passes the host's game room code on to the crew (message `game-room`).
 - `room.test.ts` starts a real server and connects two real clients.

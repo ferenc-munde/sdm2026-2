@@ -1,12 +1,15 @@
-import { createTrainScene } from "./scene";
+import { createTrainScene, type SceneTaskMarker } from "./scene";
 import { createHud, type HudTask, type HudJourney } from "./hud";
 import { createLocalStateModel, type GameSession } from "./stateModel.ts";
 import { hostGame, joinGame, serverAddress, type NetSession } from "./net.ts";
 import { localStateToHud } from "./state-to-hud";
 import gameConfig from "../config/game.json";
 import { TRAIN_CARS } from "./train-map";
+import { createInputAdapter } from "./input.ts";
 import { mountLobby } from "./lobby";
 import { mountGameRules } from "./rules";
+import { openTaskModal, closeTaskModal, showStationPrompt, showTaskToast, type OpenTask } from "./task-modal";
+import { getAudioSettings, playAmbient, playButtonInteraction, playLobbyMusic, playPuzzleAction, playPuzzleSuccess, playTrainAmbience, playWarning, setAudioVolume, stopAmbient, stopLobbyMusic, stopTrainAmbience, taskSpawnPing, toggleAudioMute, unlockAudio } from "./audio";
 import "./hud.css";
 import "./styles.css";
 
@@ -50,7 +53,62 @@ let demoSpeed = 1;
 let demoPaused = false;
 const isPreview = () => developerTools && mode.value === "preview";
 
+// --- Tasks: station prompts, spawn noise, minigames -------------------------
+const TASK_RANGE = 30; // map units between the player and a task station
+const stationsById = new Map<string, { x: number; y: number }>();
+for (const car of TRAIN_CARS) {
+  for (const station of car.stations) stationsById.set(station.id, { x: station.x, y: station.y });
+}
+let knownTaskIds = new Set<string>();
+let promptTaskId: string | undefined;
+let powerWasDangerous = false;
+let pressureWasDangerous = false;
+
+function nearestTaskInTaskRange(): OpenTask | undefined {
+  const state = session.state;
+  const me = state.players.get(session.playerId);
+  if (!me) return undefined;
+  let best: OpenTask | undefined;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const [id, task] of state.tasks) {
+    const station = stationsById.get(task.stationId);
+    if (!station) continue;
+    const distance = Math.hypot(station.x - me.x, station.y - me.y);
+    if (distance <= TASK_RANGE && distance < bestDistance) {
+      bestDistance = distance;
+      best = { id, title: task.title, type: task.type, minigame: task.minigame, current: task.current, target: task.target };
+    }
+  }
+  return best;
+}
+
+function openTask(task: OpenTask): void {
+  unlockAudio();
+  playAmbient(task.type);
+  openTaskModal(task, (amount) => {
+    playPuzzleSuccess(task.minigame);
+    session.send({ type: "progress", taskId: task.id, amount });
+  }, { onClosed: () => stopAmbient() });
+}
+
+/** New task ids since the last update → spawn ping + toast ("the noise"). */
+function watchTaskNoise(liveTasks: ReadonlyMap<string, { title: string }>): void {
+  for (const [id, task] of liveTasks) {
+    if (!knownTaskIds.has(id)) {
+      taskSpawnPing();
+      showTaskToast(`New task: ${task.title}`);
+    }
+  }
+  knownTaskIds = new Set(liveTasks.keys());
+}
+
+
 mapSelect.addEventListener("change", () => {
+  if (mapSelect.value === "follow") {
+    trainScene?.followPlayer();
+    document.getElementById("map-description")!.textContent = "Following your player · nearby carriages and passages stay visible.";
+    return;
+  }
   const car = mapSelect.value === "all" ? null : Number(mapSelect.value);
   trainScene?.focusCar(car);
   document.getElementById("map-description")!.textContent = car === null
@@ -71,13 +129,36 @@ function update() {
   if (isPreview()) {
     hud.updateTasks(tasks);
     hud.updateGauges({ power: tasks[0]?.current ? 100 : 40, pressure: 35 });
-    hud.updateJourney({ ...journey, speed: journey.phase === "running" && !demoPaused ? demoSpeed / 300 : 0 });
+    hud.updateJourney({ ...journey, speed: journey.phase === "running" && !demoPaused ? demoSpeed / gameConfig.timeLimitSeconds : 0 });
     trainScene?.setSpeed(journey.phase === "running" ? demoSpeed : 0);
+    showStationPrompt(null);
+    const demo = stationsById.get("breaker-box")!;
+    trainScene?.setTaskMarkers([{ id: "example-repair", x: demo.x, y: demo.y, type: "POWER" }]);
   } else {
     hud.updateTasks(view.tasks);
     hud.updateGauges(view.gauges);
     hud.updateJourney(view.journey);
-    trainScene?.setSpeed(view.speed);
+    // The scene expects a scenery multiplier; rules publish route fractions per second.
+    trainScene?.setSpeed(view.speed * gameConfig.timeLimitSeconds);
+
+    const powerDanger = view.gauges.power < 15;
+    const pressureDanger = view.gauges.pressure >= 100;
+    if ((powerDanger && !powerWasDangerous) || (pressureDanger && !pressureWasDangerous)) playWarning();
+    powerWasDangerous = powerDanger;
+    pressureWasDangerous = pressureDanger;
+
+    const liveTasks = new Map(Array.from(state.tasks, ([id, task]) => [id, { title: task.title }] as const));
+    watchTaskNoise(liveTasks);
+    const inRange = nearestTaskInTaskRange();
+    promptTaskId = inRange?.id;
+    showStationPrompt(inRange ? `E — ${inRange.title}` : null);
+
+    const taskMarkers: SceneTaskMarker[] = [];
+    for (const [id, task] of state.tasks) {
+      const station = stationsById.get(task.stationId);
+      if (station) taskMarkers.push({ id, x: station.x, y: station.y, type: task.type });
+    }
+    trainScene?.setTaskMarkers(taskMarkers);
   }
   // Draw players and items from the live game state every frame.
   trainScene?.setPlayers(state.players, session.playerId);
@@ -91,7 +172,7 @@ function update() {
 function reset() {
   demoSpeed = 1; demoPaused = false; speedInput.value = "1";
   tasks = [{ id: "example-repair", title: "Example: repair electrical panel", current: 0, target: 1 }];
-  journey = { distance: 0, remainingSeconds: 300, totalSeconds: 300, phase: "running" };
+  journey = { distance: 0, remainingSeconds: gameConfig.timeLimitSeconds, totalSeconds: gameConfig.timeLimitSeconds, phase: "running" };
   update();
 }
 function button(id: string, action: () => void) {
@@ -114,52 +195,91 @@ function syncMode() {
   }
   update();
 }
-mode.addEventListener("change", syncMode);
+mode.addEventListener("change", () => {
+  // The scene preview renders example data: an open lobby would only cover it.
+  if (mode.value === "preview") {
+    lobby?.destroy();
+    lobby = undefined;
+    stopLobbyMusic();
+  } else {
+    mountLobbyIfNetworked();
+  }
+  syncMode();
+});
 
-// Keyboard → inputs. Movement is hold-to-move: one `move` input whenever the held direction
-// (or Shift) changes, and a zero vector on release. The server moves the player every tick.
-const moves: Record<string, [number, number]> = {
-  w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
-  ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
-};
-const STOPPED = "0,0,false";
-const held = new Set<string>();
-let running = false;
-let lastMove = STOPPED;
-function sendMove() {
-  let mx = 0, my = 0;
-  for (const key of held) { mx += moves[key]![0]; my += moves[key]![1]; }
-  mx = Math.sign(mx); my = Math.sign(my);
-  const run = running && (mx !== 0 || my !== 0);
-  const next = `${mx},${my},${run}`;
-  if (next === lastMove) return;
-  lastMove = next;
-  session.send({ type: "move", mx, my, run });
+const { cleanup: cleanupInput, refreshMovement } = createInputAdapter({
+  send: (input) => session.send(input),
+  isEnabled: () => canControlGame,
+  isPreview,
+});
+
+// Click is a user gesture, so this unlocks Web Audio and gives buttons a quiet tick.
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const clickedButton = target.closest<HTMLButtonElement>("button");
+  if (!clickedButton || clickedButton.disabled) return;
+  unlockAudio();
+  if (clickedButton.closest(".sound-controls")) return;
+  const puzzleControl = target.closest<HTMLElement>(".ltm-crank, .ltm-node, .ltm-tile");
+  if (puzzleControl) {
+    playPuzzleAction(puzzleControl.classList.contains("ltm-crank") ? "crank" : puzzleControl.classList.contains("ltm-node") ? "wires" : "panel");
+    return;
+  }
+  playButtonInteraction();
+}, true);
+
+const soundControls = document.createElement("section");
+soundControls.className = "sound-controls";
+soundControls.setAttribute("aria-label", "Sound controls");
+soundControls.innerHTML = `
+  <button type="button" data-volume-down aria-label="Decrease sound">−</button>
+  <output data-volume-level aria-live="polite"></output>
+  <button type="button" data-volume-up aria-label="Increase sound">+</button>
+  <button type="button" data-mute aria-pressed="false">Mute</button>
+`;
+const volumeLevel = soundControls.querySelector<HTMLOutputElement>("[data-volume-level]")!;
+const muteButton = soundControls.querySelector<HTMLButtonElement>("[data-mute]")!;
+function updateSoundControls(): void {
+  const settings = getAudioSettings();
+  volumeLevel.value = `${Math.round(settings.volume * 100)}%`;
+  volumeLevel.textContent = volumeLevel.value;
+  muteButton.textContent = settings.muted ? "Unmute" : "Mute";
+  muteButton.setAttribute("aria-pressed", String(settings.muted));
 }
-function releaseKeys() { held.clear(); running = false; sendMove(); }
-const keyOf = (event: KeyboardEvent) => event.key.length === 1 ? event.key.toLowerCase() : event.key;
-function onKeyDown(event: KeyboardEvent) {
-  if (!canControlGame || isPreview() || (event.target instanceof HTMLElement &&
-    (event.target.closest("input, select, textarea, button:not(.game-rules-control)") || event.target.isContentEditable))) return;
-  const key = keyOf(event);
-  running = event.shiftKey;
-  if (moves[key]) {
-    held.add(key); sendMove();
+soundControls.querySelector<HTMLButtonElement>("[data-volume-down]")!.addEventListener("click", () => {
+  const settings = getAudioSettings();
+  setAudioVolume(settings.volume - 0.1);
+  updateSoundControls();
+});
+soundControls.querySelector<HTMLButtonElement>("[data-volume-up]")!.addEventListener("click", () => {
+  const settings = getAudioSettings();
+  setAudioVolume(settings.volume + 0.1);
+  updateSoundControls();
+});
+muteButton.addEventListener("click", () => {
+  toggleAudioMute();
+  updateSoundControls();
+});
+updateSoundControls();
+document.body.append(soundControls);
+
+// E is contextual: a task station in range opens its minigame, otherwise pick up.
+// Separate from the input adapter because it drives the modal, not a room input.
+window.addEventListener("keydown", (event) => {
+  if (!canControlGame || isPreview() || event.repeat) return;
+  if (event.key.length === 1 ? event.key.toLowerCase() !== "e" : event.key !== "e") return;
+  const target = event.target;
+  if (target instanceof HTMLElement && (target.closest("input, select, textarea, button:not(.game-rules-control)") || target.isContentEditable)) return;
+  unlockAudio();
+  const task = promptTaskId ? session.state.tasks.get(promptTaskId) : undefined;
+  if (task) {
+    openTask({ id: promptTaskId!, title: task.title, type: task.type, minigame: task.minigame, current: task.current, target: task.target });
     event.preventDefault();
-  } else if (key === "Shift") sendMove();
-  else if (event.repeat) return;
-  else if (key === "e") session.send({ type: "pickup", itemId: "wrench" });
-  else if (key === "q") session.send({ type: "drop", itemId: "wrench" });
-}
-function onKeyUp(event: KeyboardEvent) {
-  if (!canControlGame) return;
-  running = event.shiftKey;
-  held.delete(keyOf(event));
-  sendMove();
-}
-window.addEventListener("keydown", onKeyDown);
-window.addEventListener("keyup", onKeyUp);
-window.addEventListener("blur", releaseKeys);
+  } else {
+    session.send({ type: "pickup", itemId: "wrench" });
+  }
+});
 
 /** Swap the offline model for a seat in the game room. */
 async function enterGameRoom(connect: () => Promise<NetSession>) {
@@ -170,15 +290,18 @@ async function enterGameRoom(connect: () => Promise<NetSession>) {
     local.stop();
     canControlGame = true;
     session = next; online = true;
-    lastMove = STOPPED; sendMove();
+    playTrainAmbience();
+    refreshMovement();
     next.onTick(update);
     next.onClosed(() => {
       online = false;
+      stopTrainAmbience();
       netStatus = "The connection to the game room ended · reload the page to play again";
       update();
     });
   } catch (error) {
-    netStatus = `Could not join the game room (${error instanceof Error ? error.message : String(error)}) · reload to try again`;
+    netStatus = `Could not start the game: ${error instanceof Error ? error.message : String(error)}`;
+    lobby?.showTransitionError(netStatus);
     console.error(error);
   }
   update();
@@ -187,7 +310,10 @@ async function enterGameRoom(connect: () => Promise<NetSession>) {
 function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(message)), ms);
-    promise.then((value) => { clearTimeout(timer); resolve(value); }, reject);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
   });
 }
 
@@ -196,36 +322,46 @@ reset(); syncMode();
 
 let lobby: ReturnType<typeof mountLobby> | undefined;
 const directCode = params.get("room");
+/** Mount the lobby for networked play; a no-op when offline, in a direct room, already mounted, or seated. */
+function mountLobbyIfNetworked(): void {
+	if (offline || directCode || lobby || online) return;
+	// Lobby creation/joining remains behind player entry and only connects on form submission.
+	// The host creates the game room and shares its code; the rest of the crew joins that room.
+	lobby = mountLobby(document.body, (match) => {
+		stopLobbyMusic();
+		void enterGameRoom(async () => {
+			if (match.isHost) {
+				const hosted = await hostGame(server, match.name);
+				match.shareGameCode(hosted.code);
+				return hosted;
+			}
+			const code = await withTimeout(match.gameCode, GAME_CODE_TIMEOUT_MS, "the host did not open a game room");
+			return joinGame(server, code, match.name);
+		}).finally(() => match.leaveLobby());
+	}, server.http);
+	playLobbyMusic();
+}
 function enterPlayerFlow(): void {
 	if (offline) {
 		// Preserve the explicit offline demo mode, but don't start it before the rules are accepted.
 		canControlGame = true;
 		local.start();
+		playTrainAmbience();
 	} else if (directCode) {
 		// Preserve direct room-code links; they still wait until the player continues past the rules.
 		void enterGameRoom(() => joinGame(server, directCode));
 	} else {
-		// Lobby creation/joining remains behind player entry and only connects on form submission.
-		// The host creates the game room and shares its code; the rest of the crew joins that room.
-		lobby = mountLobby(document.body, (match) => {
-			void enterGameRoom(async () => {
-				if (match.isHost) {
-					const hosted = await hostGame(server, match.name);
-					match.shareGameCode(hosted.code);
-					return hosted;
-				}
-				const code = await withTimeout(match.gameCode, GAME_CODE_TIMEOUT_MS, "the host did not open a game room");
-				return joinGame(server, code, match.name);
-			}).finally(() => match.leaveLobby());
-		}, server.http);
+		mountLobbyIfNetworked();
 	}
 }
 // Initial briefing and persistent help share one rules source and one fixed button.
 const gameRules = mountGameRules(document.body, enterPlayerFlow);
 window.addEventListener("pagehide", () => {
+  cleanupInput();
   session.stop(); local.stop();
-  window.removeEventListener("keydown", onKeyDown); window.removeEventListener("keyup", onKeyUp);
-  window.removeEventListener("blur", releaseKeys);
+  closeTaskModal(); stopAmbient(); stopTrainAmbience(); showStationPrompt(null);
+	stopLobbyMusic();
+	soundControls.remove();
   lobby?.destroy(); trainScene?.destroy(); hud.destroy();
   gameRules.destroy();
 });

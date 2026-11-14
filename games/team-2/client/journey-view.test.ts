@@ -4,9 +4,9 @@ import type { HudJourney } from "./hud";
 
 const running: HudJourney = { distance: 0.4, remainingSeconds: 150, totalSeconds: 300, phase: "running", speed: 0.003 };
 describe("journey display", () => {
-  it("warns at two minutes or less only while the run is active", () => {
-    expect(journeyView({ ...running, remainingSeconds: 121 }).urgent).toBe(false);
-    expect(journeyView({ ...running, remainingSeconds: 120 }).urgent).toBe(true);
+  it("warns at ninety seconds or less only while the run is active", () => {
+    expect(journeyView({ ...running, remainingSeconds: 91 }).urgent).toBe(false);
+    expect(journeyView({ ...running, remainingSeconds: 90 }).urgent).toBe(true);
     expect(journeyView({ ...running, remainingSeconds: 0 }).urgent).toBe(true);
     expect(journeyView({ ...running, remainingSeconds: 100, phase: "lobby" }).urgent).toBe(false);
     expect(journeyView({ ...running, remainingSeconds: 100, phase: "won" }).urgent).toBe(false);
