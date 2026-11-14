@@ -44,6 +44,7 @@ The platform room (`@sdm/host`, connected in #80) will hold one `GameSession` pe
 | [run/random.ts](run/random.ts) | The seeded random source | `favyabils234-hash` (#50) |
 | [journey/journey.ts](journey/journey.ts) | Fuel drains, speed follows fuel (and stops on an engine fire), distance grows, hazards wear the hull. **Owns all continuous hull damage** | `Abmuminfav` (#102) |
 | [items/items.ts](items/items.ts) | Pick up the nearest item, one at a time, drop where you stand; two players grabbing one item: first request wins | `Abmuminfav` (#123) |
+| [items/actionTarget.ts](items/actionTarget.ts) | What tap-E would act on now (coal station, item to pick up or drop, the lever), in the room's own order, for the client highlight | `Abmuminfav` (#295) |
 
 ### Lobby
 | File | What it does | By |
