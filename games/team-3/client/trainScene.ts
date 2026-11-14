@@ -46,7 +46,7 @@ import { applyCrewPose, buildCrewFigure, HOLD_POINT } from "./crewModel.ts";
 /** The crew are drawn a little larger than their collision circle so they read from the camera. */
 const CREW_SCALE = 1.35;
 import { buildBreachModel, buildFlame, buildItemModel, buildStationModel, FLAME_SCALE } from "./propModels.ts";
-import { PALETTE, mat, ownMat } from "./style.ts";
+import { LIGHTING, PALETTE, mat, ownMat } from "./style.ts";
 import { buildTrainBody, END_WALL_HEIGHT, FAR_WALL_HEIGHT, LOCOMOTIVE_LENGTH, NEAR_WALL_HEIGHT } from "./trainModel.ts";
 
 /** One distinct colour per seat, in the order the players joined. */
@@ -527,10 +527,10 @@ export function buildTrainScene(
 
   // Evening light: a cool sky above, warm bounce from the ground, and a low warm sun that casts
   // shadows so the crew, props and walls sit on the floor instead of floating.
-  scene.add(new AmbientLight(0xffffff, 0.35));
-  scene.add(new HemisphereLight("#9fb6e0", "#4a3a26", 1.1));
-  const sun = new DirectionalLight("#ffe2b8", 2.6);
-  sun.position.set(mapCentreX(map) - 500, 900, 600);
+  scene.add(new AmbientLight(0xffffff, LIGHTING.ambient));
+  scene.add(new HemisphereLight(LIGHTING.skyColor, LIGHTING.groundColor, LIGHTING.hemisphere));
+  const sun = new DirectionalLight(LIGHTING.sunColor, LIGHTING.sunIntensity);
+  sun.position.set(mapCentreX(map) + LIGHTING.sunOffset.x, LIGHTING.sunOffset.y, LIGHTING.sunOffset.z);
   sun.target.position.set(mapCentreX(map) - (LOCOMOTIVE_LENGTH + 50) / 2, 0, 0);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);

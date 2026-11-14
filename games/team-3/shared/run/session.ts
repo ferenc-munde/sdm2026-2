@@ -6,7 +6,7 @@
 // Everything here is pure and deterministic.
 
 import { roomSettings } from "../config.ts";
-import { PLAYER_NAME_MAX_LENGTH } from "../constants.ts";
+import { FIRST_HAZARD_SECONDS, PLAYER_NAME_MAX_LENGTH } from "../constants.ts";
 import type { ErrorCode, InputMessage } from "../messages.ts";
 import type { Direction, GameState, PlayerId, Vec2 } from "../types.ts";
 import { createDirector, crewSize, type DirectorState, type HazardSpot, stepDirector } from "./director.ts";
@@ -182,7 +182,7 @@ export function startSession(session: GameSession): SessionResult {
   if (session.state.phase !== "lobby") return refuse(session, "gameInProgress");
   if (!canStartRun(session.state)) return refuse(session, "notEnoughPlayers");
   const state = startRun(session.state);
-  return accept({ state, director: createDirector(crewSize(state)), inputs: {} });
+  return accept({ state, director: { ...createDirector(crewSize(state)), secondsUntilNext: FIRST_HAZARD_SECONDS }, inputs: {} });
 }
 
 /**

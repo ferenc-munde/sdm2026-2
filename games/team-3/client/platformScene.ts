@@ -22,7 +22,7 @@ import { createPlatformMap, type PlatformMap } from "../shared/map/platform.ts";
 import type { ActionHighlight } from "./actionHighlight.ts";
 import { applyCrewPose, buildCrewFigure } from "./crewModel.ts";
 import { buildBreachModel, buildStationModel } from "./propModels.ts";
-import { PALETTE, mat } from "./style.ts";
+import { LIGHTING, PALETTE, mat } from "./style.ts";
 import { advanceWalk, crewPose, smoothSpeed, speedBetween } from "./crewPose.ts";
 import { createHighlightRing } from "./highlightRing.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
@@ -253,10 +253,10 @@ export function buildPlatformScene(
   scene.add(camera);
 
   // The same evening light as on the train.
-  scene.add(new AmbientLight(0xffffff, 0.35));
-  scene.add(new HemisphereLight("#9fb6e0", "#4a3a26", 1.1));
-  const sun = new DirectionalLight("#ffe2b8", 2.6);
-  sun.position.set(-300, 900, 500);
+  scene.add(new AmbientLight(0xffffff, LIGHTING.ambient));
+  scene.add(new HemisphereLight(LIGHTING.skyColor, LIGHTING.groundColor, LIGHTING.hemisphere));
+  const sun = new DirectionalLight(LIGHTING.sunColor, LIGHTING.sunIntensity);
+  sun.position.set(LIGHTING.sunOffset.x + 350, LIGHTING.sunOffset.y, LIGHTING.sunOffset.z);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
   Object.assign(sun.shadow.camera, { left: -600, right: 600, top: 400, bottom: -400, near: 100, far: 2200 });
