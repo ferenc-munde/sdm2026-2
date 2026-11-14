@@ -43,7 +43,7 @@ pnpm run build       # production build of the client
 | Move | **W A S D** or the **arrow keys** |
 | Interact (hold) | **Space** or **E**: repair a breach with the wrench, put out a fire with the extinguisher, hold the steering console |
 | Pick up / drop, take or deliver coal, pull the departure lever | **Tap E** or **left-click** |
-| Throw the held item | **Shift** or **F** |
+| Throw the held item, or **dash** with empty hands (1.5 s cooldown) | **Shift** or **F** |
 
 ## How the game works
 

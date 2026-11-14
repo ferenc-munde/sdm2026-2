@@ -31,6 +31,7 @@ The platform room (`@sdm/host`, connected in #80) will hold one `GameSession` pe
 | [map/map.ts](map/map.ts) | The three-car train: walls, narrow doors, stations, hazard spots, item and player starts; `validateMap` | `Abmuminfav` (#83) |
 | [map/platform.ts](map/platform.ts) | The lobby platform: walls, player starts, and where the platform objects stand; `validatePlatform` | `Abmuminfav` (#182) |
 | [movement/movement.ts](movement/movement.ts) | Walking in 8 directions at constant speed, stopping at walls, passing doors; works on any map with walls | `Abmuminfav` (#86) |
+| [movement/dash.ts](movement/dash.ts) | Dash with empty hands: a short burst in the facing direction, stops at walls, 1.5 s cooldown, not while stunned | `Abmuminfav` (#228) |
 
 ### The run
 | File | What it does | By |
