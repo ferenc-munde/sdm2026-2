@@ -69,5 +69,23 @@ in one game room.
 
 ## Coming next
 
+### Train motion (#434)
+
+The game room starts running on its first player join, after the separate lobby
+departs. `shared/sim.ts` publishes route speed and distance for all clients.
+With full power and zero pressure, the clear-route journey takes 200 seconds.
+Each unfinished task subtracts 20% of cruising speed; each hazard subtracts
+8%, capped at 85% total drag. The round lasts four minutes; even one persistent
+task makes the 200-second clear-route journey take 250 seconds, so repairs matter.
+Completing tasks removes their drag on the next
+tick. These values are validated in `shared/config.ts` and set in
+`config/game.json`. Existing power and pressure also scale speed.
+
+Scenery converts route fractions/second to a visual multiplier; the HUD keeps
+the real route speed. Restart the dev server after changing shared rules.
+Test through the lobby with two tabs; `?local` is only the offline alternative.
+Arrival clamps distance at 100%; win/lose and timeout decisions remain a
+separate responsibility, and are not implemented by the speed module.
+
 See [`docs/NEXT_STEPS.md`](docs/NEXT_STEPS.md) for the prioritised list of
 what `SPEC.md` describes and the code does not do yet.

@@ -129,7 +129,7 @@ function update() {
   if (isPreview()) {
     hud.updateTasks(tasks);
     hud.updateGauges({ power: tasks[0]?.current ? 100 : 40, pressure: 35 });
-    hud.updateJourney({ ...journey, speed: journey.phase === "running" && !demoPaused ? demoSpeed / 300 : 0 });
+    hud.updateJourney({ ...journey, speed: journey.phase === "running" && !demoPaused ? demoSpeed / gameConfig.timeLimitSeconds : 0 });
     trainScene?.setSpeed(journey.phase === "running" ? demoSpeed : 0);
     showStationPrompt(null);
     const demo = stationsById.get("breaker-box")!;
@@ -138,7 +138,8 @@ function update() {
     hud.updateTasks(view.tasks);
     hud.updateGauges(view.gauges);
     hud.updateJourney(view.journey);
-    trainScene?.setSpeed(view.speed);
+    // The scene expects a scenery multiplier; rules publish route fractions per second.
+    trainScene?.setSpeed(view.speed * gameConfig.timeLimitSeconds);
 
     const powerDanger = view.gauges.power < 15;
     const pressureDanger = view.gauges.pressure >= 100;
@@ -171,7 +172,7 @@ function update() {
 function reset() {
   demoSpeed = 1; demoPaused = false; speedInput.value = "1";
   tasks = [{ id: "example-repair", title: "Example: repair electrical panel", current: 0, target: 1 }];
-  journey = { distance: 0, remainingSeconds: 300, totalSeconds: 300, phase: "running" };
+  journey = { distance: 0, remainingSeconds: gameConfig.timeLimitSeconds, totalSeconds: gameConfig.timeLimitSeconds, phase: "running" };
   update();
 }
 function button(id: string, action: () => void) {
