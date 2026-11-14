@@ -33,7 +33,7 @@ function teamSection({ team, quality, linesAdded, prsMerged, members }) {
       const s = m.score;
       return `
       <article class="student">
-        <div class="who"><b>${esc(m.name || m.login)}</b><small>@${esc(m.login)}${m.onTime === false ? ` · <span class="late">late: ×1.25 effort</span>` : ""}${m.areas.length ? ` · ${esc(m.areas.slice(0, 2).join(", "))}` : ""}</small></div>
+        <div class="who"><b>${esc(m.name || m.login)}</b><small>@${esc(m.login)}${m.onTime === false ? ` · <span class="late">late: ×1.2 effort</span>` : ""}${m.areas.length ? ` · ${esc(m.areas.slice(0, 2).join(", "))}` : ""}</small></div>
         <div class="share">
           <div class="row"><span class="pct num">${pct(m.share)}</span><span class="num lines">${num(m.linesAdded)} lines</span></div>
           <div class="track"><span style="width:${(m.share * 100).toFixed(2)}%;background:${color(i)}"></span></div>
@@ -42,7 +42,7 @@ function teamSection({ team, quality, linesAdded, prsMerged, members }) {
         <div class="summary"><p>${esc(m.summary)}</p>${m.ruleProblems?.length
           ? `<p class="rules" title="${esc(m.ruleProblems.join("\n"))}">${m.ruleProblems.length} rule ${m.ruleProblems.length === 1 ? "problem" : "problems"}: ${esc(m.ruleProblems.slice(0, 3).join("; "))}${m.ruleProblems.length > 3 ? " …" : ""}</p>`
           : ""}</div>
-        <div class="grade" title="Activity ${s.points}/10 (Delivery ${s.delivery}/4 · Process ${s.process}/3 · Collaboration ${s.collaboration}/3)${m.onTime === false ? ", late arrival: thresholds ×1.25" : ""} · Game quality ${s.quality ?? "not given yet"}${s.quality === null ? "" : "/10"} · Total = 75% activity + 25% quality">
+        <div class="grade" title="Activity ${s.points}/10 (Delivery ${s.delivery}/4 · Process ${s.process}/3 · Collaboration ${s.collaboration}/3)${m.onTime === false ? ", late arrival: thresholds ×1.2" : ""} · Game quality ${s.quality ?? "not given yet"}${s.quality === null ? "" : "/10"} · Total = 75% activity + 25% quality">
           <span class="chip g${s.grade}">${s.grade}</span><small>${s.total}/10${s.provisional ? " *" : ""}<br>${s.provisional ? "provisional" : GRADE_WORDS[s.grade]}</small>
         </div>
       </article>`;
@@ -189,7 +189,7 @@ footer { color: var(--muted); font-size: 0.82rem; }
           <tr><td>Delivery: merged PRs (5+ / 2–4 / 1 / only open)</td><td class="num">4 / 3 / 2 / 1</td></tr>
           <tr><td>Process: PRs follow the rules · issues follow the rules · assigned issue closed</td><td class="num">+1 each</td></tr>
           <tr><td>Collaboration: reviews (5+ / 1–4) · at least half an equal share</td><td class="num">2 / 1 · +1</td></tr>
-          <tr><td>Late arrival: every count above ×1.25, rounded up (merged PRs 7+ / 3–6 / 2 / 1 or open, reviews 7+ / 2–6, 62.5% of an equal share, 2 of each Process item)</td><td class="num">×1.25 effort</td></tr>
+          <tr><td>Late arrival: every count above ×1.2, rounded up (merged PRs 6+ / 3–5 / 2 / 1 or open, reviews 6+ / 2–5, 60% of an equal share, 2 of each Process item)</td><td class="num">×1.2 effort</td></tr>
           <tr><td><b>Game quality</b> (25% of the total): the game runs and meets the requirements, given by the instructors per team</td><td class="num">0–10</td></tr>
           <tr><td>Total = 0.75 × activity + 0.25 × quality. Without a quality score yet: activity alone, marked * (provisional)</td><td class="num">0–10</td></tr>
           <tr><td>Total → grade: 8–10 / 5–7.9 / 3–4.9 / 1–2.9 / below 1</td><td class="num">5 / 4 / 3 / 2 / 1</td></tr>

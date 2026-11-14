@@ -77,8 +77,8 @@ export function areaOf(path) {
 
 /** Share of the game quality in the total: the rest (75%) comes from the activity points. */
 export const QUALITY_WEIGHT = 0.25;
-/** Extra work a late student has to do for the same points: 25% more. */
-export const LATE_FACTOR = 1.25;
+/** Extra work a late student has to do for the same points: 20% more. */
+export const LATE_FACTOR = 1.2;
 
 /**
  * Grade proposal, 0-10 points. The total is 75% activity and 25% game quality.
@@ -91,10 +91,10 @@ export const LATE_FACTOR = 1.25;
  *   Collaboration 0-3: reviewed other people's PRs 5+ -> 2, 1-4 -> 1; +1 at least half of an equal
  *                      share of the team's merged work
  *
- * Late arrival: a student marked `"onTime": false` in the roster has to do 25% more for the same
- * activity points. Every count threshold is multiplied by 1.25 and rounded up (merged PRs 7+ -> 4,
- * 3-6 -> 3, 2 -> 2, 1 or only open -> 1; 2 merged PRs / 2 issues opened / 2 closed assigned issues
- * for the Process points; reviews 7+ -> 2, 2-6 -> 1; 62.5% of an equal share). The rule ratios (half
+ * Late arrival: a student marked `"onTime": false` in the roster has to do 20% more for the same
+ * activity points. Every count threshold is multiplied by 1.2 and rounded up (merged PRs 6+ -> 4,
+ * 3-5 -> 3, 2 -> 2, 1 or only open -> 1; 2 merged PRs / 2 issues opened / 2 closed assigned issues
+ * for the Process points; reviews 6+ -> 2, 2-5 -> 1; 60% of an equal share). The rule ratios (half
  * of the PRs, 80% of the issues) stay the same. A missing `onTime` counts as on time.
  *
  * Game quality, 0-10 points: given by the instructors by hand, per team, in `gameQuality` in the roster
@@ -284,7 +284,7 @@ export function toMarkdown(report, repo) {
     "Activity: 0-10 points from the repository. Quality: the team's game quality, 0-10, given by the instructors.",
     "Total: 75% activity + 25% quality; while the quality is missing, the total is the activity alone (provisional, marked *).",
     "Rule problems: issues and PRs judged by the rules in force when they were created (see RULES in the script).",
-    "On time: no = arrived late, every activity threshold is 25% higher (rounded up) for this student.",
+    "On time: no = arrived late, every activity threshold is 20% higher (rounded up) for this student.",
     "",
   );
   for (const { team, quality: q, members } of report) {
@@ -294,7 +294,7 @@ export function toMarkdown(report, repo) {
     lines.push("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
     for (const m of members) {
       lines.push(
-        `| ${m.name || "–"} | ${m.login} | ${m.onTime ? "yes" : "no (×1.25)"} | ${m.issuesAssignedClosed} / ${m.issuesAssigned} | ${m.issuesOpened} | ${m.prsOpened} | ${m.prsMerged} | ${m.reviewsGiven} | ${m.linesAdded} | ${Math.round(m.share * 100)}% | ${m.ruleProblems.length} | ${m.score.points} | ${m.score.quality ?? "–"} | ${m.score.total} | ${m.score.grade}${m.score.provisional ? "*" : ""} |`,
+        `| ${m.name || "–"} | ${m.login} | ${m.onTime ? "yes" : "no (×1.2)"} | ${m.issuesAssignedClosed} / ${m.issuesAssigned} | ${m.issuesOpened} | ${m.prsOpened} | ${m.prsMerged} | ${m.reviewsGiven} | ${m.linesAdded} | ${Math.round(m.share * 100)}% | ${m.ruleProblems.length} | ${m.score.points} | ${m.score.quality ?? "–"} | ${m.score.total} | ${m.score.grade}${m.score.provisional ? "*" : ""} |`,
       );
     }
     lines.push("");
