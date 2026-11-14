@@ -1,6 +1,6 @@
-import * as THREE from 'three';
-import { Player } from './client/player/Player';
-import { PlayerRenderer } from './client/renderer/PlayerRenderer';
+import * as THREE from "three";
+import { Player } from "./player/Player";
+import { PlayerRenderer } from "./renderer/PlayerRenderer";
 
 // Placeholder collision map
 class SimpleCollisionMap {
@@ -67,6 +67,8 @@ const player = new Player('player-1', 10, 10, collisionMap, {
   maxInventorySlots: 8,
   interactionRange: 2,
 });
+camera.position.x = player.getPosition().x;
+camera.position.y = -player.getPosition().y;
 
 // Create player renderer
 const playerRenderer = new PlayerRenderer(player, scene);

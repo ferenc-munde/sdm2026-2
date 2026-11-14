@@ -12,8 +12,8 @@
     "test": "echo 'Tests not yet configured'"
   },
   "dependencies": {
-    "@colyseus/sdk": "^0.15.0",
-    "@colyseus/schema": "^2.0.0",
+    "@colyseus/sdk": "^0.18.10",
+    "@colyseus/schema": "^5.0.8",
     "three": "^0.163.0",
     "zod": "^3.22.4"
   },

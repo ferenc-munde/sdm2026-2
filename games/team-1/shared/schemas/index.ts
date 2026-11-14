@@ -1,4 +1,4 @@
-import { Type, Schema, type } from '@colyseus/schema';
+import { MapSchema, Schema, type } from '@colyseus/schema';
 
 export class PlayerSchema extends Schema {
   @type('string')
@@ -19,7 +19,7 @@ export class PlayerSchema extends Schema {
 
 export class GameStateSchema extends Schema {
   @type({ map: PlayerSchema })
-  players = new Map<string, PlayerSchema>();
+  players = new MapSchema<PlayerSchema>();
 
   @type('number')
   trainCondition: number = 100;

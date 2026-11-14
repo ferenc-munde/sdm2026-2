@@ -1,8 +1,25 @@
 # Architecture
 
-> **Target architecture.** This describes how the system is built. The repository is a skeleton: the platform team and the game teams build these parts during the hackathon. Each folder's `README.md` says what goes in it.
+> **Target architecture.** This describes how the system is built. The repository is a skeleton: the platform team and the game teams build these parts during the hackathon. Each folder's `README.md` says what goes in it. [Current status](#current-status) shows what exists so far.
 
 Every team builds its own real-time multiplayer browser game in `games/team-N/`. All games share one platform in `server/`: the same server host, contract, tooling and CI.
+
+## Current status
+
+What has been done so far:
+
+| Area | Status |
+|---|---|
+| Repository skeleton | Done: rules (`CLAUDE.md`), getting started guide, `server/` structure with a README per package, `games/team-1` to `team-4` folders, course info |
+| Team roster | Done: `course/teams.json` lists instructors, students and their team |
+| Branches | Done: `main` → `staging` → `development` → `Team_1_Feature`, `Team_2_Feature`, `Team_3_Feature` (see [Branch structure](#branch-structure)) |
+| CI workflows | In progress (platform team, build-order step 2): GitHub Actions on every PR |
+| Workspace (`package.json`, `pnpm-workspace.yaml`, TypeScript config) | Not started (build-order step 1) |
+| `@sdm/core`, `@sdm/host`, `@sdm/template` | Not built: only the README of each package exists |
+| `@sdm/gateway`, Railway environments | Not built, nothing is deployed |
+| Game teams | Planning: project plans, specs and package skeletons are in review (for example Team 2, PRs #75 and #85) |
+
+The game teams are blocked on `@sdm/core`, `@sdm/host` and `@sdm/template` before they can write their game rules. Team 2 asked for them in issue #73. The build order is in [README.md](README.md#build-order).
 
 ```
 repo root            pnpm workspace (package.json, pnpm-workspace.yaml, lint/format and test config)
@@ -72,7 +89,33 @@ One address, one path per game. The gateway is the only public service of an env
 | `/<game>/rest` | Proxied to the game's private address, WebSocket upgrades included; the `/<game>` prefix is removed |
 | anything else | 404; a game that cannot be reached gives 502 |
 
+## Branch structure
+
+Branches created so far. `staging` was cut from `main`, `development` from `staging`, and the feature branches from `development`, so every team has its own branch to put its work on:
+
+```
+main
+└─ staging
+   └─ development
+      ├─ Team_1_Feature
+      ├─ Team_2_Feature
+      └─ Team_3_Feature
+```
+
+| Branch | Purpose |
+|---|---|
+| `main` | Root branch of the repository |
+| `staging` | Created from `main` |
+| `development` | Created from `staging`; integration branch for the teams |
+| `Team_N_Feature` | Created from `development`; the branch a team works on and puts its stuff in |
+
+Teams commit to their own `Team_N_Feature` branch and merge into `development` through a PR. Only three feature branches exist so far; `Team_4_Feature` is not created yet.
+
+The repository rules in [../CLAUDE.md](../CLAUDE.md#2-branch) still describe short-lived `<team-label>/<issue-number>-<short-description>` branches and PRs into `main`. Which base branch those PRs target (`Team_N_Feature`, `development` or `main`) is still to be decided and then written into `CLAUDE.md`.
+
 ## Environments (Railway)
+
+> **Not set up yet.** This is the target. Which branch deploys to which environment has to be aligned with the [branch structure](#branch-structure) above.
 
 Railway project `sdm2026-2`, separate from Team 10's `sdm2026-1` project (see the instructors' setup issues). The gateway plus one service per game, one replica each.
 
