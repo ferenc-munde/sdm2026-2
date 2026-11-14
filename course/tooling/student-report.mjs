@@ -4,6 +4,9 @@
 //   node course/tooling/student-report.mjs                 Markdown tables (stdout)
 //   node course/tooling/student-report.mjs --html          one HTML page: contribution share, summary, grade proposal
 //   node course/tooling/student-report.mjs --json          the same data as JSON
+//   node course/tooling/student-report.mjs --me            your own grade check (your gh login): every point and why
+//   node course/tooling/student-report.mjs --student LOGIN one student's grade check
+//   add --out path/to/file to write to a file (its folder is created) instead of stdout
 //   node course/tooling/student-report.mjs --repo owner/name --roster path/to/teams.json
 //
 // Needs Node 18+ and the GitHub CLI (gh), logged in (`gh auth login`). No npm packages.
@@ -12,7 +15,7 @@
 // The output contains per-person numbers: keep it out of the repository (e.g. in .private/).
 
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { toHtml } from "./report-html.mjs";
@@ -345,6 +348,74 @@ export function toMarkdown(report, repo) {
   return lines.join("\n");
 }
 
+/**
+ * One student's grade check: every part of the score with the reason behind it and what the next point
+ * needs. Plain Markdown, written for the student (or their AI agent) to read.
+ */
+export function toStudentCheck(report, login, repo) {
+  const key = login.toLowerCase();
+  const t = report.find((x) => x.members.some((m) => m.login.toLowerCase() === key));
+  if (!t) {
+    return [
+      "# Grade check: @" + login,
+      "",
+      "No activity and no roster entry found for @" + login + " in " + repo + ".",
+      "Check the login: it is your GitHub username, as listed in course/teams.json.",
+    ].join("\n");
+  }
+  const m = t.members.find((x) => x.login.toLowerCase() === key);
+  const s = m.score;
+  const f = effortFactor(m);
+  const need = (n) => Math.ceil(n * f - 1e-9);
+  const size = t.members.length;
+  const pctOf = (x) => Math.round(x * 1000) / 10 + "%";
+  const when = (ms) => new Date(ms).toISOString().slice(0, 16).replace("T", " ") + " UTC";
+  const L = [];
+  L.push("# Grade check: " + (m.name || m.login) + " (@" + m.login + "), " + t.team, "");
+  L.push("Repository: " + repo + ". Generated: " + when(Date.now()) + ".");
+  L.push("This is a proposal computed from the repository. The instructors decide the final grade.", "");
+  L.push("- On time on the first day: " + (m.onTime ? "yes" : "no, so every activity threshold is x" + LATE_FACTOR + ", rounded up"));
+  for (const g of m.sharedWith ?? []) {
+    L.push("- Shared credit with @" + g.with.join(", @") + " until " + when(g.until) + ": " + g.reason);
+  }
+
+  L.push("", "## Activity: " + s.points + " / 10 (75% of the total)", "");
+  L.push("| Part | Points | Why | Next point |", "|---|---|---|---|");
+  const nextDelivery =
+    s.delivery >= 4 ? "maximum reached"
+    : s.delivery === 3 ? need(5) + " merged work PRs"
+    : s.delivery === 2 ? need(2) + " merged work PRs"
+    : s.delivery === 1 ? need(1) + " merged work PR" + (need(1) === 1 ? "" : "s")
+    : "open a work PR (1 point) and get it merged";
+  L.push("| Delivery | " + s.delivery + " / 4 | " + fmt(m.prsMerged) + " merged, " + fmt(m.prsOpened) + " opened work PRs | " + nextDelivery + " |");
+
+  const prRule = m.prsMerged >= need(1) && (m.prsJudged === 0 || m.prsOk * 2 >= m.prsJudged);
+  const issueRule = m.issuesOpened >= need(1) && (m.issuesJudged === 0 || m.issuesOk * 5 >= m.issuesJudged * 4);
+  const closed = m.issuesAssignedClosed >= need(1);
+  L.push("| Process: PRs follow the rules | " + (prRule ? 1 : 0) + " / 1 | " + fmt(m.prsOk) + " of " + fmt(m.prsJudged) + " judged merged PRs OK (needs " + need(1) + "+ merged, at least half OK) | " + (prRule ? "done" : "merged PRs that say Closes #N and target the right branch") + " |");
+  L.push("| Process: issues follow the rules | " + (issueRule ? 1 : 0) + " / 1 | " + fmt(m.issuesOk) + " of " + fmt(m.issuesJudged) + " judged issues OK, " + fmt(m.issuesOpened) + " opened (needs " + need(1) + "+ opened, 80% OK) | " + (issueRule ? "done" : "open issues with one team label and a [label] title") + " |");
+  L.push("| Process: assigned issue closed | " + (closed ? 1 : 0) + " / 1 | " + fmt(m.issuesAssignedClosed) + " of " + fmt(m.issuesAssigned) + " assigned issues closed (needs " + need(1) + ") | " + (closed ? "done" : "get assigned to an issue and close it with a merged PR") + " |");
+
+  const shareOk = size > 0 && m.share * size * 2 >= f;
+  const reviewPts = s.collaboration - (shareOk ? 1 : 0);
+  L.push("| Collaboration: reviews | " + reviewPts + " / 2 | " + fmt(m.reviewsGiven) + " PRs of others reviewed | " + (reviewPts >= 2 ? "maximum reached" : (reviewPts === 1 ? need(5) + " reviews" : need(1) + (need(1) === 1 ? " review" : " reviews"))) + " |");
+  L.push("| Collaboration: share | " + (shareOk ? 1 : 0) + " / 1 | " + pctOf(m.share) + " of the team's lines in merged work PRs (" + Math.round(m.linesAdded) + " lines) | " + (shareOk ? "done" : "reach " + pctOf(size > 0 ? f / (2 * size) : 0) + " of the team's lines") + " |");
+
+  L.push("", "## Game quality (25% of the total)", "");
+  L.push(s.quality === null
+    ? "Not given yet. The instructors score each team's game by hand (does it run, does it meet the requirements)."
+    : "Your team's game: " + s.quality + " / 10.");
+
+  L.push("", "## Total", "");
+  L.push(s.provisional
+    ? "Total: " + s.total + " / 10 (activity only, until the game quality is given) -> grade proposal " + s.grade + " (provisional)."
+    : "Total: 0.75 x " + s.points + " + 0.25 x " + s.quality + " = " + s.total + " / 10 -> grade proposal " + s.grade + ".");
+  L.push("Grades: 8-10 -> 5, 5-7.9 -> 4, 3-4.9 -> 3, 1-2.9 -> 2, below 1 -> 1.");
+  if (m.ruleProblems.length) L.push("", "## Rule problems", "", ...m.ruleProblems.map((r) => "- " + r));
+  L.push("", "Rules and scoring: course/README.md, section Evaluation.");
+  return L.join("\n");
+}
+
 // ---- GitHub access (gh CLI) -------------------------------------------------
 
 function gh(path) {
@@ -396,12 +467,30 @@ function main(argv) {
     process.exit(3);
   }
   const report = buildReport(data, roster);
-  const out = argv.includes("--json")
+  let student = arg("--student", null);
+  if (argv.includes("--me")) {
+    try {
+      student = gh("user").login;
+    } catch {
+      console.error("Could not read your GitHub login. Is gh logged in (gh auth login)?");
+      process.exit(3);
+    }
+  }
+  const out = student
+    ? toStudentCheck(report, student, repo)
+    : argv.includes("--json")
     ? JSON.stringify(report, null, 2)
     : argv.includes("--html")
       ? toHtml(report, { repo, generatedAt: new Date(), rules: RULES })
       : toMarkdown(report, repo);
-  process.stdout.write(`${out}\n`);
+  const file = arg("--out", null);
+  if (file) {
+    mkdirSync(dirname(resolve(file)), { recursive: true });
+    writeFileSync(file, `${out}\n`);
+    console.error(`Written to ${file}`);
+  } else {
+    process.stdout.write(`${out}\n`);
+  }
 }
 
 if (process.argv[1] && resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1])) {

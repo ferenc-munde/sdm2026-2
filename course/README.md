@@ -52,15 +52,35 @@ The grading rules are presented at the opening on the first day. The results are
 
 Only work that is visible in this repository counts, so keep your issues and PRs up to date.
 
+### Check your own grade
+
+Anyone can compute their own grade proposal at any time, with the same script and the same rules the instructors use. You need [Node](https://nodejs.org/) 18+ and the [GitHub CLI](https://cli.github.com/), logged in once with `gh auth login`. No `npm install` is needed.
+
+1. Get the latest `development` branch: `git switch development`, then `git pull`.
+2. From the repository root, run:
+
+   ```bash
+   node course/tooling/student-report.mjs --me
+   ```
+
+   `--me` uses the GitHub account you are logged in with. To check someone else, use `--student <github-login>` instead. To save the result, add `--out .private/my-grade.md`.
+3. Wait a few minutes: the script reads every pull request in the repository.
+
+The output shows each part of your score with the reason behind it and **what the next point needs**, your team's game quality, the total and the grade proposal. It also lists any rule problems (for example a PR without `Closes #N`), so you can fix your habits for the next PR. It is a proposal: the instructors decide the final grade. Keep the output out of the repository (`.private/` is ignored by git).
+
+**Ask your AI agent.** You can also ask your agent (Claude Code, Codex, Copilot, ...) to do this for you, for example:
+
+> Check my grade proposal in this repository: run `node course/tooling/student-report.mjs --me` on the latest `development` branch, then explain each point I got and what I should do next to raise my grade, following the rules in course/README.md.
+
 ### Student activity report (instructors)
 
 ```bash
-node course/tooling/student-report.mjs --html > .private/student-report.html
-node course/tooling/student-report.mjs > .private/student-report.md
-node course/tooling/student-report.mjs --json > .private/student-report.json
+node course/tooling/student-report.mjs --html --out .private/student-report.html
+node course/tooling/student-report.mjs --out .private/student-report.md
+node course/tooling/student-report.mjs --json --out .private/student-report.json
 ```
 
-`--html` writes one page with a section per team: a bar with each student's contribution share, and per student the numbers, a short summary built from them, and a grade proposal. Open the file in a browser.
+`--out` creates the folder if it is missing. `--html` writes one page with a section per team: a bar with each student's contribution share, and per student the numbers, a short summary built from them, and a grade proposal. Open the file in a browser.
 
 - **Contribution share:** the student's part of the lines added in the team's merged work pull requests. Generated files, dependencies, lockfiles and binary assets are left out. Lines measure size, not quality.
 - **Grade proposal** (0–10 points): **75% activity + 25% game quality**.
