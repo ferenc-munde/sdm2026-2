@@ -1,5 +1,14 @@
 export { createGameRoom, type HostDeps } from "./room";
-export { DEFAULT_CLIENT_DIRS, GAME_ROOM_NAME, findClientDir, startGameServer, type RunningGameServer, type StartGameServerOptions } from "./server";
+export {
+  DEFAULT_CLIENT_DIRS,
+  GAME_ROOM_NAME,
+  findClientDir,
+  startGameServer,
+  type RoomDefinition,
+  type RoomRegistration,
+  type RunningGameServer,
+  type StartGameServerOptions,
+} from "./server";
 export { createLogger, type Logger } from "./logger";
 export { RoomRegistry, type RoomStats } from "./registry";
 export { BugReportStore, RateLimiter, ReplayStore, TokenBucket, type StoredBugReport } from "./replays";

@@ -200,6 +200,64 @@ export function buildScenery(bounds: SceneryBounds): Scenery {
     }
   }
 
+  // Second pass of countryside details (visual polish): a separate seed, so everything placed
+  // above keeps its exact position. Round broadleaf trees among the pines, small flower clusters
+  // and pebbles in the grass, and white mileposts beside the track.
+  const detailRandom = seeded(11);
+  const broadleaf: { dx: number; z: number; size: number }[] = [];
+  for (let n = 0; n < 6; n += 1) {
+    broadleaf.push({ dx: detailRandom() * COUNTRYSIDE_PERIOD, z: -(bounds.depth / 2 + 260 + detailRandom() * 620), size: 0.75 + detailRandom() * 0.5 });
+  }
+  const flowers: { dx: number; z: number; colour: number }[] = [];
+  for (let n = 0; n < 22; n += 1) {
+    const near = n % 2 === 0;
+    const z = near ? bounds.depth / 2 + 175 + detailRandom() * 240 : -(bounds.depth / 2 + 140 + detailRandom() * 500);
+    flowers.push({ dx: detailRandom() * COUNTRYSIDE_PERIOD, z, colour: Math.floor(detailRandom() * 3) });
+  }
+  const pebbles: { dx: number; z: number; size: number }[] = [];
+  for (let n = 0; n < 10; n += 1) {
+    const side = n % 2 === 0 ? 1 : -1;
+    pebbles.push({ dx: detailRandom() * COUNTRYSIDE_PERIOD, z: side * (bounds.depth / 2 + 95 + detailRandom() * 40), size: 2.5 + detailRandom() * 2.5 });
+  }
+  const roundCrown = new DodecahedronGeometry(30, 1);
+  const flowerGeometry = new DodecahedronGeometry(2.2, 0);
+  const pebbleGeometry = new DodecahedronGeometry(1, 0);
+  const flowerMaterials = [mat(PALETTE.flowerWhite), mat(PALETTE.flowerYellow), mat(PALETTE.flowerPink)];
+  const milepostGeometry = new BoxGeometry(5, 18, 5);
+  const milepostCap = new BoxGeometry(6, 3, 6);
+  const milepostMaterial = mat(PALETTE.milepost, { roughness: 0.8 });
+  const darkCap = mat(PALETTE.iron);
+  const rockMaterial = mat(PALETTE.rock);
+  for (let start = first - COUNTRYSIDE_PERIOD; start <= last + COUNTRYSIDE_PERIOD; start += COUNTRYSIDE_PERIOD) {
+    broadleaf.forEach((spot, index) => {
+      const tree = new Group();
+      tree.position.set(start + spot.dx, SCENERY_Y - 5, spot.z);
+      tree.scale.setScalar(spot.size);
+      tree.userData = { kind: "tree" };
+      put(tree, new Mesh(trunkGeometry, wood), 0, 20, 0, "trunk");
+      put(tree, new Mesh(roundCrown, leaves[(index + 1) % 2]!), 0, 62, 0, "foliage");
+      countryside.add(tree);
+    });
+    flowers.forEach((spot) => {
+      // A small cluster of three blooms, low enough that it never competes with the train.
+      for (let k = 0; k < 3; k += 1) {
+        const bloom = put(countryside, new Mesh(flowerGeometry, flowerMaterials[spot.colour]!), start + spot.dx + k * 5 - 5, SCENERY_Y - 2.5, spot.z + ((k * 7) % 9) - 4, "flower");
+        bloom.castShadow = false;
+      }
+    });
+    pebbles.forEach((spot) => {
+      const pebble = put(countryside, new Mesh(pebbleGeometry, rockMaterial), start + spot.dx, SCENERY_Y - 3, spot.z, "pebble");
+      pebble.scale.setScalar(spot.size);
+      pebble.castShadow = false;
+    });
+    // A milepost on the near side every quarter tile, so the speed of the train reads clearly.
+    for (let quarter = 0; quarter < 4; quarter += 1) {
+      const x = start + quarter * (COUNTRYSIDE_PERIOD / 4) + 45;
+      put(countryside, new Mesh(milepostGeometry, milepostMaterial), x, SCENERY_Y + 4, bounds.depth / 2 + 118, "milepost");
+      put(countryside, new Mesh(milepostCap, darkCap), x, SCENERY_Y + 14.5, bounds.depth / 2 + 118, "milepostCap");
+    }
+  }
+
   let distance = 0;
   const place = (): void => {
     group.position.x = sceneryOffset(distance);
