@@ -1,5 +1,6 @@
 import { Color, Mesh, MeshStandardMaterial, Object3D, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
+import { CARRY_ARM_LIFT, INTERACT_ARM_LIFT } from "./crewPose.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import {
   PLAYER_COLORS,
@@ -310,5 +311,76 @@ describe("updateState keeps what did not change", () => {
     train.updateState({ players: [players[1]!, cy], items: [], hazards: [] });
     expect(train.playersGroup.children.map((group) => group.userData.playerId)).toEqual(["b", "c"]);
     expect(train.playersGroup.children[0]).not.toBe(bela);
+  });
+});
+
+describe("crew and wheel animation (#294)", () => {
+  const moving = (position: { x: number; y: number }): RenderWorld => ({
+    players: [{ id: "a", name: "Ada", position, facing: { dx: 1, dy: 0 } }],
+    items: [],
+    hazards: [],
+  });
+  const limbs = (figure: Object3D, kind: string): Object3D[] =>
+    figure.children.filter((child) => child.userData.kind === kind);
+
+  it("gives every figure two legs and two arms", () => {
+    const train = build({ players, items: [], hazards: [] });
+    for (const figure of train.playersGroup.children) {
+      expect(limbs(figure, "leg")).toHaveLength(2);
+      expect(limbs(figure, "arm")).toHaveLength(2);
+    }
+  });
+
+  it("swings the limbs while moving and settles when the figure stands still", () => {
+    const train = build(moving({ x: 0, y: 0 }));
+    const figure = train.playersGroup.children[0]!;
+    const legs = limbs(figure, "leg");
+    const arms = limbs(figure, "arm");
+
+    train.updateMotion(0.1, 1);
+    expect(legs.every((leg) => leg.rotation.z === 0)).toBe(true);
+
+    let maxLeg = 0;
+    let maxArm = 0;
+    for (let frame = 1; frame <= 8; frame += 1) {
+      train.updateState(moving({ x: frame * 16, y: 0 }));
+      train.updateMotion(0.1, 1);
+      for (const leg of legs) maxLeg = Math.max(maxLeg, Math.abs(leg.rotation.z));
+      for (const arm of arms) maxArm = Math.max(maxArm, Math.abs(arm.rotation.z));
+    }
+    expect(maxLeg).toBeGreaterThan(0.05);
+    expect(maxArm).toBeGreaterThan(0.02);
+
+    // Standing still for long enough lets the eased speed fall back to zero.
+    for (let frame = 0; frame < 40; frame += 1) train.updateMotion(0.1, 1);
+    expect(legs.every((leg) => Math.abs(leg.rotation.z) < 1e-6)).toBe(true);
+  });
+
+  it("lifts the arms for a carried item, and further while interacting", () => {
+    const train = build({
+      ...moving({ x: 0, y: 0 }),
+      items: [{ id: "c", kind: "coal", position: { x: 0, y: 0 }, heldBy: "a" }],
+    });
+    const arms = limbs(train.playersGroup.children[0]!, "arm");
+
+    train.updateMotion(0.1, 1);
+    for (const arm of arms) expect(arm.rotation.z).toBeCloseTo(CARRY_ARM_LIFT);
+
+    train.updateMotion(0.1, 1, "a");
+    for (const arm of arms) expect(arm.rotation.z).toBeCloseTo(INTERACT_ARM_LIFT);
+  });
+
+  it("rolls a wheel on each corner with the train speed factor", () => {
+    const train = build();
+    const wheels = train.mapGroup.children.filter((child) => child.userData.kind === "wheel");
+    expect(wheels).toHaveLength(train.map.cars.length * 4);
+
+    const first = wheels[0]!;
+    train.updateMotion(0.5, 1);
+    const rolling = first.rotation.z;
+    expect(rolling).toBeGreaterThan(0);
+
+    train.updateMotion(0.5, 0);
+    expect(first.rotation.z).toBe(rolling);
   });
 });
