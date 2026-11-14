@@ -10,7 +10,7 @@
 import { LOW_FUEL_THRESHOLD } from "../shared/constants.ts";
 import type { GameState } from "../shared/types.ts";
 
-export type SoundName = "hazard" | "repairDone" | "coal" | "depart" | "lowFuel" | "win" | "lose";
+export type SoundName = "hazard" | "repairDone" | "coal" | "depart" | "pickup" | "lowFuel" | "win" | "lose";
 
 /** One beep: a frequency and how long it lasts. */
 export interface Note {
@@ -50,6 +50,11 @@ export const SOUNDS: Record<SoundName, SoundSpec> = {
       { frequency: 523, seconds: 0.08 },
       { frequency: 784, seconds: 0.1 },
     ],
+  },
+  pickup: {
+    type: "sine",
+    volume: 0.12,
+    notes: [{ frequency: 1046, seconds: 0.05 }],
   },
   lowFuel: {
     type: "triangle",
@@ -111,6 +116,12 @@ export function eventsBetween(previous: GameState, next: GameState): SoundName[]
   const deliveredCoal =
     previous.phase === "playing" && next.phase === "playing" && next.journey.fuel > previous.journey.fuel + 0.01;
   if (deliveredCoal) sounds.push("coal");
+
+  // A player goes from empty hands to holding something; dropping or swapping stays quiet.
+  const pickedUp = Object.values(next.players).some(
+    (player) => player.connected && player.heldItem !== null && previous.players[player.id]?.heldItem === null,
+  );
+  if (pickedUp) sounds.push("pickup");
 
   const crossedLowFuel =
     previous.journey.fuel > LOW_FUEL_THRESHOLD && next.journey.fuel <= LOW_FUEL_THRESHOLD;
