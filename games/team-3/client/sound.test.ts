@@ -39,13 +39,35 @@ describe("eventsBetween", () => {
     expect(eventsBetween(before, after)).toEqual(["hazard", "repairDone"]);
   });
 
+  it("blips when a player picks an item up (#403)", () => {
+    const held = (heldItem: string | null): GameState => {
+      const base = state();
+      return { ...base, players: { ...base.players, p1: { ...base.players.p1!, heldItem } } };
+    };
+    expect(eventsBetween(held(null), held("coal"))).toEqual(["pickup"]);
+    expect(eventsBetween(held("coal"), held(null))).toEqual([]);
+    expect(eventsBetween(held("coal"), held("wrench"))).toEqual([]);
+  });
+
   it("sounds low fuel only when the tank crosses the threshold", () => {
     const at = (fuel: number): GameState => state({ journey: { ...JOURNEY, fuel } });
     expect(eventsBetween(at(30), at(LOW_FUEL_THRESHOLD))).toEqual(["lowFuel"]);
     expect(eventsBetween(at(30), at(24))).toEqual(["lowFuel"]);
     expect(eventsBetween(at(LOW_FUEL_THRESHOLD + 1), at(LOW_FUEL_THRESHOLD + 1))).toEqual([]);
     expect(eventsBetween(at(20), at(19))).toEqual([]);
-    expect(eventsBetween(at(10), at(50))).toEqual([]);
+    expect(eventsBetween(at(10), at(50))).toEqual(["coal"]); // a rise is a delivery, not low fuel
+  });
+
+  it("chimes when coal raises the fuel while playing (#402)", () => {
+    const at = (fuel: number): GameState => state({ journey: { ...JOURNEY, fuel } });
+    expect(eventsBetween(at(20), at(55))).toEqual(["coal"]);
+    expect(eventsBetween(at(60), at(59))).toEqual([]); // a drop above the threshold is not a delivery
+    expect(
+      eventsBetween(
+        state({ phase: "lobby", journey: { ...JOURNEY, fuel: 20 } }),
+        state({ phase: "lobby", journey: { ...JOURNEY, fuel: 55 } }),
+      ),
+    ).toEqual([]);
   });
 
   it("sounds the end of the run, replacing other events", () => {
@@ -53,6 +75,11 @@ describe("eventsBetween", () => {
     expect(eventsBetween(state(), state({ phase: "won" }))).toEqual(["win"]);
     expect(eventsBetween(hazardState, state({ phase: "lost" }))).toEqual(["lose"]);
     expect(eventsBetween(state({ phase: "won" }), state({ phase: "lobby" }))).toEqual([]);
+  });
+
+  it("whistles once when the lobby departs (#401)", () => {
+    expect(eventsBetween(state({ phase: "lobby" }), state({ phase: "playing" }))).toEqual(["depart"]);
+    expect(eventsBetween(state({ phase: "playing" }), state({ phase: "playing" }))).toEqual([]);
   });
 
   it("stays quiet when nothing changed", () => {
@@ -65,7 +92,7 @@ describe("eventsBetween", () => {
 
 describe("sound specs", () => {
   it("has a short sound for every event", () => {
-    const names: SoundName[] = ["hazard", "repairDone", "lowFuel", "win", "lose"];
+    const names: SoundName[] = ["hazard", "repairDone", "coal", "depart", "pickup", "lowFuel", "win", "lose"];
     for (const name of names) {
       const spec = SOUNDS[name];
       expect(spec.notes.length).toBeGreaterThan(0);
