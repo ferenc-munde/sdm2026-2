@@ -16,5 +16,9 @@
     {"login": "Main-66", "name": "Sisoulath Phongpasith", "nickname": "Bee", "team": "team-3", "onTime": false},
     {"login": "elok9", "name": "Ude Ikenna Chukwueloka", "nickname": "Ikenna", "team": "platform", "onTime": true}
   ],
+  "sharedCredit": [
+    {"logins": ["elok9", "itx-huzaifa819"], "until": "2026-11-13T23:00:00Z",
+     "reason": "On the first day itx-huzaifa819 could not push, so both worked from elok9's account. Their first-day work is split 50-50."}
+  ],
   "gameQuality": {"team-1": null, "team-2": null, "team-3": null, "platform": null}
 }

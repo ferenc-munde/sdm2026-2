@@ -28,7 +28,7 @@ Every issue and pull request carries exactly one team label:
 | `platform`          | the platform team | `server/`     |
 | `team-instructor`   | the instructors | `course/`       |
 
-**Team roster.** [`teams.json`](teams.json) is the official list of who is in which team, with each student's GitHub login, name, nickname and whether they arrived on time (`onTime`), the instructors, and the game quality score of each team (`gameQuality`, 0–10, given by the instructors). Everyone can read it; only the instructors change it. The `team` field stays empty until the teams are formed at the hackathon; then it is set to `team-1` … `team-3` or `platform`.
+**Team roster.** [`teams.json`](teams.json) is the official list of who is in which team, with each student's GitHub login, name, nickname and whether they arrived on time (`onTime`), the instructors, and the game quality score of each team (`gameQuality`, 0–10, given by the instructors), and any shared-credit windows (`sharedCredit`). Everyone can read it; only the instructors change it. The `team` field stays empty until the teams are formed at the hackathon; then it is set to `team-1` … `team-3` or `platform`.
 
 ## Tracking progress
 
@@ -67,6 +67,7 @@ node course/tooling/student-report.mjs --json > .private/student-report.json
   - *Activity* (0–10, from the repository): Delivery 0–4 (merged PRs: 5+ → 4, 2–4 → 3, 1 → 2, only open → 1); Process 0–3 (+1 most merged PRs link their issue, +1 issues opened follow the label and title rules, +1 closed an assigned issue); Collaboration 0–3 (reviews: 5+ → 2, 1–4 → 1; +1 at least half of an equal share).
   - *Game quality* (0–10, per team): does the game run, does it meet the requirements. The instructors give it by hand in `gameQuality` in [`teams.json`](teams.json); every member of the team gets the team's value. Until it is given, the total is the activity alone and the grade is marked provisional (*).
   - *Total* = 0.75 × activity + 0.25 × quality. Total → grade: 8–10 → 5, 5–7.9 → 4, 3–4.9 → 3, 1–2.9 → 2, below 1 → 1. The instructor decides the final grade.
+- **Shared credit:** on the first day `itx-huzaifa819` could not push, and both platform developers worked from `elok9`'s account. Everything the two of them did on 2026-11-13 (issues, pull requests, reviews and lines) is pooled and split 50-50 between them. This is set in `sharedCredit` in [`teams.json`](teams.json); counts in the report can then be fractions.
 - **Late arrival:** students marked `"onTime": false` in [`teams.json`](teams.json) did not arrive on time on the first day, and have to do 20% more for the same activity points: every count is multiplied by 1.2 and rounded up (merged PRs 6+ → 4, 3–5 → 3, 2 → 2, 1 or only open → 1; Process needs 2 merged PRs, 2 issues opened and 2 closed assigned issues; reviews 6+ → 2, 2–5 → 1; Collaboration +1 needs 60% of an equal share). The game quality is not affected. The report marks them.
 - **Rules of their time:** every issue and pull request is judged by the rules in force when it was created, so a rule added later never costs anyone points. The rules the report checks, and the moment each came into force, are listed in `RULES` at the top of `course/tooling/student-report.mjs` and at the bottom of the HTML page. When `CLAUDE.md` gets a new rule that the report should check, add it there with its date.
 

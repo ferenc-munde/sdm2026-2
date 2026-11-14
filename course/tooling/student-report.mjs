@@ -130,7 +130,7 @@ export function scoreOf(p, teamSize, quality = null) {
 }
 
 function plural(n, word) {
-  return `${n} ${word}${n === 1 ? "" : "s"}`;
+  return `${fmt(n)} ${word}${n === 1 ? "" : "s"}`;
 }
 
 /** A short, factual summary built from the numbers. The instructor can rewrite it before sharing. */
@@ -147,10 +147,31 @@ export function summaryOf(p) {
   } else {
     parts.push("No pull request yet.");
   }
-  if (p.issuesAssigned > 0) parts.push(`Closed ${p.issuesAssignedClosed} of ${plural(p.issuesAssigned, "assigned issue")}.`);
-  if (p.issuesOpened >= 5) parts.push(`Planned the work: opened ${p.issuesOpened} issues.`);
+  if (p.issuesAssigned > 0) parts.push(`Closed ${fmt(p.issuesAssignedClosed)} of ${plural(p.issuesAssigned, "assigned issue")}.`);
+  if (p.issuesOpened >= 5) parts.push(`Planned the work: opened ${fmt(p.issuesOpened)} issues.`);
   parts.push(p.reviewsGiven > 0 ? `Reviewed ${plural(p.reviewsGiven, "pull request")} of teammates.` : "No reviews of other people's pull requests.");
   return parts.join(" ");
+}
+
+/**
+ * Shared credit: while one student could not push, a teammate pushed for both. Everything in the
+ * window (issues, PRs, reviews and lines, by the time they were created) that either of them did is
+ * pooled and split evenly between them. Set in the roster:
+ *   "sharedCredit": [{"logins": ["a", "b"], "until": "2026-11-13T23:00:00Z", "reason": "..."}]
+ * `since` is optional (open start); `until` is exclusive.
+ */
+export function sharedGroups(roster) {
+  return (roster.sharedCredit ?? []).map((g) => ({
+    logins: g.logins.map((l) => l.toLowerCase()),
+    since: g.since ? Date.parse(g.since) : -Infinity,
+    until: g.until ? Date.parse(g.until) : Infinity,
+    reason: g.reason ?? "",
+  }));
+}
+
+/** A count for display: whole numbers as they are, shared (split) counts with one decimal. */
+export function fmt(n) {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
 /** Team order in the report: game teams first, then platform, then whatever else the roster has. */
@@ -163,7 +184,7 @@ const emptyPerson = (login, name, team, onTime = true) => ({
   login, name, team, onTime,
   issuesAssigned: 0, issuesAssignedClosed: 0, issuesOpened: 0, issuesJudged: 0, issuesOk: 0,
   prsOpened: 0, prsMerged: 0, prsJudged: 0, prsOk: 0, reviewsGiven: 0, ruleProblems: [],
-  linesAdded: 0, areaLines: {}, areas: [], share: 0,
+  linesAdded: 0, areaLines: {}, areas: [], share: 0, sharedWith: [],
 });
 
 /**
@@ -190,65 +211,86 @@ export function buildReport(data, roster) {
     return people.get(key);
   };
 
+  // Who gets the credit for something `login` did at `when`: [person, weight] pairs. Normally the one
+  // person with weight 1; inside a shared-credit window, every member of the group with an even part.
+  const groups = sharedGroups(roster);
+  for (const g of groups) {
+    for (const l of g.logins) {
+      const p = person(l);
+      if (p) p.sharedWith.push({ with: g.logins.filter((o) => o !== l), reason: g.reason, until: g.until });
+    }
+  }
+  const credit = (login, when) => {
+    const p = person(login);
+    if (!p) return [];
+    const t = when ? Date.parse(when) : NaN;
+    const g = groups.find((x) => x.logins.includes(login.toLowerCase()) && t >= x.since && t < x.until);
+    if (!g) return [[p, 1]];
+    const members = g.logins.map(person).filter(Boolean);
+    return members.map((m) => [m, 1 / members.length]);
+  };
+
   for (const issue of data.issues) {
     if (issue.pull_request) continue; // the issues endpoint also returns PRs
-    const author = person(issue.user?.login);
-    if (author) {
-      author.issuesOpened++;
-      if (ruleApplies("issue-label-title", issue.created_at)) {
-        author.issuesJudged++;
-        const labels = (issue.labels ?? []).map((l) => (typeof l === "string" ? l : l.name)).filter((l) => TEAM_LABELS.includes(l));
-        const prefix = /^\[([^\]]+)\]/.exec(issue.title ?? "")?.[1];
-        if (labels.length === 1 && prefix === labels[0]) author.issuesOk++;
-        else author.ruleProblems.push(`issue #${issue.number}: team label / [label] title`);
-      }
+    let issueOk = null;
+    if (ruleApplies("issue-label-title", issue.created_at)) {
+      const labels = (issue.labels ?? []).map((l) => (typeof l === "string" ? l : l.name)).filter((l) => TEAM_LABELS.includes(l));
+      const prefix = /^\[([^\]]+)\]/.exec(issue.title ?? "")?.[1];
+      issueOk = labels.length === 1 && prefix === labels[0];
+    }
+    const authors = credit(issue.user?.login, issue.created_at);
+    for (const [author, w] of authors) {
+      author.issuesOpened += w;
+      if (issueOk === null) continue;
+      author.issuesJudged += w;
+      if (issueOk) author.issuesOk += w;
+      else author.ruleProblems.push(`issue #${issue.number}: team label / [label] title${authors.length > 1 ? " (shared)" : ""}`);
     }
     for (const a of issue.assignees ?? []) {
-      const p = person(a.login);
-      if (!p) continue;
-      p.issuesAssigned++;
-      if (issue.state === "closed" && issue.state_reason !== "not_planned") p.issuesAssignedClosed++;
+      for (const [p, w] of credit(a.login, issue.created_at)) {
+        p.issuesAssigned += w;
+        if (issue.state === "closed" && issue.state_reason !== "not_planned") p.issuesAssignedClosed += w;
+      }
     }
   }
 
   for (const pr of data.pulls) {
     if (isIntegrationBranch(pr.head?.ref ?? "")) continue; // promotions and syncs repeat work counted elsewhere
-    const author = person(pr.user?.login);
-    if (author) {
-      author.prsOpened++;
-      if (pr.merged_at) {
-        author.prsMerged++;
-        const checks = [];
-        if (ruleApplies("pr-links-issue", pr.created_at)) {
-          checks.push(/\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+/i.test(pr.body ?? "") || "no Closes #N");
-        }
-        if (ruleApplies("pr-base-branch", pr.created_at) && pr.base?.ref) {
-          const want = expectedBase(author.team);
-          checks.push(pr.base.ref === want || `targets ${pr.base.ref}, not ${want}`);
-        }
-        if (checks.length) {
-          author.prsJudged++;
-          const problems = checks.filter((c) => c !== true);
-          if (problems.length === 0) author.prsOk++;
-          else author.ruleProblems.push(`PR #${pr.number}: ${problems.join(", ")}`);
-        }
-        for (const f of data.files?.[pr.number] ?? []) {
-          if (isGeneratedFile(f.filename)) continue;
-          author.linesAdded += f.additions ?? 0;
-          const area = areaOf(f.filename);
-          author.areaLines[area] = (author.areaLines[area] ?? 0) + (f.additions ?? 0);
-        }
+    const authors = credit(pr.user?.login, pr.created_at);
+    for (const [author, w] of authors) {
+      author.prsOpened += w;
+      if (!pr.merged_at) continue;
+      author.prsMerged += w;
+      const checks = [];
+      if (ruleApplies("pr-links-issue", pr.created_at)) {
+        checks.push(/\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+/i.test(pr.body ?? "") || "no Closes #N");
+      }
+      if (ruleApplies("pr-base-branch", pr.created_at) && pr.base?.ref) {
+        const want = expectedBase(author.team);
+        checks.push(pr.base.ref === want || `targets ${pr.base.ref}, not ${want}`);
+      }
+      if (checks.length) {
+        author.prsJudged += w;
+        const problems = checks.filter((c) => c !== true);
+        if (problems.length === 0) author.prsOk += w;
+        else author.ruleProblems.push(`PR #${pr.number}: ${problems.join(", ")}${authors.length > 1 ? " (shared)" : ""}`);
+      }
+      for (const f of data.files?.[pr.number] ?? []) {
+        if (isGeneratedFile(f.filename)) continue;
+        const added = (f.additions ?? 0) * w;
+        author.linesAdded += added;
+        const area = areaOf(f.filename);
+        author.areaLines[area] = (author.areaLines[area] ?? 0) + added;
       }
     }
-    const reviewers = new Set();
+    const reviewers = new Map(); // login -> time of the first review on this PR
     for (const r of data.reviews[pr.number] ?? []) {
       const login = r.user?.login;
       if (!login || login === pr.user?.login || r.state === "PENDING") continue;
-      reviewers.add(login.toLowerCase());
+      if (!reviewers.has(login.toLowerCase())) reviewers.set(login.toLowerCase(), r.submitted_at);
     }
-    for (const login of reviewers) {
-      const p = person(login);
-      if (p) p.reviewsGiven++;
+    for (const [login, when] of reviewers) {
+      for (const [p, w] of credit(login, when)) p.reviewsGiven += w;
     }
   }
 
@@ -284,6 +326,7 @@ export function toMarkdown(report, repo) {
     "Activity: 0-10 points from the repository. Quality: the team's game quality, 0-10, given by the instructors.",
     "Total: 75% activity + 25% quality; while the quality is missing, the total is the activity alone (provisional, marked *).",
     "Rule problems: issues and PRs judged by the rules in force when they were created (see RULES in the script).",
+    "Shared: in a shared-credit window (see sharedCredit in teams.json) the work of the group is split evenly, so counts can be fractions.",
     "On time: no = arrived late, every activity threshold is 20% higher (rounded up) for this student.",
     "",
   );
@@ -294,7 +337,7 @@ export function toMarkdown(report, repo) {
     lines.push("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
     for (const m of members) {
       lines.push(
-        `| ${m.name || "–"} | ${m.login} | ${m.onTime ? "yes" : "no (×1.2)"} | ${m.issuesAssignedClosed} / ${m.issuesAssigned} | ${m.issuesOpened} | ${m.prsOpened} | ${m.prsMerged} | ${m.reviewsGiven} | ${m.linesAdded} | ${Math.round(m.share * 100)}% | ${m.ruleProblems.length} | ${m.score.points} | ${m.score.quality ?? "–"} | ${m.score.total} | ${m.score.grade}${m.score.provisional ? "*" : ""} |`,
+        `| ${m.name || "–"} | ${m.login} | ${m.onTime ? "yes" : "no (×1.2)"} | ${fmt(m.issuesAssignedClosed)} / ${fmt(m.issuesAssigned)} | ${fmt(m.issuesOpened)} | ${fmt(m.prsOpened)} | ${fmt(m.prsMerged)} | ${fmt(m.reviewsGiven)} | ${Math.round(m.linesAdded)} | ${Math.round(m.share * 100)}% | ${m.ruleProblems.length} | ${m.score.points} | ${m.score.quality ?? "–"} | ${m.score.total} | ${m.score.grade}${m.score.provisional ? "*" : ""} |`,
       );
     }
     lines.push("");
