@@ -20,6 +20,7 @@ import {
   Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
+  PointLight,
   SRGBColorSpace,
   Scene,
   SphereGeometry,
@@ -75,6 +76,14 @@ const DOOR_THICKNESS = 2;
 const LABEL_HEIGHT = 70;
 const HAZARD_BAR_HEIGHT = 46;
 const HAZARD_BAR_WIDTH = 44;
+
+/** Fire lights (#356): small, warm and few, so a run with several fires stays fast. */
+const MAX_FIRE_LIGHTS = 3;
+const FIRE_LIGHT_DISTANCE = 120;
+const FIRE_LIGHT_INTENSITY = 2.2;
+const FIRE_LIGHT_HEIGHT = 26;
+/** Breach steam puffs: enough that one is always rising, staggered around the plume. */
+const STEAM_PUFFS = 8;
 
 const FLOOR_COLOR = "#2a2a33";
 const WALL_COLOR = "#71717f";
@@ -368,6 +377,15 @@ function buildHazardGroup(hazard: RenderHazard): Group {
     flame.name = "fire";
     flame.userData = { kind: "hazardShape", hazardKind: hazard.kind };
     group.add(flame);
+
+    // A small warm light so the fire lights the floor and walls around it (#356). `updateEffects`
+    // flickers it and keeps only the first few fires lit.
+    const light = new PointLight(PALETTE.fire, FIRE_LIGHT_INTENSITY, FIRE_LIGHT_DISTANCE);
+    light.name = "fireLight";
+    light.position.y = FIRE_LIGHT_HEIGHT;
+    light.castShadow = false;
+    light.userData = { kind: "fireLight" };
+    group.add(light);
   } else if (hazard.kind === "breach") {
     const mark = buildBreachModel();
     mark.name = "breach";
@@ -381,16 +399,21 @@ function buildHazardGroup(hazard: RenderHazard): Group {
     group.add(mark);
   }
 
-  // Steam puffs on a breach (#217), animated by `updateEffects`.
+  // Steam puffs on a breach (#217), animated by `updateEffects`. A fuller plume (#356): twice the
+  // puffs, staggered so one is always rising, each drifting a little to the side as it climbs.
   if (hazard.kind === "breach") {
-    for (let index = 0; index < 4; index += 1) {
-      const puff = new Mesh(
-        new SphereGeometry(5, 8, 6),
-        new MeshStandardMaterial({ color: 0xd7e2f0, transparent: true, opacity: 0.5, depthWrite: false }),
-      );
+    const puffGeometry = new SphereGeometry(5, 8, 6);
+    for (let index = 0; index < STEAM_PUFFS; index += 1) {
+      const puff = new Mesh(puffGeometry, ownMat(PALETTE.steam, { opacity: 0.5 }));
       puff.name = "steam";
       puff.position.y = 4;
-      puff.userData = { kind: "steam", phase: index / 4 };
+      const angle = (index / STEAM_PUFFS) * Math.PI * 2;
+      puff.userData = {
+        kind: "steam",
+        phase: index / STEAM_PUFFS,
+        driftX: Math.cos(angle) * 16,
+        driftZ: Math.sin(angle) * 10,
+      };
       group.add(puff);
     }
   }
@@ -669,9 +692,22 @@ export function buildTrainScene(
     const glow = mapGroup.getObjectByName("fireboxGlow");
     if (glow instanceof Mesh) (glow.material as MeshStandardMaterial).emissiveIntensity = 1.2 + 0.5 * Math.sin(seconds * 7);
 
+    let fireLights = 0;
     for (const group of hazardsGroup.children) {
       const kind = group.userData.hazardKind;
       if (kind === "fire") {
+        // The fire's own light (#356): it flickers with the flame, and only the first few fires
+        // get one, so a run with many fires stays fast.
+        const light = group.children.find((child) => child.name === "fireLight");
+        if (light instanceof PointLight) {
+          const lit = fireLights < MAX_FIRE_LIGHTS;
+          light.visible = lit;
+          if (lit) {
+            fireLights += 1;
+            light.intensity = FIRE_LIGHT_INTENSITY * (0.85 + 0.15 * Math.sin(seconds * 13 + group.id));
+          }
+        }
+
         const flame = group.children.find((child) => child.name === "fire");
         if (flame instanceof Mesh) {
           for (const lick of flame.children) {
@@ -692,6 +728,9 @@ export function buildTrainScene(
           const phase = Number(puff.userData.phase) || 0;
           const rise = (seconds * 0.6 + phase) % 1;
           puff.position.y = 4 + rise * 40;
+          // A slight sideways drift, so the plume bends as it rises instead of standing still.
+          puff.position.x = (Number(puff.userData.driftX) || 0) * rise;
+          puff.position.z = (Number(puff.userData.driftZ) || 0) * rise;
           puff.scale.setScalar(0.7 + rise * 1.1);
           const material = puff.material;
           if (material instanceof MeshStandardMaterial) material.opacity = 0.55 * (1 - rise);

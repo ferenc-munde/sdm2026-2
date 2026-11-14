@@ -1,5 +1,5 @@
 import { LOCOMOTIVE_LENGTH } from "./trainModel.ts";
-import { Color, Mesh, MeshStandardMaterial, Object3D, Vector3 } from "three";
+import { Color, Mesh, MeshStandardMaterial, Object3D, PointLight, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { CARRY_ARM_LIFT, INTERACT_ARM_LIFT } from "./crewPose.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
@@ -12,6 +12,7 @@ import {
   type RenderItem,
   type RenderWorld,
 } from "./trainScene.ts";
+import { PALETTE } from "./style.ts";
 
 const labelFactory = (name: string): Object3D => {
   const label = new Object3D();
@@ -204,12 +205,16 @@ describe("updateState", () => {
 
     const breach = train.hazardsGroup.children.find((group) => group.userData.hazardId === "b");
     const steam = breach?.children.filter((child) => child.userData.kind === "steam") ?? [];
-    expect(steam).toHaveLength(4);
+    expect(steam).toHaveLength(8);
 
     train.updateEffects(0.1);
     const early = steam[0]?.position.y;
     train.updateEffects(0.9);
     expect(steam[0]?.position.y).not.toBe(early);
+    // Staggered phases: the puffs are not all at the same height at once.
+    expect(new Set(steam.map((puff) => puff.position.y.toFixed(2))).size).toBeGreaterThan(1);
+    // And they drift a little to the side as they climb (#356).
+    expect(steam.some((puff) => puff.position.x !== 0)).toBe(true);
 
     const fire = train.hazardsGroup.children.find((group) => group.userData.hazardId === "f");
     const flame = fire?.children.find((child) => child.name === "fire");
@@ -217,6 +222,34 @@ describe("updateState", () => {
     const firstScale = flame?.scale.x;
     train.updateEffects(0.5);
     expect(flame?.scale.x).not.toBe(firstScale);
+  });
+
+  it("lights a fire and keeps at most three fire lights (#356)", () => {
+    const fires: RenderHazard[] = [0, 1, 2, 3].map((index) => ({
+      id: `fire-${index}`,
+      kind: "fire",
+      position: { x: index * 100, y: 0 },
+      progress: 0,
+    }));
+    const train = build({ hazards: fires });
+    const lights = train.hazardsGroup.children.map((group) =>
+      group.children.find((child) => child.name === "fireLight"),
+    );
+
+    const light = lights[0];
+    expect(light).toBeInstanceOf(PointLight);
+    if (!(light instanceof PointLight)) return;
+    expect(light.distance).toBe(120);
+    expect(light.castShadow).toBe(false);
+    expect(light.color.getHexString()).toBe(new Color(PALETTE.fire).getHexString());
+
+    train.updateEffects(0.1);
+    expect(lights.filter((candidate) => candidate?.visible)).toHaveLength(3);
+
+    // The light goes with its fire when the hazard is repaired.
+    train.updateState({ hazards: fires.slice(0, 1) });
+    expect(train.hazardsGroup.children).toHaveLength(1);
+    expect(train.hazardsGroup.children[0]?.getObjectByName("fireLight")).toBeDefined();
   });
 
   it("can be disposed without throwing", () => {
