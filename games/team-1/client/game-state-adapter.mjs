@@ -8,6 +8,30 @@ function copyState(state) {
   };
 }
 
+const PREVIEW_SPAWNS = [
+  { position: { x: 0.18, z: 0.5 }, color: "#d6ac68" },
+  { position: { x: 0.38, z: 0.5 }, color: "#8bb8a4" },
+  { position: { x: 0.58, z: 0.5 }, color: "#c78875" },
+  { position: { x: 0.78, z: 0.5 }, color: "#8f9dcc" },
+];
+
+export function reconcilePreviewPlayers(players, existing = []) {
+  const previous = new Map(existing.map((player) => [player.id, player]));
+  const retained = players.map((player) => previous.get(player.id)).filter(Boolean);
+  const usedColors = new Set(retained.map((player) => player.color));
+
+  return players.map((player, index) => {
+    const current = previous.get(player.id);
+    if (current) return { ...current, ...player, position: { ...current.position } };
+    const spawn = PREVIEW_SPAWNS.find((candidate) => !usedColors.has(candidate.color)) ?? {
+      position: { x: 0.18 + index * 0.2, z: 0.5 },
+      color: PREVIEW_SPAWNS[index % PREVIEW_SPAWNS.length].color,
+    };
+    usedColors.add(spawn.color);
+    return { ...player, position: { ...spawn.position }, color: spawn.color };
+  });
+}
+
 /**
  * Local-only gameplay state source for frontend previews and tests.
  * `publish` represents a received state snapshot; this class does not run a
@@ -41,13 +65,7 @@ export class MockGameStateAdapter {
 export function createPreviewSnapshot(players = []) {
   return {
     connectionState: "connected",
-    players: players.map((player, index) => ({
-      id: player.id,
-      name: player.name,
-      connected: player.connected,
-      position: { x: 0.18 + index * 0.2, z: 0.5 },
-      color: ["#d6ac68", "#8bb8a4", "#c78875", "#8f9dcc"][index % 4],
-    })),
+    players: reconcilePreviewPlayers(players),
     secondsRemaining: 180,
     trainCondition: 100,
     repairs: { completed: 0, total: 5 },

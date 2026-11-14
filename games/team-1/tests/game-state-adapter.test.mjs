@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createPreviewSnapshot, MockGameStateAdapter } from "../client/game-state-adapter.mjs";
+import { createPreviewSnapshot, MockGameStateAdapter, reconcilePreviewPlayers } from "../client/game-state-adapter.mjs";
 
 let passed = 0;
 const failures = [];
@@ -22,6 +22,21 @@ await test("creates a backend-shaped preview snapshot without mutating lobby pla
   assert.equal(players[0].position, undefined);
   assert.equal(createPreviewSnapshot(players).players[0].position.x, 0.18);
   assert.equal(snapshot.outcome.kind, "playing");
+});
+
+await test("spawns four distinct players and preserves existing positions and colors when the roster changes", () => {
+  const crew = ["a", "b", "c", "d"].map((id) => ({ id, name: id, connected: true }));
+  const initial = createPreviewSnapshot(crew).players;
+  assert.equal(new Set(initial.map((player) => player.color)).size, 4);
+  assert.equal(new Set(initial.map((player) => JSON.stringify(player.position))).size, 4);
+  initial[2].position.x = 0.7;
+  const remaining = reconcilePreviewPlayers([crew[2], crew[0]], initial);
+  assert.deepEqual(remaining[0], initial[2]);
+  assert.deepEqual(remaining[1], initial[0]);
+  const added = reconcilePreviewPlayers([crew[2], crew[0], crew[3]], remaining);
+  assert.deepEqual(added[0], initial[2]);
+  assert.equal(added[2].color, initial[1].color);
+  assert.deepEqual(added[2].position, initial[1].position);
 });
 
 await test("publishes synchronized player state to client subscribers", () => {

@@ -4,6 +4,8 @@ export function toPlayerViewModels(snapshot) {
     name: player.name,
     connected: player.connected,
     color: player.color,
+    direction: player.direction,
+    isMoving: player.isMoving,
     x: Math.min(1, Math.max(0, player.position.x)),
     z: Math.min(1, Math.max(0, player.position.z)),
   }));

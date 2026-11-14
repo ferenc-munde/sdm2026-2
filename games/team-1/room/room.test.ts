@@ -231,7 +231,10 @@ describe("team-1 client adapters against the platform host", () => {
     const before = guest.game.getSnapshot().players[0]?.position.x ?? Number.NaN;
     host.game.sendInput({ type: "move", x: 1, z: 0 });
     await waitFor(() => (guest.game.getSnapshot().players[0]?.position.x ?? 0) > before + 0.05);
+    expect(guest.game.getSnapshot().players[0]).toMatchObject({ direction: "right", isMoving: true });
     host.game.sendInput({ type: "move", x: 0, z: 0 });
+    await waitFor(() => guest.game.getSnapshot().players[0]?.isMoving === false);
+    expect(guest.game.getSnapshot().players[0]?.direction).toBe("right");
 
     await guest.session.leaveSession();
     await waitFor(() => hostEvents.length === 2);

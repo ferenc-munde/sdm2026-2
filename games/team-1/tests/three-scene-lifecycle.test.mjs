@@ -141,6 +141,51 @@ try {
     }
   });
 
+  test("animates walking, retains facing, and returns to idle", () => {
+    const scene = createHarness();
+    try {
+      const snapshot = createPreviewSnapshot([{ id: "p1", name: "Engineer", connected: true }]);
+      snapshot.players[0].direction = "left";
+      snapshot.players[0].isMoving = true;
+      scene.train.update(snapshot);
+      const avatar = scene.avatars()[0];
+      assert.equal(avatar.children[3].position.x, -0.2);
+      assert.equal(avatar.children[3].position.z, 0);
+      const startX = avatar.position.x;
+      const railway = scene.scene.userData.railwayMotion;
+      const startDistance = railway.userData.travelDistance ?? 0;
+      snapshot.players[0].position.x = 0.75;
+      scene.train.update(snapshot);
+      const [id, callback] = pendingFrames.entries().next().value;
+      pendingFrames.delete(id);
+      const frameTime = Math.ceil(performance.now() / (Math.PI * 120)) * Math.PI * 120 + Math.PI * 60;
+      callback(frameTime);
+      assert.ok(avatar.children[0].position.y > 0.54);
+      assert.ok(avatar.position.x > startX);
+      assert.ok(railway.userData.travelDistance > startDistance);
+      snapshot.players[0].isMoving = false;
+      scene.train.update(snapshot);
+      const [nextId, nextCallback] = pendingFrames.entries().next().value;
+      pendingFrames.delete(nextId);
+      nextCallback(frameTime + 16);
+      assert.equal(avatar.children[0].position.y, 0.54);
+      assert.equal(avatar.children[3].position.x, -0.2);
+    } finally {
+      scene.train.dispose();
+    }
+  });
+
+  test("removes and disposes a remaining player once on scene teardown", () => {
+    const scene = createHarness();
+    scene.train.update(createPreviewSnapshot([{ id: "p1", name: "Engineer", connected: true }]));
+    const avatar = scene.avatars()[0];
+    let disposed = 0;
+    avatar.children[0].material.addEventListener("dispose", () => disposed++);
+    scene.train.dispose();
+    assert.equal(avatar.parent, null);
+    assert.equal(disposed, 1);
+  });
+
   test("disposes per-player materials and marker geometry on removal, then shared geometry at scene teardown", () => {
     const scene = createHarness();
     scene.train.update(createPreviewSnapshot([
