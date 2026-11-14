@@ -113,7 +113,7 @@ team-N/<issue>-<description>  →  Team_N_Feature  →  development  →  stagin
 
 | Branch | Purpose | Receives pull requests from |
 |---|---|---|
-| `main` | Production: the stable, released state | `staging` only |
+| `main` | Production: the stable, released state | `staging` only, merged by an instructor (enforced by a repository ruleset) |
 | `staging` | Release candidate, checked before it goes to production | `development` only |
 | `development` | Integration branch for all teams | `Team_N_Feature`, and `platform` and `team-instructor` work branches |
 | `Team_N_Feature` | Team N's integration branch | Team N's work branches (`team-N/<issue>-<description>`) |
@@ -136,7 +136,7 @@ Railway project `sdm2026-2`, separate from Team 10's `sdm2026-1` project (see th
 | Environment | Deploys | `APP_ENV` |
 |---|---|---|
 | development | `development`, after CI passed on the commit | `development` |
-| production | `main`, through a reviewed promotion PR from `staging` | `production` |
+| production | `main`, through a promotion PR from `staging` that an instructor merges | `production` |
 
 `staging` has no environment of its own yet: it is the release candidate that CI checks before the promotion to `main`.
 
