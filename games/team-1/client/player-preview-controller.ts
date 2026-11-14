@@ -34,7 +34,12 @@ export class PlayerPreviewController {
     const { x, y } = this.player.getPosition();
     const snapshot: GameClientSnapshot = this.adapter.getSnapshot();
     const players = snapshot.players.map((candidate): GamePlayer => candidate.id === this.playerId
-      ? { ...candidate, position: { x: clamp01(x / GRID_WIDTH), z: clamp01(y / GRID_HEIGHT) } }
+      ? {
+          ...candidate,
+          position: { x: clamp01(x / GRID_WIDTH), z: clamp01(y / GRID_HEIGHT) },
+          direction: this.player.getDirection(),
+          isMoving: this.player.getIsMoving(),
+        }
       : candidate);
     this.adapter.publish({ ...snapshot, players });
   }
