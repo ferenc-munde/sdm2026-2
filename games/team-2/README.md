@@ -2,7 +2,9 @@
 
 This folder holds the game of Team 2 (package `@team-2/game`, label `team-2`).
 
-Work only inside this folder unless an issue says otherwise. The package was self-scaffolded (mirroring [server/template/README.md](../../server/template/README.md)) until the platform lands: the rules are in [server/CLAUDE.md](../../server/CLAUDE.md), build details in `DEVELOPMENT.md`.
+Work only inside this folder unless an issue says otherwise. The game runs on the shared platform (`@sdm/core`, `@sdm/host`): the rules are in [server/CLAUDE.md](../../server/CLAUDE.md), build details in `DEVELOPMENT.md`.
+
+**New here, or an AI agent picking the work up? Start with [`docs/README.md`](docs/README.md)**, then [`docs/PLATFORM.md`](docs/PLATFORM.md) and [`docs/NEXT_STEPS.md`](docs/NEXT_STEPS.md).
 
 ## Game
 
@@ -18,24 +20,53 @@ Work only inside this folder unless an issue says otherwise. The package was sel
 - GitHub CLI (`gh`) is **optional** — handy for issues/PRs from the terminal,
   but the web UI works fine; nothing in the run steps needs it
 
-## Run locally (once the platform template is copied here)
+## Run the game and multiplayer lobby
+
+Install once from the repository root (`pnpm install`: this is one pnpm workspace), then from `games/team-2/`:
 
 ```bash
-pnpm install
-pnpm --filter @team-2/game dev   # client on :5173, server on :2567
-pnpm --filter @team-2/game test  # headless rules tests (deterministic sim)
+pnpm dev             # game server on :2567 (lobby + game room) and Vite client on :5173
+pnpm test            # rules tests and the two-client room test
+pnpm run typecheck
+pnpm run build       # typecheck + client build to client/dist/ (Vite root is client/)
+pnpm run preview     # serve the client build
 ```
 
-> Until the platform template is copied into this folder (#35 / #73), there is
-> no dev server: only `npm test` and `npm run typecheck` work from
-> `games/team-2/`.
+Open two browser tabs at `http://127.0.0.1:5173/`, choose the same crew size, and join with distinct names.
+The host can skip the 30-second lobby countdown and depart with the current
+crew, including one player. When the timer expires, the game starts with
+whoever joined.
 
-Two browser tabs at `localhost:5173` = two players.
+After departure every player sits in the **same game room on the server**:
+the lobby host's browser creates it and the others join it by its code. Each
+player is a coloured disc; WASD or the arrow keys move it (Shift runs) and the
+server decides the position, so both tabs show both players moving. Phases,
+tasks, hazards, items and the journey are not simulated yet
+([docs/NEXT_STEPS.md](docs/NEXT_STEPS.md)).
+
+Add `?local` to the address for the offline demo: no server and no lobby, the
+same rules run in the browser with one player (`client/stateModel.ts`).
+`?room=CODE` joins a game room directly by its code.
+
+The map is flat 2D, displayed by Three.js with five vertical carriages, 20
+station locations, four passages, scrolling scenery and a carriage inspector.
+The landscape scrolls in the scene preview and follows `speed` from the game
+state otherwise (which stays 0 until the speed model exists).
+
+The **Game state** data source shows the actual state. Current rule modules
+are partly stubs, so speed, tasks and journey do not advance even while ticks
+increase.
+
+Choose **Scene preview** to use the separate example controls: repair,
+journey/time, speed (0–2x), pause, victory, defeat and reset. These controls
+never modify the game state. Switch back to Game state to see live state.
+The standalone HUD preview is also available with `node client/preview-hud.mjs`
+on port 5174.
 
 ## Workflow (repo rules — see root `CLAUDE.md`)
 
 1. **Issue first** — `[team-2] Short description`, goal + `done when`, label `team-2`, assignee.
-2. Branch `team-2/<issue#>-<short-description>` from up-to-date `main`.
+2. Branch `team-2/<issue#>-<short-description>` from up-to-date `Team_2_Feature`.
 3. Conventional Commits: `feat(team-2): add boiler station` + `Refs #N` in the body.
 4. One PR per issue, `Closes #N`, say how you tested it; ≥1 approving review; delete branch after merge.
 5. Never push to `main`. Platform needs → `platform`-labeled issue, never patch `server/`.

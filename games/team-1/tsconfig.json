@@ -6,8 +6,11 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": []
   },
-  "include": ["client/**/*.ts", "vite.config.ts"]
+  "include": ["client/**/*.ts", "shared/**/*.ts", "room/**/*.ts", "server.ts", "vite.config.ts", "vitest.config.ts"]
 }

@@ -3,5 +3,7 @@
   "patchRate": 20,
   "maxPlayers": 4,
   "reconnectSeconds": 30,
-  "timeLimitSeconds": 300
+  "timeLimitSeconds": 300,
+  "walkSpeed": 120,
+  "runSpeed": 200
 }

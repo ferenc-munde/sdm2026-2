@@ -15,6 +15,12 @@ describe("game config", () => {
 		expect(parseGameConfig(configJson)).toMatchObject(valid);
 	});
 
+	it("has movement speeds, with defaults when the file leaves them out", () => {
+		expect(parseGameConfig(configJson)).toMatchObject({ walkSpeed: 120, runSpeed: 200 });
+		expect(parseGameConfig(valid)).toMatchObject({ walkSpeed: 120, runSpeed: 200 });
+		expect(() => parseGameConfig({ ...valid, walkSpeed: 0 })).toThrow();
+	});
+
 	it("rejects an out-of-range tickRate", () => {
 		expect(() => parseGameConfig({ ...valid, tickRate: 5 })).toThrow();
 		expect(() => parseGameConfig({ ...valid, tickRate: 61 })).toThrow();

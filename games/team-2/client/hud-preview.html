@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Last Train — task panel preview</title>
+<link rel="stylesheet" href="hud.css">
+<style>
+  body { margin: 0; background: #0b141e; color: #e8edf1; font: 18px/1.6 system-ui; }
+  main { max-width: 600px; padding: 36px; margin-top: 520px; }
+  h1 { margin-bottom: 0; }
+  p { color: #bdc9d2; }
+  button { padding: 12px 18px; margin: 4px; border: 0; border-radius: 6px; cursor: pointer; font: inherit; }
+</style>
+<div id="hud"></div>
+<main>
+  <h1>The Last Train</h1>
+  <p>Your task panel preview. These buttons use example data; they do not affect a real game.</p>
+  <button id="repair">Repair electricity</button>
+  <button id="fuse">Replace one fuse</button>
+  <button id="clear">Remove tasks</button>
+  <p>Try changing the train's example gauges:</p>
+  <button id="power-down">Power −10%</button>
+  <button id="power-up">Power +10%</button>
+  <button id="pressure-down">Pressure −10%</button>
+  <button id="pressure-up">Pressure +10%</button>
+  <p>Journey and end screens:</p>
+  <button id="advance">Travel +10%</button>
+  <button id="time">Use 30 seconds</button>
+  <button id="win">Preview victory</button>
+  <button id="lose">Preview defeat</button>
+  <button id="reset">Start again</button>
+</main>
+<script type="module">
+  import { createHud } from './hud.js';
+  const hud = createHud(document.getElementById('hud'));
+  let tasks;
+  let power = 100;
+  let pressure = 0;
+  let distance = 0;
+  let remainingSeconds = 300;
+  let phase = 'running';
+  function updateJourney() {
+    hud.updateJourney({ distance, remainingSeconds, totalSeconds: 300, phase });
+  }
+  function updateGauges() {
+    hud.updateGauges({ power, pressure });
+  }
+  function reset() {
+    distance = 0;
+    remainingSeconds = 300;
+    phase = 'running';
+    updateJourney();
+    power = 100;
+    pressure = 0;
+    updateGauges();
+    tasks = [
+      { id: 'electric', title: 'Repair electrical panel', current: 0, target: 1 },
+      { id: 'fuses', title: 'Replace fuses', current: 0, target: 2 },
+    ];
+    hud.updateTasks(tasks);
+  }
+  document.getElementById('repair').onclick = () => {
+    const task = tasks.find(t => t.id === 'electric');
+    if (task) task.current = 1;
+    hud.updateTasks(tasks);
+  };
+  document.getElementById('fuse').onclick = () => {
+    const task = tasks.find(t => t.id === 'fuses');
+    if (task) task.current = Math.min(task.target, task.current + 1);
+    hud.updateTasks(tasks);
+  };
+  document.getElementById('clear').onclick = () => { tasks = []; hud.updateTasks(tasks); };
+  document.getElementById('power-down').onclick = () => { power = Math.max(0, power - 10); updateGauges(); };
+  document.getElementById('power-up').onclick = () => { power = Math.min(100, power + 10); updateGauges(); };
+  document.getElementById('pressure-down').onclick = () => { pressure = Math.max(0, pressure - 10); updateGauges(); };
+  document.getElementById('pressure-up').onclick = () => { pressure = Math.min(100, pressure + 10); updateGauges(); };
+  document.getElementById('reset').onclick = reset;
+  document.getElementById('advance').onclick = () => { distance = Math.min(1, distance + 0.1); updateJourney(); };
+  document.getElementById('time').onclick = () => { remainingSeconds = Math.max(0, remainingSeconds - 30); updateJourney(); };
+  document.getElementById('win').onclick = () => { distance = 1; phase = 'won'; updateJourney(); };
+  document.getElementById('lose').onclick = () => { phase = 'lost'; updateJourney(); };
+  reset();
+</script>
+</html>
