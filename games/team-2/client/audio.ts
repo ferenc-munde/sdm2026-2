@@ -42,27 +42,39 @@ export function unlockAudio(): void {
   if (ctx.state === "suspended") void ctx.resume();
 }
 
+function whenAudioRuns(action: (audio: AudioContext, output: GainNode) => void): void {
+  if (!ctx || !master) return;
+  const audio = ctx;
+  const output = master;
+  const run = () => {
+    if (ctx === audio && master === output && audio.state === "running") action(audio, output);
+  };
+  if (audio.state === "running") run();
+  else void audio.resume().then(run).catch(() => {});
+}
+
 /** A quiet mechanical bed while players are aboard the train. */
 export function playTrainAmbience(): void {
-  if (!ctx || !master || trainAmbience) return;
-  const out = ctx.createGain();
-  out.gain.value = 0.0001;
-  out.connect(master);
-  out.gain.linearRampToValueAtTime(0.018, ctx.currentTime + 1.5);
-  const inner = rumble()(ctx, out);
-  if (!inner) return;
-  const audio = ctx;
-  trainAmbience = {
-    stop: () => {
-      out.gain.cancelScheduledValues(audio.currentTime);
-      out.gain.setValueAtTime(out.gain.value, audio.currentTime);
-      out.gain.linearRampToValueAtTime(0.0001, audio.currentTime + 0.6);
-      window.setTimeout(() => {
-        inner.stop();
-        out.disconnect();
-      }, 800);
-    },
-  };
+  whenAudioRuns((audio, output) => {
+    if (trainAmbience) return;
+    const out = audio.createGain();
+    out.gain.value = 0.0001;
+    out.connect(output);
+    out.gain.linearRampToValueAtTime(0.07, audio.currentTime + 1.5);
+    const inner = rumble()(audio, out);
+    if (!inner) return;
+    trainAmbience = {
+      stop: () => {
+        out.gain.cancelScheduledValues(audio.currentTime);
+        out.gain.setValueAtTime(out.gain.value, audio.currentTime);
+        out.gain.linearRampToValueAtTime(0.0001, audio.currentTime + 0.6);
+        window.setTimeout(() => {
+          inner.stop();
+          out.disconnect();
+        }, 800);
+      },
+    };
+  });
 }
 
 export function stopTrainAmbience(): void {
@@ -71,42 +83,43 @@ export function stopTrainAmbience(): void {
 }
 
 function playToneSequence(notes: readonly { frequency: number; offset: number; duration: number; gain: number }[]): void {
-  if (!ctx || !master) return;
-  const start = ctx.currentTime;
-  for (const note of notes) {
-    const oscillator = ctx.createOscillator();
-    const envelope = ctx.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.value = note.frequency;
-    envelope.gain.setValueAtTime(0.0001, start + note.offset);
-    envelope.gain.exponentialRampToValueAtTime(note.gain, start + note.offset + 0.015);
-    envelope.gain.exponentialRampToValueAtTime(0.0001, start + note.offset + note.duration);
-    oscillator.connect(envelope);
-    envelope.connect(master);
-    oscillator.start(start + note.offset);
-    oscillator.stop(start + note.offset + note.duration + 0.02);
-  }
+  whenAudioRuns((audio, output) => {
+    const start = audio.currentTime;
+    for (const note of notes) {
+      const oscillator = audio.createOscillator();
+      const envelope = audio.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.value = note.frequency;
+      envelope.gain.setValueAtTime(0.0001, start + note.offset);
+      envelope.gain.exponentialRampToValueAtTime(note.gain, start + note.offset + 0.015);
+      envelope.gain.exponentialRampToValueAtTime(0.0001, start + note.offset + note.duration);
+      oscillator.connect(envelope);
+      envelope.connect(output);
+      oscillator.start(start + note.offset);
+      oscillator.stop(start + note.offset + note.duration + 0.02);
+    }
+  });
 }
 
 /** Soft confirmation tick for buttons; called after a user gesture unlocks audio. */
 export function playButtonInteraction(): void {
-  playToneSequence([{ frequency: 620, offset: 0, duration: 0.055, gain: 0.055 }]);
+  playToneSequence([{ frequency: 620, offset: 0, duration: 0.055, gain: 0.14 }]);
 }
 
 /** Short rising chime for completing a repair minigame. */
 export function playPuzzleSuccess(): void {
   playToneSequence([
-    { frequency: 660, offset: 0, duration: 0.12, gain: 0.11 },
-    { frequency: 880, offset: 0.11, duration: 0.16, gain: 0.12 },
-    { frequency: 1100, offset: 0.24, duration: 0.2, gain: 0.1 },
+    { frequency: 660, offset: 0, duration: 0.12, gain: 0.19 },
+    { frequency: 880, offset: 0.11, duration: 0.16, gain: 0.2 },
+    { frequency: 1100, offset: 0.24, duration: 0.2, gain: 0.17 },
   ]);
 }
 
 /** Two restrained low notes for a newly dangerous train gauge. */
 export function playWarning(): void {
   playToneSequence([
-    { frequency: 330, offset: 0, duration: 0.16, gain: 0.09 },
-    { frequency: 260, offset: 0.2, duration: 0.2, gain: 0.085 },
+    { frequency: 330, offset: 0, duration: 0.16, gain: 0.16 },
+    { frequency: 260, offset: 0.2, duration: 0.2, gain: 0.15 },
   ]);
 }
 
