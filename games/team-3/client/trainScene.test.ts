@@ -190,6 +190,31 @@ describe("updateState", () => {
     expect(train.hazardsGroup.children).toHaveLength(0);
   });
 
+  it("gives a breach rising steam and flickers a fire (#217)", () => {
+    const train = build({
+      hazards: [
+        { id: "b", kind: "breach", position: { x: 0, y: 0 }, progress: 0 },
+        { id: "f", kind: "fire", position: { x: 100, y: 0 }, progress: 0 },
+      ],
+    });
+
+    const breach = train.hazardsGroup.children.find((group) => group.userData.hazardId === "b");
+    const steam = breach?.children.filter((child) => child.userData.kind === "steam") ?? [];
+    expect(steam).toHaveLength(4);
+
+    train.updateEffects(0.1);
+    const early = steam[0]?.position.y;
+    train.updateEffects(0.9);
+    expect(steam[0]?.position.y).not.toBe(early);
+
+    const fire = train.hazardsGroup.children.find((group) => group.userData.hazardId === "f");
+    const flame = fire?.children.find((child) => child.name === "fire");
+    train.updateEffects(0.2);
+    const firstScale = flame?.scale.x;
+    train.updateEffects(0.5);
+    expect(flame?.scale.x).not.toBe(firstScale);
+  });
+
   it("can be disposed without throwing", () => {
     const train = build();
     expect(() => train.dispose()).not.toThrow();

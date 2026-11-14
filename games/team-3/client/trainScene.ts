@@ -19,8 +19,8 @@ import {
   MeshStandardMaterial,
   PerspectiveCamera,
   SRGBColorSpace,
-  SphereGeometry,
   Scene,
+  SphereGeometry,
   Sprite,
   SpriteMaterial,
   type Object3D,
@@ -103,6 +103,8 @@ export interface TrainScene {
   hullGroup: Group;
   map: TrainMap;
   updateState(world: RenderWorld): void;
+  /** Animates fire flicker and breach steam; call every frame with the elapsed seconds. */
+  updateEffects(seconds: number): void;
   dispose(): void;
 }
 
@@ -338,6 +340,20 @@ function buildHazardGroup(hazard: RenderHazard): Group {
     group.add(mark);
   }
 
+  // Steam puffs on a breach (#217), animated by `updateEffects`.
+  if (hazard.kind === "breach") {
+    for (let index = 0; index < 4; index += 1) {
+      const puff = new Mesh(
+        new SphereGeometry(5, 8, 6),
+        new MeshStandardMaterial({ color: 0xd7e2f0, transparent: true, opacity: 0.5, depthWrite: false }),
+      );
+      puff.name = "steam";
+      puff.position.y = 4;
+      puff.userData = { kind: "steam", phase: index / 4 };
+      group.add(puff);
+    }
+  }
+
   // Repair progress (#19): a bar above the hazard that follows `hazard.progress`.
   const bar = new Group();
   bar.name = "progress";
@@ -550,6 +566,34 @@ export function buildTrainScene(
     );
   };
 
+  /** Fire flicker and rising breach steam; pure presentation, driven by the frame clock. */
+  const updateEffects = (seconds: number): void => {
+    for (const group of hazardsGroup.children) {
+      const kind = group.userData.hazardKind;
+      if (kind === "fire") {
+        const flame = group.children.find((child) => child.name === "fire");
+        if (flame instanceof Mesh) {
+          const flicker = 1 + 0.08 * Math.sin(seconds * 11 + group.id);
+          flame.scale.set(flicker, 1 + 0.1 * Math.sin(seconds * 9), flicker);
+          const material = flame.material;
+          if (material instanceof MeshStandardMaterial) {
+            material.emissiveIntensity = 0.3 + 0.2 * (0.5 + 0.5 * Math.sin(seconds * 13));
+          }
+        }
+      } else if (kind === "breach") {
+        for (const puff of group.children) {
+          if (puff.userData.kind !== "steam" || !(puff instanceof Mesh)) continue;
+          const phase = Number(puff.userData.phase) || 0;
+          const rise = (seconds * 0.6 + phase) % 1;
+          puff.position.y = 4 + rise * 40;
+          puff.scale.setScalar(0.7 + rise * 1.1);
+          const material = puff.material;
+          if (material instanceof MeshStandardMaterial) material.opacity = 0.55 * (1 - rise);
+        }
+      }
+    }
+  };
+
   updateState(world);
 
   return {
@@ -562,6 +606,7 @@ export function buildTrainScene(
     hullGroup,
     map,
     updateState,
+    updateEffects,
     dispose: () => {
       drawnPlayers.clear();
       drawnItems.clear();

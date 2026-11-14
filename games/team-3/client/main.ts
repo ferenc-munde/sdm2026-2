@@ -471,6 +471,7 @@ function drawLive(delta: number, time: number): void {
     triggerCourseFx(failureDirection(liveState, state));
   }
   liveState = state;
+  train.updateEffects(time / 1000);
   applyCourseFx(time);
   renderer.render(train.scene, train.camera);
 }
@@ -574,6 +575,7 @@ const walk = (time: number): void => {
   }
 
 
+  train.updateEffects(time / 1000);
   applyCourseFx(time);
   renderer.render(train.scene, train.camera);
   requestAnimationFrame(walk);
