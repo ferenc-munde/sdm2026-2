@@ -6,6 +6,7 @@ import { localStateToHud } from "./state-to-hud";
 import gameConfig from "../config/game.json";
 import { TRAIN_CARS } from "./train-map";
 import { mountLobby } from "./lobby";
+import { mountGameRules } from "./rules";
 import "./hud.css";
 import "./styles.css";
 
@@ -35,6 +36,7 @@ const hud = createHud(document.querySelector<HTMLElement>("#hud")!);
 const local = createLocalStateModel();
 let session: GameSession = local;
 let online = false;
+let canControlGame = false;
 let netStatus = offline ? "" : "Not in a game room yet · join through the lobby";
 const mode = document.querySelector<HTMLSelectElement>("#view-mode")!;
 const status = document.querySelector<HTMLOutputElement>("#status")!;
@@ -139,8 +141,8 @@ function sendMove() {
 function releaseKeys() { held.clear(); running = false; sendMove(); }
 const keyOf = (event: KeyboardEvent) => event.key.length === 1 ? event.key.toLowerCase() : event.key;
 function onKeyDown(event: KeyboardEvent) {
-  if (isPreview() || (event.target instanceof HTMLElement &&
-    (event.target.closest("input, select, textarea, button") || event.target.isContentEditable))) return;
+  if (!canControlGame || isPreview() || (event.target instanceof HTMLElement &&
+    (event.target.closest("input, select, textarea, button:not(.game-rules-control)") || event.target.isContentEditable))) return;
   const key = keyOf(event);
   running = event.shiftKey;
   if (moves[key]) {
@@ -152,6 +154,7 @@ function onKeyDown(event: KeyboardEvent) {
   else if (key === "q") session.send({ type: "drop", itemId: "wrench" });
 }
 function onKeyUp(event: KeyboardEvent) {
+  if (!canControlGame) return;
   running = event.shiftKey;
   held.delete(keyOf(event));
   sendMove();
@@ -167,6 +170,7 @@ async function enterGameRoom(connect: () => Promise<NetSession>) {
   try {
     const next = await connect();
     local.stop();
+    canControlGame = true;
     session = next; online = true;
     lastMove = STOPPED; sendMove();
     next.onTick(update);
@@ -190,32 +194,40 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
 }
 
 local.onTick(() => { if (session === local) update(); });
-reset(); syncMode(); local.start();
+reset(); syncMode();
 
 let lobby: ReturnType<typeof mountLobby> | undefined;
 const directCode = params.get("room");
-if (offline) {
-  // Offline demo: no lobby, no server.
-} else if (directCode) {
-  void enterGameRoom(() => joinGame(server, directCode));
-} else {
-  // Lobby → game room: the lobby host creates the game room and reports its code to the lobby,
-  // which passes it on; everybody else joins the game room by that code.
-  lobby = mountLobby(document.body, (match) => {
-    void enterGameRoom(async () => {
-      if (match.isHost) {
-        const hosted = await hostGame(server, match.name);
-        match.shareGameCode(hosted.code);
-        return hosted;
-      }
-      const code = await withTimeout(match.gameCode, GAME_CODE_TIMEOUT_MS, "the host did not open a game room");
-      return joinGame(server, code, match.name);
-    }).finally(() => match.leaveLobby());
-  }, server.http);
+function enterPlayerFlow(): void {
+	if (offline) {
+		// Preserve the explicit offline demo mode, but don't start it before the rules are accepted.
+		canControlGame = true;
+		local.start();
+	} else if (directCode) {
+		// Preserve direct room-code links; they still wait until the player continues past the rules.
+		void enterGameRoom(() => joinGame(server, directCode));
+	} else {
+		// Lobby creation/joining remains behind player entry and only connects on form submission.
+		// The host creates the game room and shares its code; the rest of the crew joins that room.
+		lobby = mountLobby(document.body, (match) => {
+			void enterGameRoom(async () => {
+				if (match.isHost) {
+					const hosted = await hostGame(server, match.name);
+					match.shareGameCode(hosted.code);
+					return hosted;
+				}
+				const code = await withTimeout(match.gameCode, GAME_CODE_TIMEOUT_MS, "the host did not open a game room");
+				return joinGame(server, code, match.name);
+			}).finally(() => match.leaveLobby());
+		}, server.http);
+	}
 }
+// Initial briefing and persistent help share one rules source and one fixed button.
+const gameRules = mountGameRules(document.body, enterPlayerFlow);
 window.addEventListener("pagehide", () => {
   session.stop(); local.stop();
   window.removeEventListener("keydown", onKeyDown); window.removeEventListener("keyup", onKeyUp);
   window.removeEventListener("blur", releaseKeys);
   lobby?.destroy(); trainScene?.destroy(); hud.destroy();
+  gameRules.destroy();
 });
