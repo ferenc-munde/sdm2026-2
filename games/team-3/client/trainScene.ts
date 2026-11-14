@@ -29,8 +29,16 @@ import {
 } from "three";
 import { createTrainMap, type TrainMap } from "../shared/map/map.ts";
 import type { Hazard, Item, ItemKind, StationKind } from "../shared/types.ts";
+import {
+  advanceWalk,
+  crewPose,
+  smoothSpeed,
+  speedBetween,
+  wheelAngle,
+  type CrewPose,
+} from "./crewPose.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
-import { applyCrewPose, buildCrewFigure, crewPose, HOLD_POINT } from "./crewModel.ts";
+import { applyCrewPose, buildCrewFigure, HOLD_POINT } from "./crewModel.ts";
 
 /** The crew are drawn a little larger than their collision circle so they read from the camera. */
 const CREW_SCALE = 1.35;
@@ -114,8 +122,11 @@ export interface TrainScene {
   updateState(world: RenderWorld): void;
   /** Animates fire flicker and breach steam; call every frame with the elapsed seconds. */
   updateEffects(seconds: number): void;
-  /** The train's speed factor (0–1) for the wheels and chimney smoke. */
-  setSpeed(speedFactor: number): void;
+  /**
+   * Walk/idle/carry poses for the crew and the wheel roll (#294). `interactingPlayerId` is the
+   * local player while the interact key is held; other players' input is not synced.
+   */
+  updateMotion(dt: number, speedFactor: number, interactingPlayerId?: string): void;
   dispose(): void;
 }
 
@@ -198,6 +209,7 @@ function buildMapGroup(map: TrainMap): Group {
     mesh.name = `car-${car.index}`;
     mesh.userData = { kind: "car", index: car.index };
     group.add(mesh);
+
   }
 
   // Cut-away carriage walls: the far side is a full wall, the near side stays low so the camera
@@ -298,12 +310,33 @@ function buildPlayerGroup(
     const mesh = buildItemMesh(held, 0.7);
     mesh.name = `held-${held.id}`;
     mesh.position.set(HOLD_POINT.x * CREW_SCALE, HOLD_POINT.y * CREW_SCALE, HOLD_POINT.z);
-    mesh.userData = { ...mesh.userData, kind: "heldItem", heldBy: player.id };
+    mesh.userData = { ...mesh.userData, kind: "heldItem", heldBy: player.id, baseY: mesh.position.y };
     group.add(mesh);
   }
 
   placePlayer(group, player);
+  // Walk-cycle state (#294), kept on the group so a rebuilt figure starts fresh.
+  group.userData.motion = { lastX: player.position.x, lastZ: player.position.y, speed: 0, phase: 0, seconds: 0 };
   return group;
+}
+
+interface MotionState {
+  lastX: number;
+  lastZ: number;
+  speed: number;
+  phase: number;
+  seconds: number;
+}
+
+/** Applies a #294 pose to one crew figure, and bobs the item it holds with it. */
+function poseFigure(group: Object3D, pose: CrewPose): void {
+  const figure = group.getObjectByName("crew");
+  if (figure) applyCrewPose(figure, { ...pose, bob: pose.bob / CREW_SCALE });
+  for (const child of group.children) {
+    if (child.userData.kind === "heldItem" && typeof child.userData.baseY === "number") {
+      child.position.y = child.userData.baseY + pose.bob;
+    }
+  }
 }
 
 /** Moves a player figure to its position and turns it to face its walking direction. */
@@ -519,7 +552,6 @@ export function buildTrainScene(
   }
   let speedFactor = 0;
   let lastSeconds: number | null = null;
-  let travelled = 0;
 
   const itemsGroup = new Group();
   itemsGroup.name = "items";
@@ -592,10 +624,6 @@ export function buildTrainScene(
   const updateEffects = (seconds: number): void => {
     const dt = lastSeconds === null ? 0 : Math.min(0.1, Math.max(0, seconds - lastSeconds));
     lastSeconds = seconds;
-    travelled += dt * speedFactor;
-
-    // Wheels turn with the train's speed (10 units/s of journey looks right at ~2 turns a second).
-    for (const wheel of body.wheels) wheel.rotation.y = -travelled * 12;
 
     // Smoke rises from the chimney; more and faster with speed, a lazy wisp when stalled.
     for (const puff of smoke) {
@@ -606,16 +634,6 @@ export function buildTrainScene(
       (puff.material as MeshStandardMaterial).opacity = 0.55 * (1 - rise);
     }
 
-    // Crew: walk, idle and carry poses from how far each figure moved since the last frame.
-    for (const group of playersGroup.children) {
-      const previous = group.userData.lastPosition as { x: number; z: number } | undefined;
-      const moved = previous && dt > 0 ? Math.hypot(group.position.x - previous.x, group.position.z - previous.z) / dt : 0;
-      group.userData.lastPosition = { x: group.position.x, z: group.position.z };
-      const speed = (group.userData.speed = 0.7 * (Number(group.userData.speed) || 0) + 0.3 * moved);
-      const carrying = group.children.some((child) => child.userData.kind === "heldItem");
-      const figure = group.getObjectByName("crew");
-      if (figure) applyCrewPose(figure, crewPose(seconds + group.id, speed, carrying), carrying);
-    }
 
     // Loose items bob and turn a little so they read as things to pick up.
     for (const item of itemsGroup.children) {
@@ -658,6 +676,32 @@ export function buildTrainScene(
     }
   };
 
+
+  /** Crew walk/idle/carry poses and the wheel roll; pure presentation, driven by the frame clock. */
+  const updateMotion = (dt: number, factor: number, interactingPlayerId?: string): void => {
+    speedFactor = Number.isFinite(factor) ? Math.min(1, Math.max(0, factor)) : 0; // smoke follows it too
+    for (const group of playersGroup.children) {
+      const motion = group.userData.motion as MotionState | undefined;
+      if (!motion) continue;
+      const from = { x: motion.lastX, y: motion.lastZ };
+      const measured = speedBetween(from, { x: group.position.x, y: group.position.z }, dt);
+      motion.speed = smoothSpeed(motion.speed, measured, dt);
+      motion.lastX = group.position.x;
+      motion.lastZ = group.position.z;
+      motion.phase = advanceWalk(motion.phase, motion.speed, dt);
+      if (Number.isFinite(dt) && dt > 0) motion.seconds += dt;
+
+      const carrying = group.children.some((child) => child.userData.kind === "heldItem");
+      const interacting = interactingPlayerId !== undefined && interactingPlayerId === group.userData.playerId;
+      poseFigure(
+        group,
+        crewPose({ speed: motion.speed, phase: motion.phase, seconds: motion.seconds, carrying, interacting }),
+      );
+    }
+    // The bogie wheels' axles run along z; each tyre turns about its own (local y) axis.
+    for (const wheel of body.wheels) wheel.rotation.y = wheelAngle(wheel.rotation.y, speedFactor, dt);
+  };
+
   updateState(world);
 
   return {
@@ -671,9 +715,7 @@ export function buildTrainScene(
     map,
     updateState,
     updateEffects,
-    setSpeed: (factor: number) => {
-      speedFactor = Number.isFinite(factor) ? Math.min(1, Math.max(0, factor)) : 0;
-    },
+    updateMotion,
     dispose: () => {
       drawnPlayers.clear();
       drawnItems.clear();

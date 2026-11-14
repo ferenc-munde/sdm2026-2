@@ -1,5 +1,6 @@
 import { Color, Mesh, MeshStandardMaterial, Object3D, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
+import { IDLE_BOB } from "./crewPose.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import { buildPlatformScene, fitCameraToPlatform } from "./platformScene.ts";
 import { PLAYER_COLORS } from "./trainScene.ts";
@@ -119,5 +120,22 @@ describe("updatePlayers keeps what did not change", () => {
     platform.updatePlayers([players[0] as RenderPlayer, { ...(players[1] as RenderPlayer), name: "Bella" }]);
     expect(platform.playersGroup.children[0]).toBe(ada);
     expect(platform.playersGroup.children[1]).not.toBe(bela);
+  });
+});
+
+describe("waiting crew animation (#294)", () => {
+  it("breathes while standing still and never leaves the floor", () => {
+    const platform = build();
+    // The crew figure (visual pass) bobs at the hips; it is drawn 1.35x, so compare in world units.
+    const hips = platform.playersGroup.children[0]!.getObjectByName("hips")!;
+    const base = hips.position.y;
+    const lift = () => (hips.position.y - base) * 1.35;
+
+    platform.updateMotion(0.5);
+    expect(hips.position.y).not.toBe(base);
+    expect(Math.abs(lift())).toBeLessThanOrEqual(IDLE_BOB + 1e-6);
+
+    platform.updateMotion(0.5);
+    expect(Math.abs(lift())).toBeLessThanOrEqual(IDLE_BOB + 1e-6);
   });
 });

@@ -24,6 +24,10 @@ pnpm run typecheck   # TypeScript
 pnpm run build       # production build of the client
 ```
 
+**Testing alone:** the game needs two players, so `node bot.mjs` (with the server running) creates a room with a bot crewmate and prints its code. Join that code; the bot departs as soon as you're in, stands still while you play, and presses "play again" after a run. `SERVER=ws://host:port` points it at another server.
+
+**One address, as deployed:** after `pnpm run build`, `pnpm run server` also serves the built page (`@sdm/host` serves `dist/`), so `http://localhost:2567` is the whole game. That's how Railway runs it (`railway.json` with `GAME=team-3`).
+
 `pnpm test`, `pnpm run typecheck` and `pnpm run build` are the same steps the "Team 3 Feature CI" runs on every push to `Team_3_Feature`. The server runs with `vite-node`, the same loader as the tests, because the platform's state classes need TypeScript's legacy decorators.
 
 ## What works now

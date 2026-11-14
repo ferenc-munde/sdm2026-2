@@ -29,6 +29,7 @@ import { waitingView } from "./waitingRoomModel.ts";
 import { platformSpawn } from "../shared/map/platform.ts";
 import { errorText } from "./lobbyModel.ts";
 import { createActionKeys } from "./actionKeys.ts";
+import { createSmoother, withPositions } from "./smoothing.ts";
 import { createRoom, joinRoomByCode, serverAddress, type RoomConnection } from "./roomConnection.ts";
 import { joinErrorText } from "./roomLinks.ts";
 import { createSharedLinkJoin } from "./sharedLinkJoin.ts";
@@ -38,7 +39,7 @@ const demo = new URLSearchParams(window.location.search).has("demo");
 // The page caption names the hand-check page; the real game has the HUD and hints there instead.
 const caption = document.querySelector<HTMLElement>(".title");
 if (caption && !demo) caption.hidden = true;
-const server = serverAddress(window.location, import.meta.env?.VITE_SERVER_URL as string | undefined);
+const server = serverAddress(window.location, import.meta.env?.VITE_SERVER_URL as string | undefined, import.meta.env?.DEV === true);
 import { createPlatformBoard } from "./platformBoard.ts";
 
 const container = document.getElementById("app");
@@ -386,6 +387,10 @@ function showToast(text: string): void {
 }
 
 let liveState: GameState | null = null;
+const playerSmoother = createSmoother();
+const itemSmoother = createSmoother();
+const positionsOf = (records: Record<string, { position: { x: number; y: number } }>) =>
+  Object.fromEntries(Object.entries(records).map(([id, record]) => [id, record.position]));
 let lastNotice = 0;
 
 function enterLive(next: RoomConnection): void {
@@ -445,7 +450,8 @@ function drawLive(delta: number, time: number): void {
       help.update("lobby");
       waiting.show();
     }
-    platformScene.updatePlayers(Object.values(state.players));
+    platformScene.updatePlayers(withPositions(state.players, playerSmoother.step(positionsOf(state.players), delta)));
+    platformScene.updateMotion(delta);
     waiting.update(waitingView(state, live.me));
     platformBoard.update(state, live.me, platformScene.map.objects);
     liveState = state;
@@ -460,14 +466,19 @@ function drawLive(delta: number, time: number): void {
     endScreen.update(state.phase);
     help.update(state.phase);
   }
+  // Draw players and items gliding between the room's 20 updates a second instead of stepping.
   train.updateState({
-    players: Object.values(state.players),
-    items: Object.values(state.items),
+    players: withPositions(state.players, playerSmoother.step(positionsOf(state.players), delta)),
+    items: withPositions(state.items, itemSmoother.step(positionsOf(state.items), delta)),
     hazards: Object.values(state.hazards),
   });
+  train.updateMotion(
+    delta,
+    state.phase === "playing" ? state.journey.speedFactor : 0,
+    keyboard.current().interacting ? live.me : undefined,
+  );
   hud.update(hudView(state.journey));
   scenery.update(delta, state.phase === "playing" ? state.journey.speedFactor : 0);
-  train.setSpeed(state.phase === "playing" ? state.journey.speedFactor : 0);
   if (liveState && liveState.phase !== "lobby") {
     for (const name of eventsBetween(liveState, state)) sound.play(name);
   }
@@ -506,6 +517,7 @@ const walk = (time: number): void => {
   // While the crew waits, draw the platform instead of the train (#146).
   if (waitingMode) {
     if (mockState) platformBoard.update(mockState, me, platformScene.map.objects);
+    platformScene.updateMotion(delta);
     renderer.render(platformScene.scene, platformScene.camera);
     requestAnimationFrame(walk);
     return;
@@ -535,7 +547,7 @@ const walk = (time: number): void => {
     const journey = { fuel, hull, distance: progress * WIN_DISTANCE, speedFactor };
     hud.update(hudView(journey));
     scenery.update(delta, speedFactor);
-    train.setSpeed(speedFactor);
+    train.updateMotion(delta, speedFactor);
 
     // Sound cues come from diffing the states, exactly as they will in the room.
     const demoState: GameState = {
@@ -582,6 +594,7 @@ const walk = (time: number): void => {
   }
 
 
+  if (demoPhase !== "playing") train.updateMotion(delta, 0);
   train.updateEffects(time / 1000);
   applyCourseFx(time);
   renderer.render(train.scene, train.camera);

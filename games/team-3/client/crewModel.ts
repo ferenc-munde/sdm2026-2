@@ -3,6 +3,7 @@
 // the figure actually moves on screen. Drawing only: the room decides where everyone is.
 
 import { BoxGeometry, CapsuleGeometry, CylinderGeometry, Group, Mesh, SphereGeometry, type Color, type Object3D } from "three";
+import type { CrewPose } from "./crewPose.ts";
 import { PALETTE, mat, ownMat } from "./style.ts";
 
 /** Overall height of a crew member, in world units (the player's collision radius is 12). */
@@ -23,9 +24,10 @@ const geometry = {
 };
 
 /** A limb that swings from its top: the mesh hangs below a pivot group. */
-function limb(name: string, mesh: Mesh, length: number, x: number, y: number, z: number): Group {
+function limb(name: string, kind: "leg" | "arm", mesh: Mesh, length: number, x: number, y: number, z: number): Group {
   const pivot = new Group();
   pivot.name = name;
+  pivot.userData = { kind, side: name.endsWith("L") ? 1 : -1 }; // read by trainScene's #294 pose
   pivot.position.set(x, y, z);
   mesh.position.y = -length / 2;
   mesh.castShadow = true;
@@ -56,7 +58,7 @@ export function buildCrewFigure(color: Color): { figure: Group; body: Mesh } {
   figure.add(hips);
 
   for (const side of [-1, 1]) {
-    const leg = limb(side < 0 ? "legL" : "legR", new Mesh(geometry.leg, mat(PALETTE.overalls)), 12, 0, 0, side * 3.4);
+    const leg = limb(side < 0 ? "legL" : "legR", "leg", new Mesh(geometry.leg, mat(PALETTE.overalls)), 12, 0, 0, side * 3.4);
     const boot = new Mesh(geometry.boot, dark);
     boot.position.set(1.2, -12.2, 0);
     boot.castShadow = true;
@@ -77,7 +79,7 @@ export function buildCrewFigure(color: Color): { figure: Group; body: Mesh } {
   }
 
   for (const side of [-1, 1]) {
-    const arm = limb(side < 0 ? "armL" : "armR", new Mesh(geometry.arm, colour), 11, 0, 15, side * 8.4);
+    const arm = limb(side < 0 ? "armL" : "armR", "arm", new Mesh(geometry.arm, colour), 11, 0, 15, side * 8.4);
     const hand = new Mesh(geometry.hand, skin);
     hand.position.y = -12;
     arm.add(hand);
@@ -107,50 +109,16 @@ export function buildCrewFigure(color: Color): { figure: Group; body: Mesh } {
 /** Where a held item sits: in front of the chest, between the hands. */
 export const HOLD_POINT = { x: 12, y: 20, z: 0 } as const;
 
-/** One frame of a crew member's pose; pure so it can be tested. */
-export interface CrewPose {
-  legSwing: number;
-  armSwing: number;
-  bob: number;
-  lean: number;
-}
-
 /**
- * The pose `seconds` into the animation for a figure moving at `speed` (world units per second).
- * Walking swings legs and arms with the stride; standing still breathes; carrying keeps the arms
- * forward around the item.
+ * Applies a pose from `crewPose.ts` (#294) to a figure built by `buildCrewFigure`. Limbs hang
+ * along -y, so a positive turn about z swings them forward (+x); the hips carry the bob.
  */
-export function crewPose(seconds: number, speed: number, carrying: boolean): CrewPose {
-  const walk = Math.min(1, speed / 140); // full stride at walking speed (160)
-  const stride = Math.sin(seconds * 13);
-  const legSwing = walk * 0.75 * stride;
-  const idle = (1 - walk) * Math.sin(seconds * 2.4) * 0.35;
-  return {
-    legSwing,
-    // A limb hangs along -y, so a positive turn about z swings it forward (+x).
-    armSwing: carrying ? 1.25 : -walk * 0.7 * stride,
-    bob: walk * Math.abs(stride) * 1.6 + idle,
-    lean: walk * 0.12,
-  };
-}
-
-/** Applies a pose to a figure built by `buildCrewFigure`. */
-export function applyCrewPose(figure: Object3D, pose: CrewPose, carrying: boolean): void {
+export function applyCrewPose(figure: Object3D, pose: CrewPose): void {
   const hips = figure.getObjectByName("hips");
-  if (!hips) return;
-  hips.position.y = 13 + pose.bob;
-  hips.rotation.z = -pose.lean; // lean into the walk (+x is forward)
-  const set = (name: string, angle: number) => {
-    const part = hips.getObjectByName(name);
-    if (part) part.rotation.z = angle;
-  };
-  set("legL", pose.legSwing);
-  set("legR", -pose.legSwing);
-  if (carrying) {
-    set("armL", pose.armSwing);
-    set("armR", pose.armSwing);
-  } else {
-    set("armL", pose.armSwing);
-    set("armR", -pose.armSwing);
-  }
+  if (hips) hips.position.y = 13 + pose.bob;
+  figure.traverse((part) => {
+    const side = (part.userData.side as number | undefined) ?? 1;
+    if (part.userData.kind === "leg") part.rotation.z = side * pose.legSwing;
+    else if (part.userData.kind === "arm") part.rotation.z = side * pose.armSwing + pose.armLift;
+  });
 }

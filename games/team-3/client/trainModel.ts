@@ -32,6 +32,7 @@ function add(parent: Object3D, geometry: ConstructorParameters<typeof Mesh>[0], 
 /** A wheel: a dark disc with a brass hub, turned by the scene with the train's speed. */
 function wheel(parent: Object3D, x: number, z: number, radius = WHEEL_RADIUS): Mesh {
   const tyre = add(parent, new CylinderGeometry(radius, radius, 5, 14), mat(PALETTE.iron, { metalness: 0.4, roughness: 0.5 }), x, RAIL_TOP + radius, z, "wheel");
+  tyre.userData = { kind: "wheel" };
   tyre.rotation.x = Math.PI / 2;
   const hub = new Mesh(new CylinderGeometry(radius * 0.35, radius * 0.35, 5.6, 8), mat(PALETTE.brass, { metalness: 0.5 }));
   tyre.add(hub);
