@@ -137,10 +137,42 @@ html, body { margin: 0; height: 100%; background: transparent; color: #eef3f6; f
 .game-rules__panel:focus { outline: none; }
 #scene canvas { image-rendering: pixelated; }
 #demo-controls { background: #101815ed; font-family: monospace; }
+.sound-controls {
+  position: fixed;
+  z-index: 80;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid #8d956e;
+  border-radius: 10px;
+  background: #101713ed;
+  box-shadow: 0 5px 20px #0007;
+  color: #f4e9c8;
+  font: 12px "Courier New", monospace;
+}
+.sound-controls button {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 9px;
+  border: 1px solid #66724e;
+  border-radius: 6px;
+  background: #253523;
+  color: #f4e9c8;
+  cursor: pointer;
+  font: 700 14px "Courier New", monospace;
+}
+.sound-controls button:hover { border-color: #e5c46e; background: #344a2c; }
+.sound-controls button:focus-visible { outline: 2px solid #f3d77f; outline-offset: 2px; }
+.sound-controls output { min-width: 4ch; color: #e8d38d; text-align: center; font-variant-numeric: tabular-nums; }
 @media (max-width: 800px) {
   #demo-controls { max-height: 150px; overflow: auto; font-size: 12px; }
 }
 @media (max-width: 520px) {
+  .sound-controls { right: 10px; bottom: 10px; gap: 4px; padding: 5px; }
+  .sound-controls button { min-width: 30px; min-height: 30px; }
   .game-rules__welcome { place-items: start center; padding: 12px; }
   .game-rules__welcome-card { max-height: calc(100dvh - 24px); padding: 60px 16px 18px; }
   .game-rules__welcome .game-rules__list { grid-template-columns: 1fr; }
