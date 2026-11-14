@@ -15,6 +15,9 @@ import "./styles.css";
 //   ?local       offline demo: the rules run in this browser (stateModel.ts), no server needed
 // `?lobby=http://host:port` (or VITE_SERVER_URL at build time) points at another server.
 const params = new URLSearchParams(window.location.search);
+const developerTools = import.meta.env.DEV && params.get("debug") === "1";
+document.getElementById("demo-controls")!.hidden = !developerTools;
+document.body.classList.toggle("has-dev-tools", developerTools);
 const offline = params.has("local");
 const server = serverAddress(window.location, params.get("lobby") ?? import.meta.env.VITE_SERVER_URL);
 const GAME_CODE_TIMEOUT_MS = 15000;
@@ -33,7 +36,6 @@ const local = createLocalStateModel();
 let session: GameSession = local;
 let online = false;
 let netStatus = offline ? "" : "Not in a game room yet · join through the lobby";
-let runStartTick = session.state.tick;
 const mode = document.querySelector<HTMLSelectElement>("#view-mode")!;
 const status = document.querySelector<HTMLOutputElement>("#status")!;
 const speedInput = document.querySelector<HTMLInputElement>("#speed")!;
@@ -44,7 +46,7 @@ let tasks: HudTask[] = [];
 let journey: HudJourney;
 let demoSpeed = 1;
 let demoPaused = false;
-const isPreview = () => mode.value === "preview";
+const isPreview = () => developerTools && mode.value === "preview";
 
 mapSelect.addEventListener("change", () => {
   const car = mapSelect.value === "all" ? null : Number(mapSelect.value);
@@ -63,13 +65,13 @@ function describeSession(): string {
 
 function update() {
   const state = session.state;
+  const view = localStateToHud(state, gameConfig.tickRate);
   if (isPreview()) {
     hud.updateTasks(tasks);
     hud.updateGauges({ power: tasks[0]?.current ? 100 : 40, pressure: 35 });
-    hud.updateJourney(journey);
+    hud.updateJourney({ ...journey, speed: journey.phase === "running" && !demoPaused ? demoSpeed / 300 : 0 });
     trainScene?.setSpeed(journey.phase === "running" ? demoSpeed : 0);
   } else {
-    const view = localStateToHud(state, gameConfig.tickRate, runStartTick);
     hud.updateTasks(view.tasks);
     hud.updateGauges(view.gauges);
     hud.updateJourney(view.journey);
@@ -80,7 +82,7 @@ function update() {
     Array.from(state.players, ([id, player]) => ({ id, x: player.x, y: player.y, eliminated: player.eliminated })),
     session.playerId,
   );
-  trainScene?.setPaused(demoPaused);
+  trainScene?.setPaused(developerTools && demoPaused);
   speedLabel.value = `${demoSpeed.toFixed(1)}x`;
   pauseButton.textContent = demoPaused ? "Resume scenery" : "Pause scenery";
   pauseButton.setAttribute("aria-pressed", String(demoPaused));
@@ -165,7 +167,7 @@ async function enterGameRoom(connect: () => Promise<NetSession>) {
   try {
     const next = await connect();
     local.stop();
-    session = next; online = true; runStartTick = next.state.tick;
+    session = next; online = true;
     lastMove = STOPPED; sendMove();
     next.onTick(update);
     next.onClosed(() => {
