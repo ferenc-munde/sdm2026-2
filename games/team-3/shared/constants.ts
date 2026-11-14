@@ -9,6 +9,8 @@
 // Once #42 is merged, these should read from there instead of repeating the numbers.
 export const MIN_PLAYERS = 2; // plan §2
 export const MAX_PLAYERS = 4; // plan §2
+/** Seconds between the host pressing Depart and the train leaving (#385). */
+export const DEPART_COUNTDOWN_SECONDS = 5;
 export const TICK_RATE = 20; // ticks per second, from #9
 export const TICK_SECONDS = 1 / TICK_RATE;
 export const JOIN_CODE_LENGTH = 4; // TO CONFIRM
