@@ -9,7 +9,7 @@ import { createInputAdapter } from "./input.ts";
 import { mountLobby } from "./lobby";
 import { mountGameRules } from "./rules";
 import { openTaskModal, closeTaskModal, showStationPrompt, showTaskToast, type OpenTask } from "./task-modal";
-import { playAmbient, stopAmbient, taskSpawnPing, unlockAudio } from "./audio";
+import { playAmbient, playButtonInteraction, playPuzzleSuccess, playTrainAmbience, playWarning, stopAmbient, stopTrainAmbience, taskSpawnPing, unlockAudio } from "./audio";
 import "./hud.css";
 import "./styles.css";
 
@@ -61,6 +61,8 @@ for (const car of TRAIN_CARS) {
 }
 let knownTaskIds = new Set<string>();
 let promptTaskId: string | undefined;
+let powerWasDangerous = false;
+let pressureWasDangerous = false;
 
 function nearestTaskInTaskRange(): OpenTask | undefined {
   const state = session.state;
@@ -84,6 +86,7 @@ function openTask(task: OpenTask): void {
   unlockAudio();
   playAmbient(task.type);
   openTaskModal(task, (amount) => {
+    playPuzzleSuccess();
     session.send({ type: "progress", taskId: task.id, amount });
   }, { onClosed: () => stopAmbient() });
 }
@@ -136,6 +139,12 @@ function update() {
     hud.updateGauges(view.gauges);
     hud.updateJourney(view.journey);
     trainScene?.setSpeed(view.speed);
+
+    const powerDanger = view.gauges.power < 15;
+    const pressureDanger = view.gauges.pressure >= 100;
+    if ((powerDanger && !powerWasDangerous) || (pressureDanger && !pressureWasDangerous)) playWarning();
+    powerWasDangerous = powerDanger;
+    pressureWasDangerous = pressureDanger;
 
     const liveTasks = new Map(Array.from(state.tasks, ([id, task]) => [id, { title: task.title }] as const));
     watchTaskNoise(liveTasks);
@@ -202,6 +211,16 @@ const { cleanup: cleanupInput, refreshMovement } = createInputAdapter({
   isPreview,
 });
 
+// Click is a user gesture, so this unlocks Web Audio and gives buttons a quiet tick.
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const clickedButton = target.closest<HTMLButtonElement>("button");
+  if (!clickedButton || clickedButton.disabled) return;
+  unlockAudio();
+  playButtonInteraction();
+}, true);
+
 // E is contextual: a task station in range opens its minigame, otherwise pick up.
 // Separate from the input adapter because it drives the modal, not a room input.
 window.addEventListener("keydown", (event) => {
@@ -228,10 +247,12 @@ async function enterGameRoom(connect: () => Promise<NetSession>) {
     local.stop();
     canControlGame = true;
     session = next; online = true;
+    playTrainAmbience();
     refreshMovement();
     next.onTick(update);
     next.onClosed(() => {
       online = false;
+      stopTrainAmbience();
       netStatus = "The connection to the game room ended · reload the page to play again";
       update();
     });
@@ -276,6 +297,7 @@ function enterPlayerFlow(): void {
 		// Preserve the explicit offline demo mode, but don't start it before the rules are accepted.
 		canControlGame = true;
 		local.start();
+		playTrainAmbience();
 	} else if (directCode) {
 		// Preserve direct room-code links; they still wait until the player continues past the rules.
 		void enterGameRoom(() => joinGame(server, directCode));
@@ -288,7 +310,7 @@ const gameRules = mountGameRules(document.body, enterPlayerFlow);
 window.addEventListener("pagehide", () => {
   cleanupInput();
   session.stop(); local.stop();
-  closeTaskModal(); stopAmbient(); showStationPrompt(null);
+  closeTaskModal(); stopAmbient(); stopTrainAmbience(); showStationPrompt(null);
   lobby?.destroy(); trainScene?.destroy(); hud.destroy();
   gameRules.destroy();
 });
