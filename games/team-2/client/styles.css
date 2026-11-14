@@ -1,7 +1,6 @@
-html, body { margin: 0; height: 100%; background: #0b141e; color: #eef3f6; font-family: system-ui, sans-serif; }
+html, body { margin: 0; height: 100%; background: transparent; color: #eef3f6; font-family: system-ui, sans-serif; }
 /* Developer controls are never part of the normal player interface. */
 #demo-controls[hidden] { display: none; }
-body:not(.has-dev-tools) .train-hud { bottom: 20px; }
 #scene { position: fixed; inset: 0; }
 #app { position: fixed; inset: 0; }
 #app canvas { display: block; touch-action: none; image-rendering: pixelated; }
@@ -21,17 +20,8 @@ body:not(.has-dev-tools) .train-hud { bottom: 20px; }
 #status { display: block; margin: 8px 0; color: #cfdbc9; font-size: 12px; }
 #view-mode { padding: 6px; background: #24382e; color: #fff1ca; }
 #demo-controls button:disabled, #demo-controls input:disabled { opacity: 0.45; cursor: default; }
-@media (max-width: 800px) { .train-hud { max-height: 25vh; font-size: 13px; padding: 12px; } #demo-controls { font-size: 12px; } }
-/* Layout inspired by the reference: tasks left, status right, world centered. */
 #scene canvas { image-rendering: pixelated; }
-.train-hud { top: auto; bottom: 165px; left: 20px; right: auto; width: 300px; font-family: monospace; background: #101815ed; border-color: #979b80; }
-.train-hud-gauges { position: fixed; top: 20px; right: 20px; width: 250px; margin: 0; padding: 14px 20px 20px; border: 1px solid #979b80; border-radius: 12px; background: #101815ed; }
-.train-journey { left: 20px; right: auto; width: 260px; box-sizing: border-box; font: 14px/1.4 monospace; background: #101815ed; }
-.train-result { left: 50%; right: auto; top: 40%; width: min(360px, 75vw); transform: translate(-50%, -50%); }
 #demo-controls { background: #101815ed; font-family: monospace; }
 @media (max-width: 800px) {
-  .train-journey { width: 180px; padding: 10px; font-size: 11px; }
-  .train-hud-gauges { width: 140px; right: 10px; top: 10px; padding: 10px; }
-  .train-hud { top: auto; bottom: 210px; width: 190px; max-height: 180px; left: 10px; }
-  #demo-controls { max-height: 150px; overflow: auto; }
+  #demo-controls { max-height: 150px; overflow: auto; font-size: 12px; }
 }

@@ -4,6 +4,13 @@ import type { HudJourney } from "./hud";
 
 const running: HudJourney = { distance: 0.4, remainingSeconds: 150, totalSeconds: 300, phase: "running", speed: 0.003 };
 describe("journey display", () => {
+  it("warns at two minutes or less only while the run is active", () => {
+    expect(journeyView({ ...running, remainingSeconds: 121 }).urgent).toBe(false);
+    expect(journeyView({ ...running, remainingSeconds: 120 }).urgent).toBe(true);
+    expect(journeyView({ ...running, remainingSeconds: 0 }).urgent).toBe(true);
+    expect(journeyView({ ...running, remainingSeconds: 100, phase: "lobby" }).urgent).toBe(false);
+    expect(journeyView({ ...running, remainingSeconds: 100, phase: "won" }).urgent).toBe(false);
+  });
   it("shows real progress, distance left, countdown and speed with the schedule ghost", () => {
     const view = journeyView(running);
     expect(view.distanceText).toBe("40.0% travelled · 60.0% left");

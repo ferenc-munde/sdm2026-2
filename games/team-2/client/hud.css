@@ -1,59 +1,89 @@
-.train-hud {
-  position: fixed;
-  top: 20px;
-  right: 20px;
+/* HUD layout is owned here; page styles must not reposition its components. */
+.train-topbar, .train-hud, .train-result {
   box-sizing: border-box;
-  width: min(340px, calc(100vw - 40px));
-  padding: 22px;
-  border: 1px solid #566878;
-  border-top: 3px solid #efbd64;
-  border-radius: 12px;
-  background: #14222ef2;
-  color: #f2f5f7;
-  font: 16px/1.5 system-ui, sans-serif;
+  color: #f4edda;
+  font: 13px/1.4 system-ui, sans-serif;
   pointer-events: none;
-  max-height: calc(100dvh - 40px);
-  overflow-y: auto;
-  overflow-wrap: anywhere;
+  background: linear-gradient(130deg, #15241ff2, #0d1916f2);
+  border: 1px solid #b9a56d55;
+  box-shadow: 0 5px 24px #0005, inset 0 1px #ffffff08;
+  border-radius: 10px;
 }
-.train-hud h2 { margin: 0 0 14px; font-size: 20px; }
-.train-hud ul { padding: 0; margin: 0; list-style: none; }
-.train-hud li { padding: 12px 0; border-top: 1px solid #364957; }
-.train-hud .is-complete { color: #91dfb3; }
-.train-hud p { color: #bdc9d2; margin-bottom: 0; }
-.train-hud-gauges { margin-top: 20px; padding-top: 8px; border-top: 1px solid #364957; }
-.train-hud-gauges label { display: block; margin-top: 12px; }
-.train-hud-gauges span { display: block; margin-bottom: 6px; }
-.train-hud-gauges progress { display: block; width: 100%; height: 14px; accent-color: #91dfb3; }
-.train-hud-gauges .is-danger { color: #ffb0a6; }
-.train-hud-gauges .is-danger progress { accent-color: #f37566; }
+.train-topbar {
+  position: fixed; z-index: 10; top: 16px; left: 20px; right: 20px;
+  max-width: 1240px; margin: 0 auto; padding: 14px 20px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 130px 220px; gap: 24px;
+  min-height: 96px;
+}
 .train-journey {
-  position: fixed; top: 20px; left: 20px; right: 380px;
-  padding: 18px 24px; border: 1px solid #566878; border-radius: 12px;
-  background: #14222ef2; color: #f2f5f7; font: 16px/1.5 system-ui;
-  pointer-events: none;
+  min-width: 0; display: grid; align-items: center;
+  grid-template-columns: 150px minmax(100px, 1fr) 90px;
+  column-gap: 24px; row-gap: 3px;
 }
-.train-track { position: relative; height: 34px; margin: 18px 16px 8px; border-bottom: 4px dashed #efbd64; }
-.train-marker, .train-ghost { position: absolute; bottom: -4px; transform: translateX(-50%); }
-.train-marker { font-size: 28px; }
-.train-ghost { color: #c3d2df; font-size: 36px; }
-.train-station { position: absolute; right: -16px; top: -8px; }
-.train-journey small { display: block; color: #bdc9d2; }
-.journey-heading { color: #f5d190; font-weight: 700; margin-bottom: 8px; }
-.journey-stats { margin: 10px 0; font-variant-numeric: tabular-nums; }
-.train-journey.is-behind { border-color: #f37566; }
-.train-journey.is-behind small { color: #ffb0a6; }
-.train-result {
-  position: fixed; top: 210px; left: 20px; right: 380px;
-  padding: 28px; border: 2px solid #f37566; border-radius: 12px;
-  background: #14222ef5; color: #f2f5f7; font: 18px/1.5 system-ui;
-  pointer-events: none;
-}
+.journey-heading { grid-column: 1; grid-row: 1; color: #e3c582; font-weight: 700; font-size: 14px; }
+.train-journey > div:nth-child(2) { grid-column: 1; grid-row: 2; color: #bac8be; font-size: 12px; }
+.train-track { grid-column: 2; grid-row: 1 / 3; position: relative; height: 24px; margin: 0 12px; }
+.train-track::before { content: ""; position: absolute; top: 14px; left: 0; right: 0; height: 4px; background: repeating-linear-gradient(90deg, #b2a578 0 9px, #38493e 9px 13px); border-radius: 2px; }
+.train-marker { position: absolute; top: 1px; width: 24px; height: 13px; background: #e5bd68; border: 2px solid #332f20; border-radius: 3px 6px 2px 2px; transform: translateX(-50%); z-index: 2; }
+.train-marker::before { content: ""; position: absolute; width: 5px; height: 5px; top: 2px; right: 3px; background: #304e4e; box-shadow: -8px 0 #304e4e; }
+.train-marker::after { content: ""; position: absolute; width: 5px; height: 5px; bottom: -5px; left: 3px; border-radius: 50%; background: #d2c8a7; box-shadow: 13px 0 #d2c8a7; }
+.train-ghost { position: absolute; top: 0; height: 25px; width: 2px; background: #a1cbc6; transform: translateX(-50%); opacity: 0.8; }
+.train-station { position: absolute; right: -4px; top: 0; width: 2px; height: 18px; background: #e9e2c9; }
+.train-station::after { content: ""; display: block; width: 8px; height: 6px; background: #e9e2c9; }
+.journey-stats { grid-column: 3; grid-row: 1 / 3; display: flex; gap: 20px; font-variant-numeric: tabular-nums; }
+.journey-stats span { display: block; color: #8fa59a; font-size: 9px; letter-spacing: 0.12em; margin-bottom: 3px; }
+.journey-stats strong { display: block; font-size: 16px; white-space: nowrap; }
+.journey-stats > div:last-child strong { font-size: 12px; padding-top: 4px; }
+.train-countdown { align-self: center; text-align: center; padding: 8px 12px; border: 1px solid #d7bb6a70; border-radius: 8px; background: #e0b9600c; font-variant-numeric: tabular-nums; }
+.train-countdown span { display: block; color: #e5d7ac; font-size: 10px; font-weight: 700; letter-spacing: 0.15em; }
+.train-countdown strong { display: block; font-size: 36px; line-height: 1.15; color: #ffe6a0; }
+.train-countdown.is-urgent { border-color: #f16c60; background: #b8322428; }
+.train-countdown.is-urgent span, .train-countdown.is-urgent strong { color: #ff8174; }
+.train-journey small { grid-column: 2; grid-row: 3; text-align: center; color: #9fb7a7; font-size: 10px; }
+.train-journey.is-behind small { color: #ff9d85; }
+.train-journey.is-behind .train-track::before { background: #ad5947; }
+.train-hud-gauges { min-width: 0; padding-left: 22px; border-left: 1px solid #b9a56d33; display: grid; gap: 10px; align-content: center; }
+.train-hud-gauges label { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 10px; align-items: center; font-size: 12px; font-variant-numeric: tabular-nums; }
+.train-hud-gauges progress { width: 100%; height: 7px; border: 0; border-radius: 4px; overflow: hidden; appearance: none; background: #334339; accent-color: #ddbb63; }
+.train-hud-gauges progress::-webkit-progress-bar { background: #334339; border-radius: 4px; }
+.train-hud-gauges progress::-webkit-progress-value { background: #ddbb63; border-radius: 4px; }
+.train-hud-gauges progress::-moz-progress-bar { background: #ddbb63; }
+.train-hud-gauges label:last-child progress { accent-color: #75bfc5; }
+.train-hud-gauges label:last-child progress::-webkit-progress-value { background: #75bfc5; }
+.train-hud-gauges label:last-child progress::-moz-progress-bar { background: #75bfc5; }
+.train-hud-gauges .is-danger { color: #ff9d85; }
+.train-hud-gauges .is-danger progress::-webkit-progress-value { background: #ee8068; }
+.train-hud-gauges .is-danger progress::-moz-progress-bar { background: #ee8068; }
+.train-hud { position: fixed; z-index: 10; bottom: 20px; left: 20px; width: min(270px, calc(100vw - 40px)); padding: 14px 18px; max-height: 30vh; overflow-y: auto; overflow-wrap: anywhere; }
+.train-hud h2 { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #e3c582; margin: 0 0 10px; }
+.train-hud ul { list-style: none; padding: 0; margin: 0; }
+.train-hud li { padding: 7px 0; border-top: 1px solid #ffffff10; }
+.train-hud p { color: #aabeb0; font-size: 12px; margin: 0; }
+.train-hud .is-complete { color: #91dfb3; }
+.has-dev-tools .train-hud { bottom: 230px; }
+.train-result { position: fixed; z-index: 15; top: 45%; left: 50%; transform: translate(-50%, -50%); padding: 28px; width: min(400px, calc(100vw - 40px)); border-color: #d37d64; text-align: center; }
 .train-result[hidden] { display: none; }
 .train-result.is-won { border-color: #91dfb3; }
-.train-result h1 { margin: 0; }
-@media (max-width: 800px) {
-  .train-journey { right: 20px; }
-  .train-hud { top: 205px; max-height: calc(100dvh - 225px); }
-  .train-result { top: 220px; right: 20px; z-index: 2; }
+.train-result h1 { margin: 0; font-size: 26px; }
+@media (max-width: 1000px) {
+  .train-topbar { gap: 14px; padding: 12px 14px; grid-template-columns: minmax(0, 1fr) 110px 160px; }
+  .train-journey { grid-template-columns: 115px minmax(50px, 1fr) 70px; column-gap: 10px; }
+  .train-hud-gauges { padding-left: 14px; }
+  .train-hud-gauges label { grid-template-columns: 90px minmax(0, 1fr); gap: 6px; font-size: 11px; }
+  .journey-stats { gap: 12px; }
+}
+@media (max-width: 740px) {
+  .train-topbar { top: 8px; left: 8px; right: 8px; grid-template-columns: minmax(0, 1fr) 100px; gap: 10px; }
+  .train-journey { grid-template-columns: minmax(0, 1fr) auto; row-gap: 3px; }
+  .journey-heading { font-size: 12px; }
+  .journey-stats { grid-column: 2; grid-row: 1 / 3; }
+  .train-track { grid-column: 1 / -1; grid-row: 3; margin: 8px 12px 0; }
+  .train-journey small { grid-column: 1 / -1; grid-row: 4; }
+  .train-hud-gauges { padding: 8px 0 0; border-left: 0; border-top: 1px solid #b9a56d33; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .train-hud-gauges { grid-column: 1 / -1; }
+  .train-countdown { grid-column: 2; grid-row: 1; padding: 8px 6px; }
+  .train-countdown strong { font-size: 32px; }
+  .train-hud-gauges label { grid-template-columns: 1fr; gap: 4px; }
+  .train-hud { left: 8px; bottom: 8px; max-height: 24vh; padding: 10px 14px; }
+  .has-dev-tools .train-hud { bottom: 195px; }
 }
