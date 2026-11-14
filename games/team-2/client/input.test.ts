@@ -203,4 +203,27 @@ describe("client input adapter", () => {
 			{ type: "move", mx: 0, my: 0, run: false },
 		]);
 	});
+
+	it("releases movement and ignores gameplay actions after a terminal phase", () => {
+		const target = new EventTarget();
+		const send = vi.fn<(input: ClientInput) => void>();
+		let phase: "running" | "won" = "running";
+		const adapter = createInputAdapter({
+			send,
+			isEnabled: () => phase === "running",
+			isPreview: () => false,
+			eventTarget: target,
+		});
+		dispatchKey(target, "keydown", "w");
+
+		phase = "won";
+		adapter.cleanup();
+		dispatchKey(target, "keydown", "f");
+		dispatchKey(target, "keydown", "q");
+
+		expect(send.mock.calls.map(([input]) => input)).toEqual([
+			{ type: "move", mx: 0, my: -1, run: false },
+			{ type: "move", mx: 0, my: 0, run: false },
+		]);
+	});
 });

@@ -22,7 +22,7 @@ export interface HudJourney {
 }
 
 /** Display only: the game server decides task progress. */
-export function createHud(container: HTMLElement) {
+export function createHud(container: HTMLElement, onReturnToLobby?: () => void) {
   const panel = document.createElement("section");
   panel.className = "train-hud";
   panel.setAttribute("aria-label", "Crew tasks");
@@ -108,7 +108,11 @@ export function createHud(container: HTMLElement) {
   result.setAttribute("role", "status");
   const resultTitle = document.createElement("h1");
   const resultText = document.createElement("p");
-  result.append(resultTitle, resultText);
+  const returnButton = document.createElement("button");
+  returnButton.type = "button";
+  returnButton.textContent = "Return to Lobby";
+  returnButton.addEventListener("click", () => onReturnToLobby?.());
+  result.append(resultTitle, resultText, returnButton);
   result.hidden = true;
   container.append(topbar, result);
   // Reserve actual HUD height so the first carriage never sits behind it.
@@ -139,10 +143,17 @@ export function createHud(container: HTMLElement) {
         : values.phase === "won" || values.phase === "lost" ? "Journey ended"
         : view.behind ? "Behind schedule"
         : "On schedule";
-      result.hidden = values.phase !== "won" && values.phase !== "lost";
-      result.classList.toggle("is-won", values.phase === "won");
-      resultTitle.textContent = values.phase === "won" ? "Docked Safe" : "Journey Lost";
-      resultText.textContent = values.reason || (values.phase === "won" ? "The crew made it to the station." : "The train did not reach safety.");
+      const won = values.phase === "won";
+      const lost = values.phase === "lost";
+      result.hidden = !won && !lost;
+      result.classList.toggle("is-won", won);
+      if (won) {
+        resultTitle.textContent = "Congratulations!";
+        resultText.textContent = "Your crew made it! The train arrived safely.";
+      } else if (lost) {
+        resultTitle.textContent = "Better Luck Next Time!";
+        resultText.textContent = "The journey is over. Don't give up, crew!";
+      }
     },
     updateGauges(values: { power: number; pressure: number }) {
       updatePower(values.power);
