@@ -19,10 +19,12 @@ import {
   type Object3D,
 } from "three";
 import { createPlatformMap, type PlatformMap } from "../shared/map/platform.ts";
+import type { ActionHighlight } from "./actionHighlight.ts";
 import { applyCrewPose, buildCrewFigure } from "./crewModel.ts";
 import { buildBreachModel, buildStationModel } from "./propModels.ts";
 import { PALETTE, mat } from "./style.ts";
 import { advanceWalk, crewPose, smoothSpeed, speedBetween } from "./crewPose.ts";
+import { createHighlightRing } from "./highlightRing.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import {
   PLAYER_COLORS,
@@ -56,6 +58,8 @@ export interface PlatformScene {
   updatePlayers(players: readonly RenderPlayer[]): void;
   /** Walk/idle bob for the waiting crew (#294); call after `updatePlayers`. */
   updateMotion(dt: number): void;
+  /** Rings the departure lever when the local player can use it (#295); null hides the ring. */
+  updateHighlight(highlight: ActionHighlight | null, seconds: number): void;
   dispose(): void;
 }
 
@@ -265,6 +269,10 @@ export function buildPlatformScene(
   playersGroup.name = "players";
   scene.add(playersGroup);
 
+  // Under the departure lever when it is usable (#295).
+  const actionRing = createHighlightRing();
+  scene.add(actionRing.group);
+
   const drawnPlayers = new Map<string, Drawn<Group>>();
 
   // Called once per animation frame while the crew waits: figures are kept and moved, and one is
@@ -325,6 +333,7 @@ export function buildPlatformScene(
     map,
     updatePlayers,
     updateMotion,
+    updateHighlight: (highlight, seconds) => actionRing.show(highlight, seconds),
     dispose: () => {
       drawnPlayers.clear();
       disposeObject(scene);
