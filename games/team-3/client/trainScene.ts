@@ -281,6 +281,37 @@ export function createNameLabel(name: string): Object3D {
   return sprite;
 }
 
+/** One shared disc for every loose item's floor shadow (#357). */
+const ITEM_SHADOW_GEOMETRY = new CylinderGeometry(9, 9, 0.4, 16);
+/** Height of an item shadow above the floor, so it doesn't flicker into the planks. */
+const ITEM_SHADOW_Y = 0.5;
+/** How much brighter a tool looks while held (#357). */
+export const HELD_SHINE = 0.2;
+
+/** Adds a soft dark disc under a loose item; the bob in updateEffects keeps it on the floor. */
+function withFloorShadow(mesh: Mesh): Mesh {
+  const shadow = new Mesh(ITEM_SHADOW_GEOMETRY, ownMat(0x000000, { opacity: 0.28 }));
+  shadow.name = "itemShadow";
+  shadow.userData = { kind: "itemShadow" };
+  mesh.add(shadow);
+  return mesh;
+}
+
+/**
+ * Makes a held item glow faintly. Item materials are shared (`mat()`), so the held copy gets its
+ * own clones first; loose items and every other object keep their colours.
+ */
+function withShine(mesh: Mesh): Mesh {
+  mesh.traverse((part) => {
+    if (!(part instanceof Mesh) || !(part.material instanceof MeshStandardMaterial)) return;
+    const own = part.material.clone();
+    own.emissive.copy(own.color);
+    own.emissiveIntensity = HELD_SHINE;
+    part.material = own;
+  });
+  return mesh;
+}
+
 function buildItemMesh(item: RenderItem, scale = 1): Mesh {
   const mesh = buildItemModel(item.kind, scale);
   mesh.name = `item-${item.id}`;
@@ -314,7 +345,7 @@ function buildPlayerGroup(
   // A held item is drawn next to its player, not on the floor.
   const held = heldItems.find((item) => item.heldBy === player.id);
   if (held) {
-    const mesh = buildItemMesh(held, 0.7);
+    const mesh = withShine(buildItemMesh(held, 0.7));
     mesh.name = `held-${held.id}`;
     mesh.position.set(HOLD_POINT.x * CREW_SCALE, HOLD_POINT.y * CREW_SCALE, HOLD_POINT.z);
     mesh.userData = { ...mesh.userData, kind: "heldItem", heldBy: player.id, baseY: mesh.position.y };
@@ -623,7 +654,7 @@ export function buildTrainScene(
         .map((item) => ({
           id: item.id,
           key: item.kind,
-          build: () => buildItemMesh(item),
+          build: () => withFloorShadow(buildItemMesh(item)),
           place: (mesh: Mesh) => {
             mesh.position.set(item.position.x, 10, item.position.y);
           },
@@ -663,6 +694,9 @@ export function buildTrainScene(
     for (const item of itemsGroup.children) {
       item.position.y = 10 + Math.sin(seconds * 3 + item.id) * 1.5;
       item.rotation.y = seconds * 0.8 + item.id;
+      // The shadow stays on the floor while the item bobs (#357).
+      const shadow = item.getObjectByName("itemShadow");
+      if (shadow) shadow.position.y = (ITEM_SHADOW_Y - item.position.y) / (item.scale.y || 1);
     }
 
     // The firebox glows in time with the engine.
