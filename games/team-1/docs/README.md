@@ -1,6 +1,6 @@
 # The Last Train (Team 1): start here
 
-This folder is written for the team and for the AI coding agents that work with it. Read this file first, then [PLATFORM.md](PLATFORM.md) (how the game talks to the server) and [NEXT_STEPS.md](NEXT_STEPS.md) (what is not done).
+This folder is written for the team and for the AI coding agents that work with it. Read this file first, then [PLATFORM.md](PLATFORM.md) (how the game talks to the server) and [NEXT_STEPS.md](NEXT_STEPS.md) (what is not done). The player classes (input, movement, collision, inventory, interactions) are described in [PLAYER_MECHANICS.md](PLAYER_MECHANICS.md).
 
 ## What the game is
 
