@@ -2,12 +2,13 @@
 // game state: stations, items, hazards and repair progress (#19).
 //
 // The renderer is a pure function of the state it is given: `buildTrainScene`
-// creates the static map, and `updateState` replaces the dynamic parts when new
-// state arrives. It never changes the game state itself.
+// creates the static map, and `updateState` makes the dynamic parts match new
+// state, reusing the objects that did not change. It never changes the game state itself.
 
 import {
   AmbientLight,
   BoxGeometry,
+  CapsuleGeometry,
   CanvasTexture,
   Color,
   ConeGeometry,
@@ -18,6 +19,7 @@ import {
   MeshStandardMaterial,
   PerspectiveCamera,
   SRGBColorSpace,
+  SphereGeometry,
   Scene,
   Sprite,
   SpriteMaterial,
@@ -86,7 +88,7 @@ export interface TrainSceneOptions {
 export interface TrainScene {
   scene: Scene;
   camera: PerspectiveCamera;
-  /** One group per player; replaced by `updateState`. */
+  /** One group per player, in seat order; `updateState` keeps and moves them, and rebuilds one only when it changes. */
   playersGroup: Group;
   /** One group per item on the floor; held items live in their player group. */
   itemsGroup: Group;
@@ -114,9 +116,9 @@ export function mapCentreX(map: TrainMap): number {
 }
 
 /** How far down the camera looks: 55 degrees below the horizon. */
-const CAMERA_ELEVATION_DEGREES = 55;
+const CAMERA_ELEVATION_DEGREES = 48;
 /** Free space kept around the train so the outer walls are not at the screen edge. */
-const CAMERA_MARGIN = 120;
+const CAMERA_MARGIN = 90;
 
 /**
  * Places the camera above the train at an angle and far enough away that the
@@ -142,7 +144,7 @@ export function fitCameraToMap(camera: PerspectiveCamera, map: TrainMap, aspect:
 }
 
 function createCamera(map: TrainMap): PerspectiveCamera {
-  const camera = new PerspectiveCamera(45, 16 / 9, 1, 6000);
+  const camera = new PerspectiveCamera(35, 16 / 9, 1, 8000);
   fitCameraToMap(camera, map, 16 / 9);
   return camera;
 }
@@ -253,15 +255,40 @@ function buildPlayerGroup(
   group.name = `player-${player.id}`;
   group.userData = { kind: "player", playerId: player.id, name: player.name };
 
+  // A tiny crew member (#217): a colour-coded capsule body, a head, a nose that shows where they
+  // face, and a soft shadow on the floor so they read as standing in the car.
   const color = new Color(PLAYER_COLORS[seat % PLAYER_COLORS.length] ?? PLAYER_COLORS[0]);
-  const body = new Mesh(
-    new CylinderGeometry(PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_HEIGHT, 20),
-    new MeshStandardMaterial({ color, roughness: 0.6 }),
+  const shadow = new Mesh(
+    new CylinderGeometry(PLAYER_RADIUS * 1.15, PLAYER_RADIUS * 1.15, 0.5, 20),
+    new MeshStandardMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }),
   );
-  body.position.y = PLAYER_HEIGHT / 2;
+  shadow.position.y = 0.6;
+  shadow.name = "shadow";
+  group.add(shadow);
+
+  const bodyHeight = PLAYER_HEIGHT * 0.62;
+  const body = new Mesh(
+    new CapsuleGeometry(PLAYER_RADIUS * 0.85, bodyHeight - PLAYER_RADIUS * 1.7, 6, 16),
+    new MeshStandardMaterial({ color, roughness: 0.55 }),
+  );
+  body.position.y = bodyHeight / 2;
   body.name = `body-${player.id}`;
   body.userData = { kind: "playerBody", playerId: player.id, seat };
   group.add(body);
+
+  const headRadius = PLAYER_RADIUS * 0.62;
+  const head = new Mesh(
+    new SphereGeometry(headRadius, 16, 12),
+    new MeshStandardMaterial({ color: color.clone().lerp(new Color("#ffe0c4"), 0.65), roughness: 0.5 }),
+  );
+  head.position.y = bodyHeight + headRadius * 0.8;
+  head.name = "head";
+  group.add(head);
+
+  const nose = new Mesh(new BoxGeometry(5, 4, 4), new MeshStandardMaterial({ color: 0x20202a }));
+  nose.position.set(headRadius, head.position.y, 0);
+  nose.name = "facing";
+  group.add(nose);
 
   const label = labelFactory(player.name);
   label.position.y = LABEL_HEIGHT;
@@ -277,15 +304,22 @@ function buildPlayerGroup(
     group.add(mesh);
   }
 
-  group.position.set(player.position.x, 0, player.position.y);
+  placePlayer(group, player);
   return group;
+}
+
+/** Moves a player figure to its position and turns it to face its walking direction. */
+function placePlayer(group: Object3D, player: RenderPlayer): void {
+  group.position.set(player.position.x, 0, player.position.y);
+  // Local +x points along `facing`; a player with no direction faces +x, as a newly built one does.
+  const facing = player.facing;
+  group.rotation.y = facing && (facing.dx !== 0 || facing.dy !== 0) ? -Math.atan2(facing.dy, facing.dx) : 0;
 }
 
 function buildHazardGroup(hazard: RenderHazard): Group {
   const group = new Group();
   group.name = `hazard-${hazard.id}`;
   group.userData = { kind: "hazard", hazardId: hazard.id, hazardKind: hazard.kind };
-  group.position.set(hazard.position.x, 0, hazard.position.y);
 
   const color = new Color(HAZARD_COLORS[hazard.kind]);
   const material = new MeshStandardMaterial({ color, roughness: 0.5, emissive: color, emissiveIntensity: 0.35 });
@@ -305,11 +339,10 @@ function buildHazardGroup(hazard: RenderHazard): Group {
   }
 
   // Repair progress (#19): a bar above the hazard that follows `hazard.progress`.
-  const progress = Math.min(1, Math.max(0, hazard.progress));
   const bar = new Group();
   bar.name = "progress";
   bar.position.y = HAZARD_BAR_HEIGHT;
-  bar.userData = { kind: "progressBar", hazardId: hazard.id, progress };
+  bar.userData = { kind: "progressBar", hazardId: hazard.id, progress: 0 };
 
   const back = new Mesh(
     new BoxGeometry(HAZARD_BAR_WIDTH, 5, 3),
@@ -323,13 +356,25 @@ function buildHazardGroup(hazard: RenderHazard): Group {
     new MeshStandardMaterial({ color: 0x30a46c, roughness: 0.6 }),
   );
   fill.name = "progressFill";
-  fill.scale.x = progress;
-  fill.position.x = -(HAZARD_BAR_WIDTH / 2) * (1 - progress);
-  fill.userData = { kind: "progressFill", hazardId: hazard.id, progress };
+  fill.userData = { kind: "progressFill", hazardId: hazard.id, progress: 0 };
   bar.add(fill);
 
   group.add(bar);
+  placeHazard(group, hazard);
   return group;
+}
+
+/** Moves a hazard to its position and sets its repair bar to `hazard.progress`. */
+function placeHazard(group: Object3D, hazard: RenderHazard): void {
+  group.position.set(hazard.position.x, 0, hazard.position.y);
+  const progress = Math.min(1, Math.max(0, hazard.progress));
+  const bar = group.children.find((child) => child.name === "progress");
+  const fill = bar?.children.find((child) => child.name === "progressFill");
+  if (!bar || !fill) return;
+  bar.userData.progress = progress;
+  fill.userData.progress = progress;
+  fill.scale.x = progress;
+  fill.position.x = -(HAZARD_BAR_WIDTH / 2) * (1 - progress);
 }
 
 function disposeObject(object: Object3D): void {
@@ -346,6 +391,65 @@ function disposeObject(object: Object3D): void {
   });
 }
 
+/** An object in the scene and what it was built from; `key` changes when it has to be rebuilt. */
+export interface Drawn<T extends Object3D> {
+  object: T;
+  key: string;
+}
+
+/** One entry of the state to draw: how to build its object and how to move it into place. */
+export interface DrawEntry<T extends Object3D> {
+  id: string;
+  /** Everything that needs a rebuild when it changes (name, kind, seat, held item). */
+  key: string;
+  build(): T;
+  /** Applies what changes every tick (position, facing, progress) to an existing object. */
+  place(object: T): void;
+}
+
+/**
+ * Makes `parent` show exactly `entries`, in that order, reusing the objects already there. An object
+ * is only built when it is new or its `key` changed, and only disposed when it is gone, so a state
+ * that arrives every frame moves meshes instead of rebuilding geometries, materials and label
+ * textures 60 times a second.
+ */
+export function reconcile<T extends Object3D>(
+  parent: Group,
+  drawn: Map<string, Drawn<T>>,
+  entries: readonly DrawEntry<T>[],
+  dispose: (object: Object3D) => void,
+): void {
+  const wanted = new Set<string>();
+  const ordered: T[] = [];
+  for (const entry of entries) {
+    wanted.add(entry.id);
+    let current = drawn.get(entry.id);
+    if (!current || current.key !== entry.key) {
+      if (current) {
+        parent.remove(current.object);
+        dispose(current.object);
+      }
+      current = { object: entry.build(), key: entry.key };
+      drawn.set(entry.id, current);
+    }
+    entry.place(current.object);
+    ordered.push(current.object);
+  }
+  for (const [id, current] of drawn) {
+    if (wanted.has(id)) continue;
+    parent.remove(current.object);
+    dispose(current.object);
+    drawn.delete(id);
+  }
+  // Children stay in state order (seat order for players); only touched when it differs.
+  const inOrder =
+    parent.children.length === ordered.length && ordered.every((object, index) => parent.children[index] === object);
+  if (!inOrder) {
+    parent.remove(...parent.children);
+    if (ordered.length > 0) parent.add(...ordered);
+  }
+}
+
 /**
  * Creates the scene, camera, lights and static map. Call `updateState` whenever
  * a new game state arrives.
@@ -358,7 +462,7 @@ export function buildTrainScene(
   const labelFactory = options.labelFactory ?? createNameLabel;
 
   const scene = new Scene();
-  scene.background = new Color("#101018");
+  scene.background = new Color("#1a2130");
 
   const camera = createCamera(map);
   scene.add(camera);
@@ -391,34 +495,59 @@ export function buildTrainScene(
   playersGroup.name = "players";
   hullGroup.add(playersGroup);
 
-  const clear = (group: Group): void => {
-    for (const child of [...group.children]) {
-      group.remove(child);
-      disposeObject(child);
-    }
-  };
+  const drawnPlayers = new Map<string, Drawn<Group>>();
+  const drawnItems = new Map<string, Drawn<Mesh>>();
+  const drawnHazards = new Map<string, Drawn<Group>>();
 
+  // Called with every state, in practice once per animation frame: objects are kept and moved, and
+  // only rebuilt when something that shapes them changes (see `reconcile`).
   const updateState = (next: RenderWorld): void => {
     const players = next.players ?? [];
     const items = next.items ?? [];
     const hazards = next.hazards ?? [];
 
-    clear(playersGroup);
-    clear(itemsGroup);
-    clear(hazardsGroup);
+    reconcile(
+      playersGroup,
+      drawnPlayers,
+      players.map((player, seat) => {
+        const held = items.find((item) => item.heldBy === player.id);
+        return {
+          id: player.id,
+          key: [seat, player.name, held ? held.id : "", held ? held.kind : ""].join("|"),
+          build: () => buildPlayerGroup(player, seat, labelFactory, items),
+          place: (group: Group) => placePlayer(group, player),
+        };
+      }),
+      disposeObject,
+    );
 
-    players.forEach((player, seat) => {
-      playersGroup.add(buildPlayerGroup(player, seat, labelFactory, items));
-    });
+    reconcile(
+      itemsGroup,
+      drawnItems,
+      items
+        .filter((item) => item.heldBy === null)
+        .map((item) => ({
+          id: item.id,
+          key: item.kind,
+          build: () => buildItemMesh(item),
+          place: (mesh: Mesh) => {
+            mesh.position.set(item.position.x, 10, item.position.y);
+          },
+        })),
+      disposeObject,
+    );
 
-    for (const item of items) {
-      if (item.heldBy !== null) continue;
-      const mesh = buildItemMesh(item);
-      mesh.position.set(item.position.x, 10, item.position.y);
-      itemsGroup.add(mesh);
-    }
-
-    for (const hazard of hazards) hazardsGroup.add(buildHazardGroup(hazard));
+    reconcile(
+      hazardsGroup,
+      drawnHazards,
+      hazards.map((hazard) => ({
+        id: hazard.id,
+        key: hazard.kind,
+        build: () => buildHazardGroup(hazard),
+        place: (group: Group) => placeHazard(group, hazard),
+      })),
+      disposeObject,
+    );
   };
 
   updateState(world);
@@ -434,6 +563,9 @@ export function buildTrainScene(
     map,
     updateState,
     dispose: () => {
+      drawnPlayers.clear();
+      drawnItems.clear();
+      drawnHazards.clear();
       disposeObject(scene);
     },
   };

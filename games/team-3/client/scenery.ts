@@ -21,6 +21,16 @@ export const SCENERY_Y = -14;
 
 /** Extra ground around the train, so the edge of the world is never in view. */
 const GROUND_MARGIN = 600;
+/** The steel rails' cross-section, in world units. */
+export const RAIL_SIZE = { width: 8, height: 6 } as const;
+/** How far each rail sits from the track centre: just outside the car walls, on the sleepers. */
+export function railOffset(carDepth: number): number {
+  return Math.min(SLEEPER_SIZE.depth / 2 - 12, carDepth / 2 + 30);
+}
+const POLE_HEIGHT = 130;
+/** A pole every this many sleepers; a whole number so the scenery still loops seamlessly. */
+const POLE_EVERY = 4;
+const POLE_GAP = 170;
 
 export interface SceneryBounds {
   /** x of the front of the train. */
@@ -67,7 +77,7 @@ export function buildScenery(bounds: SceneryBounds): Scenery {
   const group = new Group();
   group.name = "scenery";
 
-  const groundMaterial = new MeshStandardMaterial({ color: 0x15151c, roughness: 1 });
+  const groundMaterial = new MeshStandardMaterial({ color: 0x2b3424, roughness: 1 });
   const ground = new Mesh(
     new BoxGeometry(bounds.right - bounds.left + GROUND_MARGIN, 6, bounds.depth + GROUND_MARGIN),
     groundMaterial,
@@ -77,7 +87,7 @@ export function buildScenery(bounds: SceneryBounds): Scenery {
   group.add(ground);
 
   const sleeperGeometry = new BoxGeometry(SLEEPER_SIZE.width, SLEEPER_SIZE.height, SLEEPER_SIZE.depth);
-  const sleeperMaterial = new MeshStandardMaterial({ color: 0x4a4a55, roughness: 0.9 });
+  const sleeperMaterial = new MeshStandardMaterial({ color: 0x5b4a3a, roughness: 0.9 });
 
   const first = bounds.left - SLEEPER_SPACING * 2;
   const last = bounds.right + SLEEPER_SPACING * 2;
@@ -87,6 +97,33 @@ export function buildScenery(bounds: SceneryBounds): Scenery {
     sleeper.name = "sleeper";
     sleeper.userData = { kind: "sleeper" };
     group.add(sleeper);
+  }
+
+  // Two steel rails along the sleepers (#217), outside the car walls so they show beside the train.
+  const railLength = bounds.right - bounds.left + GROUND_MARGIN;
+  const railGeometry = new BoxGeometry(railLength, RAIL_SIZE.height, RAIL_SIZE.width);
+  const railMaterial = new MeshStandardMaterial({ color: 0xa7b0bf, metalness: 0.6, roughness: 0.35 });
+  for (const side of [-1, 1]) {
+    const rail = new Mesh(railGeometry, railMaterial);
+    rail.position.set((bounds.left + bounds.right) / 2, SCENERY_Y + SLEEPER_SIZE.height / 2 + RAIL_SIZE.height / 2, side * railOffset(bounds.depth));
+    rail.name = "rail";
+    rail.userData = { kind: "rail" };
+    group.add(rail);
+  }
+
+  // Telegraph poles behind the train, every few sleepers, so the motion reads at a glance.
+  const poleGeometry = new BoxGeometry(6, POLE_HEIGHT, 6);
+  const armGeometry = new BoxGeometry(6, 4, 40);
+  const poleMaterial = new MeshStandardMaterial({ color: 0x5a4632, roughness: 0.9 });
+  for (let x = first; x <= last; x += SLEEPER_SPACING * POLE_EVERY) {
+    const pole = new Mesh(poleGeometry, poleMaterial);
+    pole.position.set(x, SCENERY_Y + POLE_HEIGHT / 2, -(bounds.depth / 2 + POLE_GAP));
+    pole.name = "pole";
+    pole.userData = { kind: "pole" };
+    const arm = new Mesh(armGeometry, poleMaterial);
+    arm.position.set(0, POLE_HEIGHT / 2 - 10, 0);
+    pole.add(arm);
+    group.add(pole);
   }
 
   let distance = 0;

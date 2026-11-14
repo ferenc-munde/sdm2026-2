@@ -35,6 +35,9 @@ import { createSharedLinkJoin } from "./sharedLinkJoin.ts";
 
 /** `?demo` opens the hand-check page; otherwise the page plays a real room. */
 const demo = new URLSearchParams(window.location.search).has("demo");
+// The page caption names the hand-check page; the real game has the HUD and hints there instead.
+const caption = document.querySelector<HTMLElement>(".title");
+if (caption && !demo) caption.hidden = true;
 const server = serverAddress(window.location, import.meta.env?.VITE_SERVER_URL as string | undefined);
 import { createPlatformBoard } from "./platformBoard.ts";
 
