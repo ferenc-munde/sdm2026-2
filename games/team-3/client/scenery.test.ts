@@ -80,6 +80,8 @@ describe("scenery", () => {
     const rails = scenery.group.children.filter((child) => child.userData.kind === "rail");
     expect(rails.map((rail) => Math.sign(rail.position.z)).sort()).toEqual([-1, 1]);
     for (const rail of rails) expect(Math.abs(rail.position.z)).toBeGreaterThan(bounds.depth / 2);
-    expect(scenery.group.children.some((child) => child.userData.kind === "pole")).toBe(true);
+    let poles = 0;
+    scenery.group.traverse((child) => { if (child.userData.kind === "pole") poles += 1; });
+    expect(poles).toBeGreaterThan(0);
   });
 });

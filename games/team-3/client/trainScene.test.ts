@@ -1,3 +1,4 @@
+import { LOCOMOTIVE_LENGTH } from "./trainModel.ts";
 import { Color, Mesh, MeshStandardMaterial, Object3D, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { CARRY_ARM_LIFT, INTERACT_ARM_LIFT } from "./crewPose.ts";
@@ -67,7 +68,8 @@ describe("the train", () => {
   it("puts the camera above the train, looking down at an angle", () => {
     const train = build();
     expect(train.camera.position.y).toBeGreaterThan(0);
-    expect(train.camera.position.x).toBeCloseTo(mapCentreX(train.map));
+    // Centred on the cars plus the locomotive in front of them (visual pass).
+    expect(train.camera.position.x).toBeCloseTo(mapCentreX(train.map) - (LOCOMOTIVE_LENGTH + 50) / 2);
 
     const direction = new Vector3();
     train.camera.getWorldDirection(direction);
@@ -96,7 +98,8 @@ describe("players and items", () => {
     expect(train.playersGroup.children).toHaveLength(2);
 
     const colours = train.playersGroup.children.map((group) => {
-      const body = group.children.find((child) => child.userData.kind === "playerBody");
+      let body: Object3D | undefined;
+      group.traverse((child) => { if (child.userData.kind === "playerBody") body = child; });
       expect(body).toBeInstanceOf(Mesh);
       return new Color(((body as Mesh).material as MeshStandardMaterial).color).getHexString();
     });
@@ -223,8 +226,8 @@ describe("updateState", () => {
   it("draws each crew member with a head and turns them to face where they walk (#217)", () => {
     const train = build({ players: [{ id: "a", name: "Ada", position: { x: 0, y: 0 }, facing: { dx: 0, dy: 1 } }] });
     const group = train.playersGroup.children[0]!;
-    expect(group.children.some((child) => child.name === "head")).toBe(true);
-    expect(group.children.some((child) => child.name === "facing")).toBe(true);
+    expect(group.getObjectByName("head")).toBeDefined();
+    expect(group.getObjectByName("facing")).toBeDefined();
     expect(group.rotation.y).toBeCloseTo(-Math.PI / 2);
   });
 });
@@ -320,8 +323,13 @@ describe("crew and wheel animation (#294)", () => {
     items: [],
     hazards: [],
   });
-  const limbs = (figure: Object3D, kind: string): Object3D[] =>
-    figure.children.filter((child) => child.userData.kind === kind);
+  const limbs = (figure: Object3D, kind: string): Object3D[] => {
+    const found: Object3D[] = [];
+    figure.traverse((child) => {
+      if (child.userData.kind === kind) found.push(child);
+    });
+    return found;
+  };
 
   it("gives every figure two legs and two arms", () => {
     const train = build({ players, items: [], hazards: [] });
@@ -370,17 +378,18 @@ describe("crew and wheel animation (#294)", () => {
     for (const arm of arms) expect(arm.rotation.z).toBeCloseTo(INTERACT_ARM_LIFT);
   });
 
-  it("rolls a wheel on each corner with the train speed factor", () => {
+  it("rolls every wheel with the train speed factor", () => {
     const train = build();
-    const wheels = train.mapGroup.children.filter((child) => child.userData.kind === "wheel");
-    expect(wheels).toHaveLength(train.map.cars.length * 4);
+    // The bogie wheels from the visual pass: eight under every car, six under the locomotive.
+    const wheels = limbs(train.hullGroup, "wheel");
+    expect(wheels).toHaveLength(train.map.cars.length * 8 + 6);
 
     const first = wheels[0]!;
     train.updateMotion(0.5, 1);
-    const rolling = first.rotation.z;
+    const rolling = first.rotation.y;
     expect(rolling).toBeGreaterThan(0);
 
     train.updateMotion(0.5, 0);
-    expect(first.rotation.z).toBe(rolling);
+    expect(first.rotation.y).toBe(rolling);
   });
 });
