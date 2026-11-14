@@ -56,6 +56,7 @@ try {
       renderer,
       fallback,
       observers: createdObservers.slice(observerStart),
+      get scene() { return renderedScene; },
       get rendererDisposed() { return rendererDisposed; },
     };
   }
@@ -95,6 +96,17 @@ try {
     assert.equal(updatedFirst.children[0].material.opacity, 0.38);
     assert.equal(updatedSecond.uuid, second.uuid);
     scene.train.dispose();
+  });
+
+  test("includes a visible repair marker for each of the five train sections", () => {
+    const scene = createHarness();
+    const markers = [];
+    scene.train.update(createPreviewSnapshot());
+    scene.scene.traverse((object) => {
+      if (object.userData.role === "repair-area") markers.push(object.userData.sectionId);
+    });
+    scene.train.dispose();
+    assert.deepEqual(markers, ["engine", "electrical", "control", "passenger", "rear"]);
   });
 
   test("keeps the remaining avatar and marker colors synchronized after roster changes", () => {
