@@ -1,5 +1,6 @@
+import { buildScenery } from "./scenery.ts";
 import { LOCOMOTIVE_LENGTH } from "./trainModel.ts";
-import { Color, Mesh, MeshStandardMaterial, Object3D, PointLight, Vector3 } from "three";
+import { BoxGeometry, Color, Mesh, MeshStandardMaterial, Object3D, PointLight, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { CARRY_ARM_LIFT, INTERACT_ARM_LIFT } from "./crewPose.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
@@ -589,6 +590,59 @@ describe("item shadows and held shine (#357)", () => {
     for (const m of looseMats) {
       expect(heldMats).not.toContain(m);
       expect(m.emissive.getHex() === 0 || m.emissiveIntensity !== HELD_SHINE).toBe(true);
+    }
+  });
+});
+
+describe("the track bends with the train (#425)", () => {
+  const course: RenderHazard = { id: "course-1", kind: "course", position: { x: -160, y: -80 }, progress: 0 };
+  /** Both ends of a rail on the floor, from its centre, length and turn. */
+  const ends = (rail: Object3D) => {
+    const half = ((rail as Mesh).geometry as BoxGeometry).parameters.width / 2;
+    const c = Math.cos(rail.rotation.y), s = Math.sin(rail.rotation.y);
+    return [
+      { x: rail.position.x - half * c, z: rail.position.z + half * s },
+      { x: rail.position.x + half * c, z: rail.position.z - half * s },
+    ];
+  };
+  const setup = () => {
+    const train = build({ players, items, hazards: [...hazards, course] });
+    const scenery = buildScenery({ left: -500, right: 1400, depth: 220 });
+    train.scene.add(scenery.group);
+    const track = train.scene.getObjectByName("trainTrack")!;
+    const sceneryRails: Object3D[] = [];
+    scenery.group.traverse((o) => { if (o.name === "rail") sceneryRails.push(o); });
+    return { train, track, sceneryRails };
+  };
+
+  it("uses the scenery's rails while straight, and its own bent rails during a curve", () => {
+    const { train, track, sceneryRails } = setup();
+    expect(track.visible).toBe(false);
+    expect(sceneryRails.every((r) => r.visible)).toBe(true);
+    let t = 0;
+    for (let i = 0; i < 40; i++) train.updateEffects((t += 0.05));
+    expect(track.visible).toBe(true);
+    expect(sceneryRails.some((r) => r.visible)).toBe(false);
+
+    train.updateState({ players, items, hazards }); // the curve is over
+    for (let i = 0; i < 100; i++) train.updateEffects((t += 0.05));
+    expect(track.visible).toBe(false);
+    expect(sceneryRails.every((r) => r.visible)).toBe(true);
+  });
+
+  it("keeps the track joined: each rail section ends where the next one starts, even fully bent", () => {
+    const { train, track } = setup();
+    let t = 0;
+    for (let i = 0; i < 80; i++) train.updateEffects((t += 0.05));
+    for (const side of [-1, 1]) {
+      const rails = track.children.filter((r) => Math.sign(r.userData.rest.z) === side);
+      const sorted = rails.sort((a, b) => a.userData.rest.x - b.userData.rest.x);
+      for (let i = 0; i + 1 < sorted.length; i++) {
+        const [, endA] = ends(sorted[i]!);
+        const [startB] = ends(sorted[i + 1]!);
+        expect(Math.hypot(endA!.x - startB!.x, endA!.z - startB!.z)).toBeLessThan(0.01);
+      }
+      expect(sorted.some((r) => Math.abs(r.rotation.y) > 0.3)).toBe(true);
     }
   });
 });
