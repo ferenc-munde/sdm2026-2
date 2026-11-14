@@ -13,13 +13,15 @@ What has been done so far:
 | Repository skeleton | Done: rules (`CLAUDE.md`), getting started guide, `server/` structure with a README per package, `games/team-1` to `team-3` folders, course info |
 | Team roster | Done: `course/teams.json` lists instructors, students and their team |
 | Branches | Done: `main` (production), `staging`, `development`, `Team_1_Feature`, `Team_2_Feature`, `Team_3_Feature`. Work flows `Team_N_Feature` → `development` → `staging` → `main` (see [Branch structure](#branch-structure)) |
-| CI workflows | In progress (platform team, build-order step 2): GitHub Actions on every PR |
-| Workspace (`package.json`, `pnpm-workspace.yaml`, TypeScript config) | Not started (build-order step 1) |
-| `@sdm/core`, `@sdm/host`, `@sdm/template` | Not built: only the README of each package exists |
-| `@sdm/gateway`, Railway environments | Not built, nothing is deployed |
-| Game teams | Planning: project plans, specs and package skeletons are in review (for example Team 2, PRs #75 and #85) |
+| CI workflows | Done: per-team feature CI (`Team N Feature CI`), `Development to Staging CI` and `Staging to Main CI` for the games, and `Platform CI` (typecheck and tests of the `server/` packages on every push and PR into `development`, `staging` and `main`). Not built: lint and format checks |
+| Workspace (`package.json`, `pnpm-workspace.yaml`, TypeScript config) | Done: pnpm workspace (`server/*`, `games/*`, Node 22) and the shared `tsconfig` in `@sdm/tooling` |
+| `@sdm/core` | Done: contract (`shared`), simulation contract (`sim`), `Simulation` with replays that re-run to the same state hash (`server`), connection helpers for the browser (`client`). Not built: prediction, interpolation and debug tools in the client core |
+| `@sdm/host` | Done: `startGameServer()`, `createGameRoom()`, `/health`, join by code, replays, bug reports, stats, structured logs, input limits, serving the built client. Not built: storage that survives a restart (replays and bug reports are kept in memory), access control for `/api/stats` and the replay routes |
+| `@sdm/template` | Not built: only the README exists |
+| `@sdm/gateway`, Railway environments | The gateway is not built. `railway.json` starts the game chosen by the `GAME` service variable; the Railway project and its services are set up by the platform team and not recorded here |
+| Game teams | Building: Team 1, Team 2 and Team 3 each start their game on the platform host with a `server.ts` and a room in `room/` |
 
-The game teams are blocked on `@sdm/core`, `@sdm/host` and `@sdm/template` before they can write their game rules. Team 2 asked for them in issue #73. The build order is in [README.md](README.md#build-order).
+All three games already run on `@sdm/core` and `@sdm/host`. `@sdm/template` is the part the teams still wait for (Team 2 asked for it in issue #73). The build order is in [README.md](README.md#build-order).
 
 ```
 repo root            pnpm workspace (package.json, pnpm-workspace.yaml, lint/format and test config)
