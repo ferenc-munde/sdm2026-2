@@ -29,6 +29,7 @@ import { waitingView } from "./waitingRoomModel.ts";
 import { platformSpawn } from "../shared/map/platform.ts";
 import { errorText } from "./lobbyModel.ts";
 import { createActionKeys } from "./actionKeys.ts";
+import { createSmoother, withPositions } from "./smoothing.ts";
 import { createRoom, joinRoomByCode, serverAddress, type RoomConnection } from "./roomConnection.ts";
 import { joinErrorText } from "./roomLinks.ts";
 import { createSharedLinkJoin } from "./sharedLinkJoin.ts";
@@ -381,6 +382,10 @@ function showToast(text: string): void {
 }
 
 let liveState: GameState | null = null;
+const playerSmoother = createSmoother();
+const itemSmoother = createSmoother();
+const positionsOf = (records: Record<string, { position: { x: number; y: number } }>) =>
+  Object.fromEntries(Object.entries(records).map(([id, record]) => [id, record.position]));
 let lastNotice = 0;
 
 function enterLive(next: RoomConnection): void {
@@ -440,7 +445,7 @@ function drawLive(delta: number, time: number): void {
       help.update("lobby");
       waiting.show();
     }
-    platformScene.updatePlayers(Object.values(state.players));
+    platformScene.updatePlayers(withPositions(state.players, playerSmoother.step(positionsOf(state.players), delta)));
     waiting.update(waitingView(state, live.me));
     platformBoard.update(state, live.me, platformScene.map.objects);
     liveState = state;
@@ -455,9 +460,10 @@ function drawLive(delta: number, time: number): void {
     endScreen.update(state.phase);
     help.update(state.phase);
   }
+  // Draw players and items gliding between the room's 20 updates a second instead of stepping.
   train.updateState({
-    players: Object.values(state.players),
-    items: Object.values(state.items),
+    players: withPositions(state.players, playerSmoother.step(positionsOf(state.players), delta)),
+    items: withPositions(state.items, itemSmoother.step(positionsOf(state.items), delta)),
     hazards: Object.values(state.hazards),
   });
   hud.update(hudView(state.journey));
