@@ -49,6 +49,12 @@ export const FIRE_SPREAD_SECONDS = 15; // plan §2, from #30
 
 /** Seconds between new hazards. plan §3 */
 export const HAZARD_INTERVAL_SECONDS = 12;
+/**
+ * Grace period: seconds before the first hazard of a run, for every crew size (#335). The
+ * per-crew intervals apply after it. A first bot play-test lost a non-repairing crew of 4 in
+ * about 30 s with the first hazard at 9 s, which leaves new crews no time to learn the stations.
+ */
+export const FIRST_HAZARD_SECONDS = 20;
 /** Seconds between new hazards once the late part of the journey starts. plan §3 */
 export const HAZARD_INTERVAL_LATE_SECONDS = 7;
 /** Share of WIN_DISTANCE after which the late interval applies. plan §3 */
