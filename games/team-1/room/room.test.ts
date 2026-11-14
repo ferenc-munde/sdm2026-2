@@ -1,10 +1,12 @@
-// The Last Train (Team 1) on the real platform host (issue #240): a server on a free port and two
+
+ // The Last Train (Team 1) on the real platform host (issue #240): a server on a free port and two
 // real clients. The first half uses the platform's connection helper directly; the second half
 // goes through the client's own adapters (client/room-adapters.ts), as the browser does.
 import { afterEach, describe, expect, it } from "vitest";
 import { hostRoom, joinRoomByCode, type GameConnection, type ServerAddress } from "@sdm/core/client";
 import { startTestServer, type TestServer } from "@sdm/host/testing";
 import config from "../config/game.json";
+import { SECTIONS, sectionAt } from "../shared/train-layout";
 import { createRoomAdapters, type RoomAdapters } from "../client/room-adapters";
 import type { SessionEvent } from "../client/session-adapter.mjs";
 import { GAME_ID, type TrainInput, type TrainState } from "../shared/game";
@@ -125,6 +127,73 @@ describe("team-1 room on the platform host", () => {
     }, 8000);
     expect(host.state().tasks.at(0)?.progress).toBe(100);
   }, 12000);
+
+  it("syncs progress for all five section repairs and wins only after the last repair", async () => {
+    const address = await boot({ roundSeconds: 60, taskCount: 5, repairStep: 50 });
+    const host = track(await hostRoom<TrainState, TrainInput>(address, { name: "Ada" }));
+    const code = await waitFor(() => host.code());
+    const guest = track(await joinRoomByCode<TrainState, TrainInput>(address, code, { name: "Bo" }));
+    await waitFor(() => host.state().players?.size === 2 && guest.state().players?.size === 2);
+
+    host.send({ type: "start" });
+    await waitFor(() => host.state().phase === "playing" && guest.state().phase === "playing");
+
+    expect(host.state().tasks).toHaveLength(5);
+    expect(host.state().tasks.find((task) => task.id === "instruments")?.section).toBe("control");
+    expect(host.state().tasks.find((task) => task.id === "passenger-lights")?.section).toBe("passenger");
+
+    for (const task of host.state().tasks) {
+      let currentSection = sectionAt(host.state().players.get(host.sessionId)?.x ?? 0.18);
+      const targetIndex = SECTIONS.indexOf(task.section as (typeof SECTIONS)[number]);
+
+      // Move the host player into the section containing the current task.
+      while (currentSection !== task.section) {
+        const currentIndex = SECTIONS.indexOf(currentSection);
+        host.send({ type: "move", x: targetIndex > currentIndex ? 1 : -1, z: 0 });
+
+        await waitFor(
+          () => sectionAt(host.state().players.get(host.sessionId)?.x ?? 0.18) === task.section,
+          5000,
+        );
+
+        host.send({ type: "move", x: 0, z: 0 });
+        currentSection = task.section as (typeof SECTIONS)[number];
+      }
+
+      // Brake calibration uses its own ordered three-action sequence.
+      // All other tasks continue to use the generic repair input.
+      const taskActions: Array<{ input: TrainInput; progress: number }> =
+        task.id === "brakes"
+          ? [
+              { input: { type: "brake-calibrate", action: "apply-pressure" }, progress: 33 },
+              { input: { type: "brake-calibrate", action: "hold-pressure" }, progress: 67 },
+              { input: { type: "brake-calibrate", action: "release-pressure" }, progress: 100 },
+            ]
+          : [
+              { input: { type: "repair" }, progress: 50 },
+              { input: { type: "repair" }, progress: 100 },
+            ];
+
+      for (const action of taskActions) {
+        host.send(action.input);
+
+        // The host receives the authoritative progress update.
+        await waitFor(
+          () => host.state().tasks.find((entry) => entry.id === task.id)?.progress === action.progress,
+        );
+
+        // The guest must receive the same authoritative progress update.
+        await waitFor(
+          () => guest.state().tasks.find((entry) => entry.id === task.id)?.progress === action.progress,
+        );
+      }
+    }
+
+    await waitFor(() => host.state().phase === "victory" && guest.state().phase === "victory");
+
+    expect([...host.state().tasks].every((task) => task.progress === 100)).toBe(true);
+    expect([...guest.state().tasks].every((task) => task.progress === 100)).toBe(true);
+  }, 30000);
 });
 
 describe("team-1 client adapters against the platform host", () => {
