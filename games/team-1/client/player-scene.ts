@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { GameClientSnapshot } from "./game-state-adapter.mjs";
 import { toPlayerViewModels } from "./presentation-model.mjs";
 import { TRAIN_LAYOUT } from "./environment/TrainEnvironment";
+import { advanceTrainMotion } from "./environment/effects/TrainMotionEffects";
 import { createScene } from "./scene";
 
 export type TrainScene = {
@@ -15,6 +16,13 @@ export type SceneRendererFactory = (
 
 /** How far the players stay from the walls of the train, in world units. */
 export const PLAYER_INSET = { length: 1.5, width: 1.25 } as const;
+
+/** Framing that leaves room for both exterior tracks while keeping the full train prominent. */
+export function trainCameraViewHeight(aspectRatio: number): number {
+  const safeAspect = Math.max(0.25, aspectRatio);
+  const viewWidth = TRAIN_LAYOUT.length + 10;
+  return Math.max(TRAIN_LAYOUT.width + 9.2, viewWidth / safeAspect);
+}
 
 function createWebGLRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
@@ -39,8 +47,10 @@ export function mountTrainScene(
   }
 
   const scene = createScene();
-  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
-  camera.position.set(0, 24, 0);
+  const railway = scene.userData.railwayMotion as THREE.Group;
+  const trainRoot = scene.userData.trainMotionRoot as THREE.Group;
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 120);
+  camera.position.set(0, 31, 9);
   camera.up.set(0, 0, -1);
   camera.lookAt(0, 0, 0);
 
@@ -85,13 +95,7 @@ export function mountTrainScene(
     const height = canvas.clientHeight;
     if (width === 0 || height === 0) return;
     const aspect = width / height;
-    // Tighter framing gives the train more of the available canvas while retaining
-    // a small margin at both laptop and narrow viewport aspect ratios.
-    const layoutPadding = 0.45;
-    const viewHeight = Math.max(
-      TRAIN_LAYOUT.width + layoutPadding * 2,
-      (TRAIN_LAYOUT.length + layoutPadding * 2) / aspect,
-    );
+    const viewHeight = trainCameraViewHeight(aspect);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(width, height, false);
     camera.left = (-viewHeight * aspect) / 2;
@@ -108,9 +112,10 @@ export function mountTrainScene(
   let frame = 0;
   let lastFrameAt = performance.now();
   const draw = (now: number) => {
-    const elapsedSeconds = Math.min(100, Math.max(0, now - lastFrameAt)) / 1000;
+    const elapsedSeconds = Math.max(0, now - lastFrameAt) / 1000;
     lastFrameAt = now;
     const smoothing = 1 - Math.exp(-14 * elapsedSeconds);
+    advanceTrainMotion(railway, trainRoot, elapsedSeconds);
     for (const group of playerMeshes.values()) {
       const target = group.userData.targetPosition as THREE.Vector3 | undefined;
       if (target) group.position.lerp(target, smoothing);
@@ -126,7 +131,7 @@ export function mountTrainScene(
       const visible = new Set(players.map((player) => player.id));
       for (const [id, group] of playerMeshes) {
         if (!visible.has(id)) {
-          scene.remove(group);
+          trainRoot.remove(group);
           disposePlayerResources(group);
           playerMeshes.delete(id);
         }
@@ -136,7 +141,7 @@ export function mountTrainScene(
         if (!group) {
           group = createPlayer(player.color);
           playerMeshes.set(player.id, group);
-          scene.add(group);
+          trainRoot.add(group);
         }
         const targetX = -TRAIN_LAYOUT.length / 2 + PLAYER_INSET.length + player.x * (TRAIN_LAYOUT.length - PLAYER_INSET.length * 2);
         const targetZ = -TRAIN_LAYOUT.width / 2 + PLAYER_INSET.width + player.z * (TRAIN_LAYOUT.width - PLAYER_INSET.width * 2);
