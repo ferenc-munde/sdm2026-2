@@ -21,6 +21,11 @@ describe("fixedHazardsBetween", () => {
     expect(fixedHazardsBetween(withHazard("course"), makeState({ phase: "playing" }))).toEqual([{ id: "course-1", kind: "course" }]);
   });
 
+  it("still calls a cleared course warning fixed while a breach drains the hull", () => {
+    const next = makeState({ phase: "playing", journey: { fuel: 100, hull: 99.9, distance: 0, speedFactor: 1 } });
+    expect(fixedHazardsBetween(withHazard("course"), next)).toEqual([{ id: "course-1", kind: "course" }]);
+  });
+
   it("does not call a failed course warning fixed", () => {
     const next = makeState({ phase: "playing", journey: { fuel: 100, hull: 88, distance: 0, speedFactor: 1 } });
     expect(fixedHazardsBetween(withHazard("course"), next)).toEqual([]);

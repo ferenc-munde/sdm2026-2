@@ -185,7 +185,8 @@ function buildStation(kind: StationKind, position: { x: number; y: number }): Gr
 
   // A low base in the station's colour keeps stations easy to tell apart; the model on it shows
   // what the station is (visual pass).
-  const base = new Mesh(new BoxGeometry(46, 2, 46), mat(STATION_COLORS[kind], { roughness: 0.7 }));
+  // Its own material, so the status tint (#296) lights this pad only.
+  const base = new Mesh(new BoxGeometry(46, 2, 46), ownMat(STATION_COLORS[kind], { roughness: 0.7 }));
   base.position.y = 1;
   base.receiveShadow = true;
   base.userData = { kind: "stationPad", stationKind: kind };
@@ -579,18 +580,14 @@ export function buildTrainScene(
     const hazards = next.hazards ?? [];
 
     if (next.stationStatuses) {
+      // Only the station's own pad is tinted: the models share cached materials with the train.
       for (const station of mapGroup.children.filter((child) => child.userData.kind === "station")) {
         const status = next.stationStatuses[station.userData.stationKind as StationKind];
         station.userData.status = status;
-        station.visible = true;
-        for (const child of station.children) {
-          if (!(child instanceof Mesh) || !(child.material instanceof MeshStandardMaterial)) continue;
-          child.material.emissive.set(status === "disabledByFire" ? "#ff1f1f" : status === "inUse" ? "#ffd166" : "#000000");
-          child.material.emissiveIntensity = status === "usable" ? 0 : 0.8;
-          child.material.opacity = status === "disabledByFire" ? 0.45 : 1;
-          child.material.transparent = status === "disabledByFire";
-          child.material.needsUpdate = true;
-        }
+        const pad = station.children.find((child) => child.userData.kind === "stationPad");
+        if (!(pad instanceof Mesh) || !(pad.material instanceof MeshStandardMaterial)) continue;
+        pad.material.emissive.set(status === "disabledByFire" ? "#ff1f1f" : status === "inUse" ? "#ffd166" : "#000000");
+        pad.material.emissiveIntensity = status === "usable" ? 0 : 0.9;
       }
     }
 
