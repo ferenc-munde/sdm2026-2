@@ -20,12 +20,26 @@ export interface ServerAddress {
   ws: string;
 }
 
+/** The parts of `window.location` the server address is built from. */
+export interface PageLocation {
+  protocol: string;
+  hostname: string;
+  host: string;
+  pathname: string;
+}
+
 /**
- * The server address for this page. `VITE_SERVER_URL` (set at build time) wins; otherwise the
- * game server runs next to the page on port 2567, as `pnpm run server` does locally.
+ * The server address for this page (#22):
+ * 1. `VITE_SERVER_URL`, set at build time, wins.
+ * 2. On the Vite dev server (`pnpm run dev`), the game server runs next to it on port 2567.
+ * 3. Otherwise the game server itself served this page (`@sdm/host` serves `dist/`), so it is the
+ *    page's own origin and folder; that also works behind the platform gateway under `/team-3/`.
  */
-export function serverAddress(page: { protocol: string; hostname: string }, configured?: string): ServerAddress {
-  const http = (configured && configured.trim()) || `${page.protocol}//${page.hostname}:2567`;
+export function serverAddress(page: PageLocation, configured?: string, devServer = false): ServerAddress {
+  const folder = page.pathname.replace(/[^/]*$/, "");
+  const http =
+    (configured && configured.trim()) ||
+    (devServer ? `${page.protocol}//${page.hostname}:2567` : `${page.protocol}//${page.host}${folder}`);
   const clean = http.replace(/\/+$/, "");
   return { http: clean, ws: clean.replace(/^http/, "ws") };
 }

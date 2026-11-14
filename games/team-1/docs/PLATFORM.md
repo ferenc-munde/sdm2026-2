@@ -67,7 +67,7 @@ Every tick while playing: players move by `playerSpeed / tickRate` world units, 
 | `reconnectSeconds` | 20 | How long a dropped player's seat is held (platform) |
 | `roundSeconds` | 180 | Length of a run |
 | `playerSpeed` | 5 | Walking speed in world units per second (the train is 26 long) |
-| `taskCount` | 3 | Repairs per run, picked from the catalogue with `ctx.random` (at most 3 today) |
+| `taskCount` | 5 | Repairs per run, picked from the catalogue with `ctx.random` |
 | `repairStep` | 10 | Progress points per `repair` input |
 | `conditionDecayPerSecond` | 0.4 | Condition lost per second while a repair is open |
 | `repairConditionBonus` | 10 | Condition won back per completed repair |

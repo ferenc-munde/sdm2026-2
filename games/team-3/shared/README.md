@@ -31,6 +31,7 @@ The platform room (`@sdm/host`, connected in #80) will hold one `GameSession` pe
 | [map/map.ts](map/map.ts) | The three-car train: walls, narrow doors, stations, hazard spots, item and player starts; `validateMap` | `Abmuminfav` (#83) |
 | [map/platform.ts](map/platform.ts) | The lobby platform: walls, player starts, and where the platform objects stand; `validatePlatform` | `Abmuminfav` (#182) |
 | [movement/movement.ts](movement/movement.ts) | Walking in 8 directions at constant speed, stopping at walls, passing doors; works on any map with walls | `Abmuminfav` (#86) |
+| [movement/dash.ts](movement/dash.ts) | Dash with empty hands: a short burst in the facing direction, stops at walls, 1.5 s cooldown, not while stunned | `Abmuminfav` (#228) |
 
 ### The run
 | File | What it does | By |
@@ -43,6 +44,7 @@ The platform room (`@sdm/host`, connected in #80) will hold one `GameSession` pe
 | [run/random.ts](run/random.ts) | The seeded random source | `favyabils234-hash` (#50) |
 | [journey/journey.ts](journey/journey.ts) | Fuel drains, speed follows fuel (and stops on an engine fire), distance grows, hazards wear the hull. **Owns all continuous hull damage** | `Abmuminfav` (#102) |
 | [items/items.ts](items/items.ts) | Pick up the nearest item, one at a time, drop where you stand; two players grabbing one item: first request wins | `Abmuminfav` (#123) |
+| [items/actionTarget.ts](items/actionTarget.ts) | What tap-E would act on now (coal station, item to pick up or drop, the lever), in the room's own order, for the client highlight | `Abmuminfav` (#295) |
 
 ### Lobby
 | File | What it does | By |

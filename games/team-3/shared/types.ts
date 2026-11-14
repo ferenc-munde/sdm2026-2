@@ -45,6 +45,10 @@ export interface Player {
   velocity?: Vec2;
   /** Remaining time during which movement input is ignored after hitting a wall. */
   stunnedSeconds?: number;
+  /** Time left in a dash (#228); while it runs, walking input is ignored. */
+  dashSeconds?: number;
+  /** Time until the player can dash again (#228). */
+  dashCooldown?: number;
 }
 
 export type StationKind = "engine" | "coalDispenser" | "wrenchRack" | "extinguisherRack" | "steeringConsole";

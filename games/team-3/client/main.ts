@@ -6,9 +6,10 @@
 // a mock waiting room, and buttons for the end screens and sounds, with no server needed.
 
 import { createConductor } from "./conductor.ts";
+import { COURSE_FX_SECONDS, courseFailed, courseFx, failureDirection } from "./courseFx.ts";
 import { createHelp } from "./help.ts";
 import { createCourseWarning } from "./courseWarning.ts";
-import { WebGLRenderer } from "three";
+import { ACESFilmicToneMapping, PCFSoftShadowMap, WebGLRenderer } from "three";
 import { FUEL_MAX, HULL_MAX, LOW_FUEL_THRESHOLD, WIN_DISTANCE } from "../shared/constants.ts";
 import type { ClientMessage, InputMessage } from "../shared/messages.ts";
 import type { GameState, Phase } from "../shared/types.ts";
@@ -28,13 +29,20 @@ import { waitingView } from "./waitingRoomModel.ts";
 import { platformSpawn } from "../shared/map/platform.ts";
 import { errorText } from "./lobbyModel.ts";
 import { createActionKeys } from "./actionKeys.ts";
+import { localActionHighlight } from "./actionHighlight.ts";
+import { createSmoother, withPositions } from "./smoothing.ts";
 import { createRoom, joinRoomByCode, serverAddress, type RoomConnection } from "./roomConnection.ts";
 import { joinErrorText } from "./roomLinks.ts";
 import { createSharedLinkJoin } from "./sharedLinkJoin.ts";
+import { stationStatus } from "../shared/stations/status.ts";
+import { fixedHazardsBetween } from "../shared/hazards/feedback.ts";
 
 /** `?demo` opens the hand-check page; otherwise the page plays a real room. */
 const demo = new URLSearchParams(window.location.search).has("demo");
-const server = serverAddress(window.location, import.meta.env?.VITE_SERVER_URL as string | undefined);
+// The page caption names the hand-check page; the real game has the HUD and hints there instead.
+const caption = document.querySelector<HTMLElement>(".title");
+if (caption && !demo) caption.hidden = true;
+const server = serverAddress(window.location, import.meta.env?.VITE_SERVER_URL as string | undefined, import.meta.env?.DEV === true);
 import { createPlatformBoard } from "./platformBoard.ts";
 
 const container = document.getElementById("app");
@@ -42,6 +50,11 @@ if (!container) throw new Error("#app is missing from index.html");
 
 const renderer = new WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// Real shadows and filmic colour (visual pass): the crew and props sit on the floor.
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = PCFSoftShadowMap;
+renderer.toneMapping = ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
 renderer.setSize(container.clientWidth, container.clientHeight);
 container.appendChild(renderer.domElement);
 
@@ -218,6 +231,41 @@ const addDemoButton = (label: string, phase: Phase): void => {
 };
 addDemoButton("Show win screen", "won");
 addDemoButton("Show lose screen", "lost");
+
+// Course-hazard feedback (#219): a failed event shakes the camera and rolls the hull.
+let fxStart: number | null = null;
+let fxDirection: 1 | -1 = 1;
+let fxBase: { x: number; y: number; z: number } | null = null;
+
+function triggerCourseFx(direction: 1 | -1): void {
+  fxStart = performance.now();
+  fxDirection = direction;
+  fxBase = { x: train.camera.position.x, y: train.camera.position.y, z: train.camera.position.z };
+}
+
+function applyCourseFx(time: number): void {
+  if (fxStart === null) return;
+  const elapsed = (time - fxStart) / 1000;
+  const view = courseFx(elapsed, fxDirection);
+  if (fxBase) train.camera.position.set(fxBase.x + view.shakeX, fxBase.y + view.shakeY, fxBase.z);
+  // The train runs along x, so a sideways lurch (the rules push across the track) is a roll around x.
+  train.hullGroup.rotation.x = view.tilt;
+  if (elapsed >= COURSE_FX_SECONDS) {
+    fxStart = null;
+    train.hullGroup.rotation.x = 0;
+    resize();
+  }
+}
+
+const courseButton = document.createElement("button");
+courseButton.type = "button";
+courseButton.textContent = "Course fail";
+courseButton.style.cssText =
+  "padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.18);" +
+  "background:rgba(16,16,24,.8);color:#e6e6ee;cursor:pointer;font:inherit";
+courseButton.addEventListener("click", () => triggerCourseFx(1));
+demoBar.append(courseButton);
+
 if (demo) document.body.append(demoBar);
 
 // One button per sound, so every cue can be checked by hand.
@@ -342,6 +390,10 @@ function showToast(text: string): void {
 }
 
 let liveState: GameState | null = null;
+const playerSmoother = createSmoother();
+const itemSmoother = createSmoother();
+const positionsOf = (records: Record<string, { position: { x: number; y: number } }>) =>
+  Object.fromEntries(Object.entries(records).map(([id, record]) => [id, record.position]));
 let lastNotice = 0;
 
 function enterLive(next: RoomConnection): void {
@@ -374,7 +426,7 @@ async function leaveLive(): Promise<void> {
 }
 
 /** Draws one frame of the real room and keeps the screens in step with its phase. */
-function drawLive(delta: number): void {
+function drawLive(delta: number, time: number): void {
   const live = connection!;
   const state = live.view();
   const notice = live.notice();
@@ -389,6 +441,7 @@ function drawLive(delta: number): void {
     showToast(notice.message ?? errorText(notice.error));
   }
   if (!state || !state.players[live.me]) {
+    platformScene.updateHighlight(null, 0);
     renderer.render(platformScene.scene, platformScene.camera);
     return;
   }
@@ -401,7 +454,12 @@ function drawLive(delta: number): void {
       help.update("lobby");
       waiting.show();
     }
-    platformScene.updatePlayers(Object.values(state.players));
+    platformScene.updatePlayers(withPositions(state.players, playerSmoother.step(positionsOf(state.players), delta)));
+    platformScene.updateMotion(delta);
+    platformScene.updateHighlight(
+      localActionHighlight(state, live.me, { train: train.map, platform: platformScene.map }),
+      time / 1000,
+    );
     waiting.update(waitingView(state, live.me));
     platformBoard.update(state, live.me, platformScene.map.objects);
     liveState = state;
@@ -416,19 +474,36 @@ function drawLive(delta: number): void {
     endScreen.update(state.phase);
     help.update(state.phase);
   }
+  // Draw players and items gliding between the room's 20 updates a second instead of stepping.
   train.updateState({
-    players: Object.values(state.players),
-    items: Object.values(state.items),
+    players: withPositions(state.players, playerSmoother.step(positionsOf(state.players), delta)),
+    items: withPositions(state.items, itemSmoother.step(positionsOf(state.items), delta)),
     hazards: Object.values(state.hazards),
+    stationStatuses: stationStatus(state, train.map),
   });
+  train.updateMotion(
+    delta,
+    state.phase === "playing" ? state.journey.speedFactor : 0,
+    keyboard.current().interacting ? live.me : undefined,
+  );
+  train.updateHighlight(
+    localActionHighlight(state, live.me, { train: train.map, platform: platformScene.map }),
+    time / 1000,
+  );
   hud.update(hudView(state.journey));
   scenery.update(delta, state.phase === "playing" ? state.journey.speedFactor : 0);
   if (liveState && liveState.phase !== "lobby") {
     for (const name of eventsBetween(liveState, state)) sound.play(name);
+    if (fixedHazardsBetween(liveState, state).length > 0) showToast("Fixed!");
   }
   courseWarning.update(state);
   conductor.update(state);
+  if (liveState && liveState.phase !== "lobby" && courseFailed(liveState, state)) {
+    triggerCourseFx(failureDirection(liveState, state));
+  }
   liveState = state;
+  train.updateEffects(time / 1000);
+  applyCourseFx(time);
   renderer.render(train.scene, train.camera);
 }
 
@@ -442,12 +517,13 @@ const walk = (time: number): void => {
   lastTime = time;
 
   if (connection) {
-    drawLive(delta);
+    drawLive(delta, time);
     requestAnimationFrame(walk);
     return;
   }
   if (!demo) {
     // The main menu: show the empty platform behind it.
+    platformScene.updateHighlight(null, 0);
     renderer.render(platformScene.scene, platformScene.camera);
     requestAnimationFrame(walk);
     return;
@@ -456,6 +532,8 @@ const walk = (time: number): void => {
   // While the crew waits, draw the platform instead of the train (#146).
   if (waitingMode) {
     if (mockState) platformBoard.update(mockState, me, platformScene.map.objects);
+    platformScene.updateMotion(delta);
+    platformScene.updateHighlight(null, 0);
     renderer.render(platformScene.scene, platformScene.camera);
     requestAnimationFrame(walk);
     return;
@@ -485,6 +563,7 @@ const walk = (time: number): void => {
     const journey = { fuel, hull, distance: progress * WIN_DISTANCE, speedFactor };
     hud.update(hudView(journey));
     scenery.update(delta, speedFactor);
+    train.updateMotion(delta, speedFactor);
 
     // Sound cues come from diffing the states, exactly as they will in the room.
     const demoState: GameState = {
@@ -516,6 +595,9 @@ const walk = (time: number): void => {
     }
     courseWarning.update(demoState);
     conductor.update(demoState);
+    if (previousDemoState && courseFailed(previousDemoState, demoState)) {
+      triggerCourseFx(failureDirection(previousDemoState, demoState));
+    }
     previousDemoState = demoState;
 
     if (progress >= 1) {
@@ -528,6 +610,10 @@ const walk = (time: number): void => {
   }
 
 
+  if (demoPhase !== "playing") train.updateMotion(delta, 0);
+  train.updateHighlight(null, 0);
+  train.updateEffects(time / 1000);
+  applyCourseFx(time);
   renderer.render(train.scene, train.camera);
   requestAnimationFrame(walk);
 };
