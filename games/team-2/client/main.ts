@@ -79,11 +79,9 @@ function update() {
     hud.updateJourney(view.journey);
     trainScene?.setSpeed(view.speed);
   }
-  // The crew is always drawn from the game state, one marker per entry of `players`.
-  trainScene?.setPlayers(
-    Array.from(state.players, ([id, player]) => ({ id, x: player.x, y: player.y, eliminated: player.eliminated })),
-    session.playerId,
-  );
+  // Draw players and items from the live game state every frame.
+  trainScene?.setPlayers(state.players, session.playerId);
+  trainScene?.setItems(state.items);
   trainScene?.setPaused(developerTools && demoPaused);
   speedLabel.value = `${demoSpeed.toFixed(1)}x`;
   pauseButton.textContent = demoPaused ? "Resume scenery" : "Pause scenery";
