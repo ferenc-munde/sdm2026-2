@@ -495,6 +495,8 @@ function drawLive(delta: number, time: number): void {
   if (liveState && liveState.phase !== "lobby") {
     for (const name of eventsBetween(liveState, state)) sound.play(name);
     if (fixedHazardsBetween(liveState, state).length > 0) showToast("Fixed!");
+  } else if (liveState?.phase === "lobby" && state.phase === "playing") {
+    sound.play("depart"); // the countdown just ended (#401)
   }
   courseWarning.update(state);
   conductor.update(state);

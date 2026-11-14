@@ -10,7 +10,7 @@
 import { LOW_FUEL_THRESHOLD } from "../shared/constants.ts";
 import type { GameState } from "../shared/types.ts";
 
-export type SoundName = "hazard" | "repairDone" | "lowFuel" | "win" | "lose";
+export type SoundName = "hazard" | "repairDone" | "lowFuel" | "depart" | "win" | "lose";
 
 /** One beep: a frequency and how long it lasts. */
 export interface Note {
@@ -51,6 +51,14 @@ export const SOUNDS: Record<SoundName, SoundSpec> = {
       { frequency: 440, seconds: 0.14 },
     ],
   },
+  depart: {
+    type: "triangle",
+    volume: 0.22,
+    notes: [
+      { frequency: 784, seconds: 0.14 },
+      { frequency: 1046, seconds: 0.22 },
+    ],
+  },
   win: {
     type: "sine",
     volume: 0.2,
@@ -81,6 +89,8 @@ export function eventsBetween(previous: GameState, next: GameState): SoundName[]
   if (next.phase !== previous.phase) {
     if (next.phase === "won") return ["win"];
     if (next.phase === "lost") return ["lose"];
+    // The host's confirmed departure, after the 5 s countdown (#385/#401).
+    if (previous.phase === "lobby" && next.phase === "playing") return ["depart"];
   }
 
   const before = hazardIds(previous);
