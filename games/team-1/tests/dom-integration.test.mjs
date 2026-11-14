@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { Window } from "happy-dom";
 import { createTestViteServer } from "./helpers/vite-loader.mjs";
 
@@ -36,6 +37,13 @@ try {
       console.error(`FAIL ${name}: ${error.message}`);
     }
   }
+
+  await test("HTML loads the single TypeScript application entry point", async () => {
+    const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+    assert.match(html, /<main id="app"/);
+    assert.match(html, /src="\/client\/main\.ts"/);
+    assert.doesNotMatch(html, /src="\/client\/main\.js"/);
+  });
 
   await test("lobby DOM connects, announces player changes, enforces visible seats, and recovers from errors", async () => {
     app.querySelector("#join-name").value = "Passenger";
@@ -130,15 +138,18 @@ try {
       connectionState: "reconnecting",
       secondsRemaining: 19,
       trainCondition: 42,
+      localPlayerId: adapter.getSnapshot().players[0].id,
       repairs: { completed: 1, total: 3 },
-      tasks: [{ id: "wires", label: "Reconnect signal wires", status: "in-progress", progress: 55 }],
-      players: [{ ...adapter.getSnapshot().players[0], connected: false }],
+      tasks: [{ id: "wires", label: "Reconnect signal wires", section: "control", status: "in-progress", progress: 55 }],
+      players: [{ ...adapter.getSnapshot().players[0], section: "control", connected: false }],
     });
     assert.equal(root.querySelector("#countdown").textContent, "00:19");
     assert.equal(root.querySelector("#countdown").classList.contains("is-urgent"), true);
     assert.equal(root.querySelector("#condition-value").textContent, "42%");
     assert.equal(root.querySelector("#condition-meter").getAttribute("aria-valuenow"), "42");
     assert.equal(root.querySelector("#repair-count").textContent, "1 / 3");
+    assert.equal(root.querySelector("#repair-hint").dataset.mode, "ready");
+    assert.match(root.querySelector("#repair-hint").textContent, /PRESS E TO REPAIR/);
     assert.match(root.querySelector("#task-list").textContent, /Reconnect signal wires/);
     assert.equal(root.querySelector("#task-list .task-status").textContent, "IN PROGRESS");
     assert.equal(root.querySelector("#game-connection").textContent, "RECONNECTING");
@@ -162,6 +173,14 @@ try {
     dispose();
     assert.equal(sceneDisposed, true);
     assert.equal(root.childElementCount, 0);
+  });
+
+  await test("page exit disposes the player controller and gameplay view", async () => {
+    app.querySelector("#board-train").click();
+    assert.ok(animationFrames.size > 0);
+    browser.dispatchEvent(new browser.Event("pagehide"));
+    assert.equal(animationFrames.size, 0);
+    assert.equal(app.querySelector("#game-screen").childElementCount, 0);
   });
 
   console.log(`${passed}/${passed + failures.length} DOM integration tests passed.`);

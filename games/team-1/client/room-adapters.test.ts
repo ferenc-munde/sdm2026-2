@@ -34,16 +34,17 @@ describe("toSnapshot", () => {
     other.progress = 40;
     lastTrain.disconnect?.(state, "second", ctx);
 
-    const snapshot = toSnapshot(state, "connected");
+    const snapshot = toSnapshot(state, "connected", "first");
     expect(snapshot.phase).toBe("playing");
+    expect(snapshot.localPlayerId).toBe("first");
     expect(snapshot.secondsRemaining).toBe(ctx.config.roundSeconds);
     expect(snapshot.players).toEqual([
-      { id: "first", name: "Ada", connected: true, position: { x: state.players.get("first")?.x, z: 0.5 }, color: "#d6ac68" },
-      { id: "second", name: "Bo", connected: false, position: { x: state.players.get("second")?.x, z: 0.5 }, color: "#8bb8a4" },
+      { id: "first", name: "Ada", connected: true, position: { x: state.players.get("first")?.x, z: 0.5 }, color: "#d6ac68", section: "electrical" },
+      { id: "second", name: "Bo", connected: false, position: { x: state.players.get("second")?.x, z: 0.5 }, color: "#8bb8a4", section: "electrical" },
     ]);
-    expect(snapshot.repairs).toEqual({ completed: 1, total: 3 });
-    expect(snapshot.tasks.map((entry) => entry.status)).toEqual(["complete", "in-progress", "available"]);
-    expect(snapshot.tasks[1]).toMatchObject({ id: other.id, label: other.label, progress: 40 });
+    expect(snapshot.repairs).toEqual({ completed: 1, total: 5 });
+    expect(snapshot.tasks.map((entry) => entry.status)).toEqual(["complete", "in-progress", "available", "available", "available"]);
+    expect(snapshot.tasks[1]).toMatchObject({ id: other.id, label: other.label, progress: 40, section: other.section });
   });
 
   it("maps the end of a run to an outcome", () => {

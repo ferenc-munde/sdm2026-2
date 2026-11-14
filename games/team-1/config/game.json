@@ -5,7 +5,7 @@
   "reconnectSeconds": 20,
   "roundSeconds": 180,
   "playerSpeed": 5,
-  "taskCount": 3,
+  "taskCount": 5,
   "repairStep": 10,
   "conditionDecayPerSecond": 0.4,
   "repairConditionBonus": 10
