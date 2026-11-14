@@ -13,14 +13,19 @@ globalThis.ResizeObserver = class {
   observe() {}
   disconnect() { this.disconnected = true; }
 };
-const pendingFrames = new Set();
+const pendingFrames = new Map();
 let nextFrame = 1;
-globalThis.requestAnimationFrame = () => {
+globalThis.requestAnimationFrame = (callback) => {
   const id = nextFrame++;
-  pendingFrames.add(id);
+  pendingFrames.set(id, callback);
   return id;
 };
 globalThis.cancelAnimationFrame = (id) => pendingFrames.delete(id);
+function advanceFrame(now) {
+  const callbacks = [...pendingFrames.values()];
+  pendingFrames.clear();
+  for (const callback of callbacks) callback(now);
+}
 
 const vite = await createTestViteServer();
 try {
@@ -91,7 +96,15 @@ try {
     scene.train.update(updated);
     const [updatedFirst, updatedSecond] = scene.avatars();
     assert.equal(updatedFirst.uuid, first.uuid);
-    assert.ok(Math.abs(updatedFirst.position.x - worldX(0.75)) < 1e-9);
+    assert.equal(updatedFirst.position.x, worldX(snapshot.players[0].position.x), "rendered position waits for the next animation frame");
+    assert.equal(updatedFirst.userData.targetPosition.x, worldX(0.75));
+    const frameStart = performance.now();
+    advanceFrame(frameStart + 16);
+    assert.ok(updatedFirst.position.x > worldX(snapshot.players[0].position.x));
+    assert.ok(updatedFirst.position.x < worldX(0.75), "the avatar eases toward the latest server position");
+    for (let index = 1; index <= 80; index += 1) advanceFrame(frameStart + index * 16);
+    assert.ok(Math.abs(updatedFirst.position.x - worldX(0.75)) < 0.001);
+    assert.equal(updated.players[0].position.x, 0.75, "visual smoothing does not change the received server snapshot");
     assert.equal(updatedFirst.children[0].material.opacity, 0.38);
     assert.equal(updatedSecond.uuid, second.uuid);
     scene.train.dispose();
