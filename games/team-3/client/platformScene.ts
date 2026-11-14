@@ -18,6 +18,7 @@ import {
   type Object3D,
 } from "three";
 import { createPlatformMap, type PlatformMap } from "../shared/map/platform.ts";
+import { advanceWalk, crewPose, smoothSpeed, speedBetween } from "./crewPose.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 import {
   PLAYER_COLORS,
@@ -49,6 +50,8 @@ export interface PlatformScene {
   mapGroup: Group;
   map: PlatformMap;
   updatePlayers(players: readonly RenderPlayer[]): void;
+  /** Walk/idle bob for the waiting crew (#294); call after `updatePlayers`. */
+  updateMotion(dt: number): void;
   dispose(): void;
 }
 
@@ -181,7 +184,7 @@ function buildPlayerGroup(player: RenderPlayer, seat: number, labelFactory: Labe
     new MeshStandardMaterial({ color, roughness: 0.6 }),
   );
   body.position.y = PLAYER_HEIGHT / 2;
-  body.userData = { kind: "playerBody", playerId: player.id, seat };
+  body.userData = { kind: "playerBody", playerId: player.id, seat, baseY: body.position.y };
   group.add(body);
 
   const label = labelFactory(player.name);
@@ -189,6 +192,7 @@ function buildPlayerGroup(player: RenderPlayer, seat: number, labelFactory: Labe
   group.add(label);
 
   group.position.set(player.position.x, 0, player.position.y);
+  group.userData.motion = { lastX: player.position.x, lastZ: player.position.y, speed: 0, phase: 0, seconds: 0 };
   return group;
 }
 
@@ -248,6 +252,40 @@ export function buildPlatformScene(
     );
   };
 
+  /** Walk bob and idle breathing for the waiting crew; the platform figures have no limbs (#294). */
+  const updateMotion = (dt: number): void => {
+    for (const group of playersGroup.children) {
+      const motion = group.userData.motion as
+        | { lastX: number; lastZ: number; speed: number; phase: number; seconds: number }
+        | undefined;
+      if (!motion) continue;
+      const measured = speedBetween(
+        { x: motion.lastX, y: motion.lastZ },
+        { x: group.position.x, y: group.position.z },
+        dt,
+      );
+      motion.speed = smoothSpeed(motion.speed, measured, dt);
+      motion.lastX = group.position.x;
+      motion.lastZ = group.position.z;
+      motion.phase = advanceWalk(motion.phase, motion.speed, dt);
+      if (Number.isFinite(dt) && dt > 0) motion.seconds += dt;
+
+      const pose = crewPose({
+        speed: motion.speed,
+        phase: motion.phase,
+        seconds: motion.seconds,
+        carrying: false,
+        interacting: false,
+      });
+      const body = group.children.find((child) => child.userData.kind === "playerBody");
+      if (body) {
+        const base = typeof body.userData.baseY === "number" ? body.userData.baseY : PLAYER_HEIGHT / 2;
+        body.position.y = base + pose.bob;
+        body.rotation.z = pose.legSwing * 0.12;
+      }
+    }
+  };
+
   updatePlayers(players);
 
   return {
@@ -257,6 +295,7 @@ export function buildPlatformScene(
     mapGroup,
     map,
     updatePlayers,
+    updateMotion,
     dispose: () => {
       drawnPlayers.clear();
       disposeObject(scene);

@@ -446,6 +446,7 @@ function drawLive(delta: number, time: number): void {
       waiting.show();
     }
     platformScene.updatePlayers(withPositions(state.players, playerSmoother.step(positionsOf(state.players), delta)));
+    platformScene.updateMotion(delta);
     waiting.update(waitingView(state, live.me));
     platformBoard.update(state, live.me, platformScene.map.objects);
     liveState = state;
@@ -466,6 +467,11 @@ function drawLive(delta: number, time: number): void {
     items: withPositions(state.items, itemSmoother.step(positionsOf(state.items), delta)),
     hazards: Object.values(state.hazards),
   });
+  train.updateMotion(
+    delta,
+    state.phase === "playing" ? state.journey.speedFactor : 0,
+    keyboard.current().interacting ? live.me : undefined,
+  );
   hud.update(hudView(state.journey));
   scenery.update(delta, state.phase === "playing" ? state.journey.speedFactor : 0);
   if (liveState && liveState.phase !== "lobby") {
@@ -506,6 +512,7 @@ const walk = (time: number): void => {
   // While the crew waits, draw the platform instead of the train (#146).
   if (waitingMode) {
     if (mockState) platformBoard.update(mockState, me, platformScene.map.objects);
+    platformScene.updateMotion(delta);
     renderer.render(platformScene.scene, platformScene.camera);
     requestAnimationFrame(walk);
     return;
@@ -535,6 +542,7 @@ const walk = (time: number): void => {
     const journey = { fuel, hull, distance: progress * WIN_DISTANCE, speedFactor };
     hud.update(hudView(journey));
     scenery.update(delta, speedFactor);
+    train.updateMotion(delta, speedFactor);
 
     // Sound cues come from diffing the states, exactly as they will in the room.
     const demoState: GameState = {
@@ -581,6 +589,7 @@ const walk = (time: number): void => {
   }
 
 
+  if (demoPhase !== "playing") train.updateMotion(delta, 0);
   train.updateEffects(time / 1000);
   applyCourseFx(time);
   renderer.render(train.scene, train.camera);

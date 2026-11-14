@@ -25,8 +25,17 @@ import {
   SpriteMaterial,
   type Object3D,
 } from "three";
-import { createTrainMap, type TrainMap } from "../shared/map/map.ts";
+import { createTrainMap, WALL_THICKNESS, type TrainMap } from "../shared/map/map.ts";
 import type { Hazard, Item, ItemKind, StationKind } from "../shared/types.ts";
+import {
+  advanceWalk,
+  crewPose,
+  smoothSpeed,
+  speedBetween,
+  wheelAngle,
+  type CrewPose,
+  WHEEL_RADIUS,
+} from "./crewPose.ts";
 import type { RenderPlayer } from "./renderPlayer.ts";
 
 /** One distinct colour per seat, in the order the players joined. */
@@ -105,6 +114,11 @@ export interface TrainScene {
   updateState(world: RenderWorld): void;
   /** Animates fire flicker and breach steam; call every frame with the elapsed seconds. */
   updateEffects(seconds: number): void;
+  /**
+   * Walk/idle/carry poses for the crew and the wheel roll (#294). `interactingPlayerId` is the
+   * local player while the interact key is held; other players' input is not synced.
+   */
+  updateMotion(dt: number, speedFactor: number, interactingPlayerId?: string): void;
   dispose(): void;
 }
 
@@ -185,6 +199,30 @@ function buildMapGroup(map: TrainMap): Group {
     mesh.name = `car-${car.index}`;
     mesh.userData = { kind: "car", index: car.index };
     group.add(mesh);
+
+    // Wheels just outside the car walls so they read from the angled camera (#294). They roll in
+    // `updateMotion` with the same speed factor as the scenery.
+    const tyreMaterial = new MeshStandardMaterial({ color: 0x2a2c33, roughness: 0.65 });
+    const hubMaterial = new MeshStandardMaterial({ color: 0xc9a227, roughness: 0.5 });
+    for (const side of [-1, 1]) {
+      for (const along of [-0.32, 0.32]) {
+        const wheel = new Group();
+        wheel.name = `wheel-${car.index}-${side}-${along}`;
+        wheel.userData = { kind: "wheel", car: car.index, side };
+        wheel.position.set(
+          car.x + along * car.width,
+          WHEEL_RADIUS / 2,
+          car.y + side * (car.depth / 2 + WALL_THICKNESS + 2),
+        );
+        const tyre = new Mesh(new CylinderGeometry(WHEEL_RADIUS, WHEEL_RADIUS, 4, 18), tyreMaterial);
+        tyre.rotation.x = Math.PI / 2; // axle along z, so the group rolls around z
+        wheel.add(tyre);
+        const hub = new Mesh(new CylinderGeometry(3, 3, 5, 10), hubMaterial);
+        hub.rotation.x = Math.PI / 2;
+        wheel.add(hub);
+        group.add(wheel);
+      }
+    }
   }
 
   for (const wall of map.walls) {
@@ -269,13 +307,41 @@ function buildPlayerGroup(
   group.add(shadow);
 
   const bodyHeight = PLAYER_HEIGHT * 0.62;
+  // Space under the body for the legs, so the walk cycle is readable from the camera (#294).
+  const legRoom = PLAYER_HEIGHT * 0.24;
+
+  // Legs and arms are pivot groups, so `applyCrewPose` can swing them from the hip and shoulder
+  // without moving the whole figure (#294). The side is +1 on the left, -1 on the right.
+  const limbMaterial = new MeshStandardMaterial({ color, roughness: 0.75 });
+  const limb = (kind: "leg" | "arm", side: number): void => {
+    const pivot = new Group();
+    pivot.name = `${kind}-${side > 0 ? "left" : "right"}`;
+    pivot.userData = { kind, side };
+    const mesh = new Mesh(
+      kind === "leg" ? new BoxGeometry(7, 16, 7) : new CapsuleGeometry(3.5, 10, 4, 8),
+      limbMaterial,
+    );
+    mesh.position.y = kind === "leg" ? -8 : -6;
+    pivot.add(mesh);
+    pivot.position.set(
+      0,
+      kind === "leg" ? legRoom : legRoom + bodyHeight * 0.82,
+      side * (kind === "leg" ? PLAYER_RADIUS * 0.6 : PLAYER_RADIUS * 1.05),
+    );
+    group.add(pivot);
+  };
+  limb("leg", 1);
+  limb("leg", -1);
+  limb("arm", 1);
+  limb("arm", -1);
+
   const body = new Mesh(
     new CapsuleGeometry(PLAYER_RADIUS * 0.85, bodyHeight - PLAYER_RADIUS * 1.7, 6, 16),
     new MeshStandardMaterial({ color, roughness: 0.55 }),
   );
-  body.position.y = bodyHeight / 2;
+  body.position.y = legRoom + bodyHeight / 2;
   body.name = `body-${player.id}`;
-  body.userData = { kind: "playerBody", playerId: player.id, seat };
+  body.userData = { kind: "playerBody", playerId: player.id, seat, baseY: body.position.y };
   group.add(body);
 
   const headRadius = PLAYER_RADIUS * 0.62;
@@ -283,13 +349,15 @@ function buildPlayerGroup(
     new SphereGeometry(headRadius, 16, 12),
     new MeshStandardMaterial({ color: color.clone().lerp(new Color("#ffe0c4"), 0.65), roughness: 0.5 }),
   );
-  head.position.y = bodyHeight + headRadius * 0.8;
+  head.position.y = legRoom + bodyHeight + headRadius * 0.8;
   head.name = "head";
+  head.userData = { kind: "playerHead", baseY: head.position.y };
   group.add(head);
 
   const nose = new Mesh(new BoxGeometry(5, 4, 4), new MeshStandardMaterial({ color: 0x20202a }));
   nose.position.set(headRadius, head.position.y, 0);
   nose.name = "facing";
+  nose.userData = { kind: "playerFacing", baseY: nose.position.y };
   group.add(nose);
 
   const label = labelFactory(player.name);
@@ -302,12 +370,44 @@ function buildPlayerGroup(
     const mesh = buildItemMesh(held, 0.7);
     mesh.name = `held-${held.id}`;
     mesh.position.set(PLAYER_RADIUS + 8, PLAYER_HEIGHT * 0.6, 0);
-    mesh.userData = { ...mesh.userData, kind: "heldItem", heldBy: player.id };
+    mesh.userData = { ...mesh.userData, kind: "heldItem", heldBy: player.id, baseY: mesh.position.y };
     group.add(mesh);
   }
 
   placePlayer(group, player);
+  // Walk-cycle state (#294), kept on the group so a rebuilt figure starts fresh.
+  group.userData.motion = { lastX: player.position.x, lastZ: player.position.y, speed: 0, phase: 0, seconds: 0 };
   return group;
+}
+
+interface MotionState {
+  lastX: number;
+  lastZ: number;
+  speed: number;
+  phase: number;
+  seconds: number;
+}
+
+/** Applies a pose to the limbs and the bobbing parts of one crew figure. */
+function applyCrewPose(group: Object3D, pose: CrewPose): void {
+  for (const child of group.children) {
+    switch (child.userData.kind) {
+      case "leg":
+        child.rotation.z = (child.userData.side as number) * pose.legSwing;
+        break;
+      case "arm":
+        child.rotation.z = (child.userData.side as number) * pose.armSwing + pose.armLift;
+        break;
+      case "playerBody":
+      case "playerHead":
+      case "playerFacing":
+      case "heldItem":
+        if (typeof child.userData.baseY === "number") child.position.y = child.userData.baseY + pose.bob;
+        break;
+      default:
+        break;
+    }
+  }
 }
 
 /** Moves a player figure to its position and turns it to face its walking direction. */
@@ -594,6 +694,32 @@ export function buildTrainScene(
     }
   };
 
+  // Wheels live in the static map; only their roll changes (#294).
+  const wheels = mapGroup.children.filter((child) => child.userData.kind === "wheel");
+
+  /** Crew walk/idle/carry poses and the wheel roll; pure presentation, driven by the frame clock. */
+  const updateMotion = (dt: number, speedFactor: number, interactingPlayerId?: string): void => {
+    for (const group of playersGroup.children) {
+      const motion = group.userData.motion as MotionState | undefined;
+      if (!motion) continue;
+      const from = { x: motion.lastX, y: motion.lastZ };
+      const measured = speedBetween(from, { x: group.position.x, y: group.position.z }, dt);
+      motion.speed = smoothSpeed(motion.speed, measured, dt);
+      motion.lastX = group.position.x;
+      motion.lastZ = group.position.z;
+      motion.phase = advanceWalk(motion.phase, motion.speed, dt);
+      if (Number.isFinite(dt) && dt > 0) motion.seconds += dt;
+
+      const carrying = group.children.some((child) => child.userData.kind === "heldItem");
+      const interacting = interactingPlayerId !== undefined && interactingPlayerId === group.userData.playerId;
+      applyCrewPose(
+        group,
+        crewPose({ speed: motion.speed, phase: motion.phase, seconds: motion.seconds, carrying, interacting }),
+      );
+    }
+    for (const wheel of wheels) wheel.rotation.z = wheelAngle(wheel.rotation.z, speedFactor, dt);
+  };
+
   updateState(world);
 
   return {
@@ -607,6 +733,7 @@ export function buildTrainScene(
     map,
     updateState,
     updateEffects,
+    updateMotion,
     dispose: () => {
       drawnPlayers.clear();
       drawnItems.clear();
