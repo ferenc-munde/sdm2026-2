@@ -15,6 +15,7 @@
 // the train. Movement (#7) uses the walls, not carAt(), so doorways never block anyone.
 
 import { CAR_COUNT, PLAYER_RADIUS } from "../constants.ts";
+import type { HazardSpot } from "../run/director.ts";
 import type { ItemKind, Station, StationKind, Vec2 } from "../types.ts";
 
 /** Length of one car along the train. */
@@ -52,12 +53,8 @@ export interface DoorLayout extends FloorBox {
   toCar: number;
 }
 
-/** A place where the hazard director may start a breach or fire (matches HazardSpot in run/director.ts). */
-export interface HazardSpotLayout {
-  id: string;
-  car: number;
-  position: Vec2;
-}
+/** A place where the hazard director may start a breach or fire: the director's own type (#316). */
+export type HazardSpotLayout = HazardSpot;
 
 /** Where an item lies when a run starts. */
 export interface ItemSpawn {
