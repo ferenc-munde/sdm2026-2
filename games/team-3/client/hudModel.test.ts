@@ -3,7 +3,9 @@ import { FUEL_MAX, HULL_MAX, LOW_FUEL_THRESHOLD, WIN_DISTANCE } from "../shared/
 import type { Journey } from "../shared/types.ts";
 import {
   BAR_COLORS,
+  FUEL_YELLOW_AT,
   barFraction,
+  fuelColor,
   fuelIsLow,
   hullFraction,
   hudView,
@@ -42,11 +44,21 @@ describe("bar fractions", () => {
 });
 
 describe("fuel colour", () => {
-  it("turns orange at or below the low-fuel threshold", () => {
+  it("turns red at or below the low-fuel threshold", () => {
     expect(fuelIsLow(journey({ fuel: LOW_FUEL_THRESHOLD + 1 }))).toBe(false);
     expect(fuelIsLow(journey({ fuel: LOW_FUEL_THRESHOLD }))).toBe(true);
     expect(fuelIsLow(journey({ fuel: LOW_FUEL_THRESHOLD - 1 }))).toBe(true);
     expect(fuelIsLow(journey({ fuel: 0 }))).toBe(true);
+  });
+
+  it("goes green, then yellow, then red (#217)", () => {
+    expect(fuelColor(100)).toBe(BAR_COLORS.fuel);
+    expect(fuelColor(FUEL_YELLOW_AT + 1)).toBe(BAR_COLORS.fuel);
+    expect(fuelColor(FUEL_YELLOW_AT)).toBe(BAR_COLORS.fuelMid);
+    expect(fuelColor(LOW_FUEL_THRESHOLD + 1)).toBe(BAR_COLORS.fuelMid);
+    expect(fuelColor(LOW_FUEL_THRESHOLD)).toBe(BAR_COLORS.fuelLow);
+    expect(fuelColor(0)).toBe(BAR_COLORS.fuelLow);
+    expect(fuelColor(Number.NaN)).toBe(BAR_COLORS.fuelLow);
   });
 });
 

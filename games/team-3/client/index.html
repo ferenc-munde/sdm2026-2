@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>The Last Train — renderer check</title>
+    <title>The Last Train</title>
     <style>
       html,
       body {
@@ -50,7 +50,7 @@
         transform: translateX(-50%);
         display: flex;
         gap: 16px;
-        width: min(860px, calc(100vw - 32px));
+        width: min(860px, calc(100vw - 220px));
         padding: 10px 14px;
         border-radius: 10px;
         background: rgba(16, 16, 24, 0.78);
@@ -168,6 +168,37 @@
       .mute[aria-pressed="true"] {
         border-color: rgba(247, 107, 21, 0.6);
         color: #f76b15;
+      }
+
+      /* How-to-play button (#26), stacked under the mute button so neither covers the HUD. */
+      .help-open {
+        position: fixed;
+        top: 56px;
+        right: 16px;
+        z-index: 40;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(16, 16, 24, 0.8);
+        color: #e6e6ee;
+        font: 12px system-ui, sans-serif;
+        cursor: pointer;
+      }
+
+      /* On a narrow window the HUD goes below the two tool buttons instead of under them (#217). */
+      @media (max-width: 760px) {
+        .hud {
+          top: 88px;
+          width: calc(100vw - 32px);
+        }
+
+        .mute {
+          top: 16px;
+        }
+
+        .help-open {
+          top: 52px;
+        }
       }
 
       /* Main menu (#12). */

@@ -1,18 +1,19 @@
 // Integration test: a real platform host on a free port, real clients over WebSocket.
 import { afterEach, describe, expect, it } from "vitest";
-import { Client, type Room } from "@colyseus/sdk";
+import { Client } from "@colyseus/sdk";
 import { GAME_ROOM_NAME } from "@sdm/core/shared";
 import { startTestServer, type TestServer } from "@sdm/host/testing";
 import config from "../config/game.json";
 import { hostGame, joinGame, type NetSession, type ServerAddress } from "../client/net.ts";
 import { GAME_ROOM_MESSAGE, LOBBY_ROOM_NAME, type GameRoomMessage } from "../shared/lobby.ts";
 import { CAR_FLOORS, SPAWN_CAR, contains } from "../shared/map.ts";
-import { configureMatchmaking, rooms } from "./index.ts";
+import { rooms } from "./index.ts";
 
 interface LobbyView {
 	status: string;
 	hostSessionId: string;
 	playerCount: number;
+	roomCode: string;
 }
 
 let running: TestServer | undefined;
@@ -20,7 +21,6 @@ let open: Array<{ leave(): Promise<unknown> }> = [];
 
 async function boot(): Promise<ServerAddress> {
 	running = await startTestServer({ gameId: "team-2", config, rooms });
-	configureMatchmaking();
 	return { http: running.url, ws: running.url.replace("http", "ws") };
 }
 
@@ -119,21 +119,26 @@ describe("team-2 rooms on the platform host", () => {
 		expect(host.state.players.size).toBe(1);
 	});
 
-	it("lobby → game room: the lobby departs, the host's game room code reaches the crew", async () => {
+	it("creates a private lobby and lets a friend join it using its room code", async () => {
 		const server = await boot();
-		const join = async (name: string, teamSize: number): Promise<Room<any, LobbyView>> => {
-			const room = await new Client(server.ws).joinOrCreate<LobbyView>(LOBBY_ROOM_NAME, { name, teamSize });
-			room.onMessage("match-started", () => {});
-			room.onMessage(GAME_ROOM_MESSAGE, () => {});
-			open.push(room);
-			return room;
-		};
-		const hostLobby = await join("Ada", 2);
-		// A different crew size gets its own lobby instead of being refused by this one.
-		const otherLobby = await join("Cy", 3);
+		await expect(new Client(server.ws).joinById<LobbyView>("unknown-room-code", { name: "Eli" }))
+			.rejects.toThrow(/not found/i);
+		const hostLobby = await new Client(server.ws).create<LobbyView>(LOBBY_ROOM_NAME, { name: "Ada", teamSize: 2 });
+		const otherLobby = await new Client(server.ws).create<LobbyView>(LOBBY_ROOM_NAME, { name: "Cy", teamSize: 3 });
+		open.push(hostLobby, otherLobby);
+		hostLobby.onMessage("match-started", () => {});
+		hostLobby.onMessage(GAME_ROOM_MESSAGE, () => {});
+		otherLobby.onMessage("match-started", () => {});
+		otherLobby.onMessage(GAME_ROOM_MESSAGE, () => {});
 		expect(otherLobby.roomId).not.toBe(hostLobby.roomId);
+		await waitFor(() => Boolean(hostLobby.state.roomCode) && Boolean(otherLobby.state.roomCode));
+		expect(hostLobby.state.roomCode).toBe(hostLobby.roomId);
+		expect(otherLobby.state.roomCode).toBe(otherLobby.roomId);
 
-		const guestLobby = await join("Bo", 2);
+		const guestLobby = await new Client(server.ws).joinById<LobbyView>(hostLobby.state.roomCode, { name: "Bo" });
+		open.push(guestLobby);
+		guestLobby.onMessage("match-started", () => {});
+		guestLobby.onMessage(GAME_ROOM_MESSAGE, () => {});
 		expect(guestLobby.roomId).toBe(hostLobby.roomId);
 		let received = "";
 		guestLobby.onMessage(GAME_ROOM_MESSAGE, (message: GameRoomMessage) => {
@@ -142,6 +147,9 @@ describe("team-2 rooms on the platform host", () => {
 		// A full crew departs at once.
 		await waitFor(() => hostLobby.state.status === "running" && guestLobby.state.status === "running");
 		expect(hostLobby.state.hostSessionId).toBe(hostLobby.sessionId);
+		expect(hostLobby.state.playerCount).toBe(2);
+		await expect(new Client(server.ws).joinById<LobbyView>(hostLobby.roomId, { name: "Dee" }))
+			.rejects.toThrow(/locked/i);
 
 		// Only the host may announce the game room.
 		guestLobby.send(GAME_ROOM_MESSAGE, { code: "FAKE" });

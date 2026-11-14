@@ -35,7 +35,7 @@ export function createCourseWarning(container: HTMLElement) {
       const view = courseWarningView(state);
       panel.hidden = view === null;
       if (!view) return;
-      const text = view.holdNow ? "HOLD Space / E at the steering console now!" : "Course hazard ahead — get to the steering console!";
+      const text = view.holdNow ? "Sharp curve ahead: HOLD Space / E at the brake lever now!" : "Sharp curve ahead — get to the brake lever!";
       if (instruction.textContent !== text) instruction.textContent = text;
       countdown.textContent = `${view.seconds} seconds remaining · hold through the final ${COURSE_HOLD_WINDOW_SECONDS} seconds to avoid ${COURSE_HULL_DAMAGE} hull damage`;
       progress.value = view.progress;

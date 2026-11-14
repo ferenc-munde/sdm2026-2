@@ -14,7 +14,8 @@
 // carAt() returns null in a doorway on purpose: a player crossing a door is still on
 // the train. Movement (#7) uses the walls, not carAt(), so doorways never block anyone.
 
-import { CAR_COUNT, PLAYER_RADIUS } from "../constants.ts";
+import { CAR_COUNT, INTERACT_RANGE, PLAYER_RADIUS } from "../constants.ts";
+import type { HazardSpot } from "../run/director.ts";
 import type { ItemKind, Station, StationKind, Vec2 } from "../types.ts";
 
 /** Length of one car along the train. */
@@ -52,12 +53,8 @@ export interface DoorLayout extends FloorBox {
   toCar: number;
 }
 
-/** A place where the hazard director may start a breach or fire (matches HazardSpot in run/director.ts). */
-export interface HazardSpotLayout {
-  id: string;
-  car: number;
-  position: Vec2;
-}
+/** A place where the hazard director may start a breach or fire: the director's own type (#316). */
+export type HazardSpotLayout = HazardSpot;
 
 /** Where an item lies when a run starts. */
 export interface ItemSpawn {
@@ -80,14 +77,19 @@ export interface TrainMap {
 /** The id of the hazard spot on the engine. A fire here stalls the train. */
 export const ENGINE_SPOT_ID = "engine";
 
-/** Stations every map must have. */
-export const REQUIRED_STATIONS: readonly StationKind[] = [
+/** Stations every map must have: every StationKind (#316). */
+export const REQUIRED_STATIONS = [
   "engine",
   "coalDispenser",
   "wrenchRack",
   "extinguisherRack",
   "steeringConsole",
-];
+] as const satisfies readonly StationKind[];
+
+/** Fails to compile when a StationKind is added to the contract but not listed above. */
+type UnlistedStation = Exclude<StationKind, (typeof REQUIRED_STATIONS)[number]>;
+const everyStationListed: [UnlistedStation] extends [never] ? true : UnlistedStation = true;
+void everyStationListed;
 
 /** Centre of a car along the train. */
 export function carCentreX(index: number): number {
@@ -237,6 +239,14 @@ export function validateMap(map: TrainMap): string[] {
     if (!map.stations.some((station) => station.kind === kind)) problems.push(`station ${kind} is missing`);
   }
   for (const station of map.stations) checkPlace(`station ${station.kind}`, station.car, station.position);
+  map.stations.forEach((station, i) => {
+    if (map.walls.some((wall) => insideBox(wall, station.position))) problems.push(`station ${station.kind} is inside a wall`);
+    // Standing at one station must not reach another, or one key press could use either.
+    map.stations.slice(i + 1).forEach((other) => {
+      const apart = Math.hypot(station.position.x - other.position.x, station.position.y - other.position.y);
+      if (apart <= INTERACT_RANGE) problems.push(`stations ${station.kind} and ${other.kind} are within reach of each other`);
+    });
+  });
 
   const spotIds = new Set<string>();
   for (const spot of map.hazardSpots) {

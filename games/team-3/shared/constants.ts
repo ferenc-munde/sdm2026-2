@@ -71,6 +71,11 @@ export const COURSE_HULL_DAMAGE = 12; // from #28
 export const COURSE_IMPULSE_SPEED = 450; // idea document §3
 export const COURSE_STUN_SECONDS = 1.5; // idea document §3
 
+// --- Dash (#228): Shift or F with empty hands ---
+export const DASH_SPEED = 480; // units per second, 3 × walking
+export const DASH_SECONDS = 0.2; // a dash covers DASH_SPEED × DASH_SECONDS = 96 units
+export const DASH_COOLDOWN_SECONDS = 1.5; // from the start of one dash to the next
+
 // --- Throwing (stretch, #29) ---
 // A throw flies THROW_SPEED² / (2 × THROW_FRICTION) = 200 units, about half a car, so coal
 // thrown near a door lands in the next car. Tune in the play-test (#27).

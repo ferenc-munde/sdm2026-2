@@ -6,6 +6,7 @@ import {
 	gameRoomMessageSchema,
 	isTeamSize,
 	LOBBY_COUNTDOWN_SECONDS,
+	lobbyCreateOptionsSchema,
 	lobbyJoinOptionsSchema,
 	removeLobbyPlayer,
 	startLobby,
@@ -13,28 +14,27 @@ import {
 	type LobbyState,
 } from "../shared/lobby.ts";
 
-type CreateOptions = { teamSize?: unknown };
-
 export class TrainLobbyRoom extends Room<{ state: LobbyState }> {
 	maxClients = 4;
 	private countdownTask?: { clear: () => void };
 	private countdownStartedAt = 0;
 	private matchAnnounced = false;
 
-	onCreate(options: CreateOptions): void {
-		if (!isTeamSize(options.teamSize)) {
+	onCreate(options: unknown): void {
+		const parsed = lobbyCreateOptionsSchema.safeParse(options);
+		if (!parsed.success || !isTeamSize(parsed.data.teamSize)) {
 			throw new Error("Choose a team size of 2, 3, or 4 players.");
 		}
-		this.maxClients = options.teamSize;
+		this.maxClients = parsed.data.teamSize;
 		this.autoDispose = true;
-		this.setState(createLobbyState(options.teamSize));
+		this.setState(createLobbyState(parsed.data.teamSize, this.roomId));
 		this.onMessage("start-now", (client) => this.requestStartNow(client));
 		this.onMessage(GAME_ROOM_MESSAGE, (client, message) => this.shareGameRoom(client, message));
 	}
 
 	onAuth(_client: Client, options: unknown): LobbyJoinOptions | false {
 		const parsed = lobbyJoinOptionsSchema.safeParse(options);
-		if (!parsed.success || parsed.data.teamSize !== this.state.teamSize) return false;
+		if (!parsed.success) return false;
 		if (this.state.status !== "waiting" || this.state.playerCount >= this.state.teamSize) return false;
 		return parsed.data;
 	}
