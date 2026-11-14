@@ -1,14 +1,9 @@
 import * as THREE from "three";
 import { MAP_HEIGHT, MAP_WIDTH, PLAYER_RADIUS } from "../shared/map.ts";
+import type { Item, Player } from "../shared/state.ts";
+import { createPlayerVisuals } from "./player-visuals";
+import { createItemVisuals } from "./item-visuals";
 import { TRAIN_CARS, TRAIN_PASSAGES } from "./train-map";
-
-/** What the scene needs to draw one crew member; positions are map units (shared/map.ts). */
-export interface ScenePlayer {
-  id: string;
-  x: number;
-  y: number;
-  eliminated?: boolean;
-}
 
 /** One colour per seat, in the order players joined (same order as the lobby avatars). */
 export const PLAYER_COLORS = ["#62cdd3", "#e46c63", "#e0bc4e", "#6f9bea"] as const;
@@ -117,17 +112,14 @@ export function createTrainScene(container: HTMLElement) {
   landscapeMesh.position.z = -0.1;
   backgroundScene.add(landscapeMesh);
   scene.add(new THREE.Mesh(geometry, material));
-  // One disc per player, created and removed as the players map changes.
-  const playerGeometry = new THREE.CircleGeometry(PLAYER_RADIUS, 24);
-  const outlineGeometry = new THREE.CircleGeometry(PLAYER_RADIUS + 3, 24);
-  const outlineMaterial = new THREE.MeshBasicMaterial({ color: "#10161a" });
-  const selfOutlineMaterial = new THREE.MeshBasicMaterial({ color: "#ffffff" });
-  const playerMarkers = new Map<string, { group: THREE.Group; outline: THREE.Mesh; material: THREE.MeshBasicMaterial }>();
-  function removeMarker(id: string) {
-    const marker = playerMarkers.get(id);
-    if (!marker) return;
-    scene.remove(marker.group); marker.material.dispose(); playerMarkers.delete(id);
-  }
+  // Layers for player and item visuals, added to the scene so the modules
+  // can manage their own children without touching the rest of the scene graph.
+  const playerLayer = new THREE.Group();
+  const itemLayer = new THREE.Group();
+  scene.add(playerLayer);
+  scene.add(itemLayer);
+  const playerVisuals = createPlayerVisuals(playerLayer);
+  const itemVisuals = createItemVisuals(itemLayer, (id) => playerVisuals.getCarryAnchor(id));
   const renderer = new THREE.WebGLRenderer({ antialias: false });
   renderer.autoClear = false;
   renderer.domElement.setAttribute("aria-label", "2D top-down train with five carriages and forest tracks");
@@ -191,38 +183,20 @@ export function createTrainScene(container: HTMLElement) {
     /** Visual multiplier, not a gameplay speed formula. Zero stops the scenery. */
     setSpeed(value: number) { speed = Number.isFinite(value) ? Math.max(0, value) : 0; },
     setPaused(value: boolean) { paused = value; },
-    /** Draw the crew: adds a marker for a new player, moves existing ones, removes those who left. */
-    setPlayers(players: Iterable<ScenePlayer>, localId?: string) {
-      const seen = new Set<string>();
-      let seat = 0;
-      for (const player of players) {
-        seen.add(player.id);
-        let marker = playerMarkers.get(player.id);
-        if (!marker) {
-          const material = new THREE.MeshBasicMaterial({ color: PLAYER_COLORS[seat % PLAYER_COLORS.length], transparent: true });
-          const outline = new THREE.Mesh(outlineGeometry, outlineMaterial);
-          const disc = new THREE.Mesh(playerGeometry, material);
-          disc.position.z = 0.1;
-          const group = new THREE.Group();
-          group.add(outline, disc);
-          marker = { group, outline, material };
-          playerMarkers.set(player.id, marker);
-          scene.add(group);
-        }
-        // Map units have y pointing down from the top-left corner; the camera looks at the map centre.
-        marker.group.position.set(player.x - MAP_WIDTH / 2, MAP_HEIGHT / 2 - player.y, 0.2);
-        marker.outline.material = player.id === localId ? selfOutlineMaterial : outlineMaterial;
-        marker.material.opacity = player.eliminated ? 0.35 : 1;
-        seat += 1;
-      }
-      for (const id of [...playerMarkers.keys()]) if (!seen.has(id)) removeMarker(id);
+    /** Draw the crew from the game state, delegated to the player-visuals module. */
+    setPlayers(players: Iterable<[string, Player]>, localId?: string) {
+      playerVisuals.update(players, localId);
+    },
+    /** Draw items from the game state, delegated to the item-visuals module. */
+    setItems(items: Iterable<[string, Item]>) {
+      itemVisuals.update(items);
     },
     destroy() {
     renderer.setAnimationLoop(null);
     viewportObserver.disconnect();
     hudObserver.disconnect();
-    for (const id of [...playerMarkers.keys()]) removeMarker(id);
-    playerGeometry.dispose(); outlineGeometry.dispose(); outlineMaterial.dispose(); selfOutlineMaterial.dispose();
+    playerVisuals.destroy();
+    itemVisuals.destroy();
     window.removeEventListener("resize", resize); geometry.dispose(); material.dispose();
     landscapeTexture.dispose(); landscapeMaterial.dispose();
     texture.dispose(); renderer.dispose(); renderer.domElement.remove();

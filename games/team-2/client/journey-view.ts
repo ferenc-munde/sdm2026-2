@@ -9,12 +9,12 @@ export function journeyView(values: HudJourney) {
   const seconds = Math.ceil(remaining);
   const required = total > 0 ? 1 - remaining / total : 0;
   return {
-    distance, required,
+    distance,
     urgent: values.phase === "running" && remaining <= 120,
     distanceText: `${(distance * 100).toFixed(1)}% travelled · ${((1 - distance) * 100).toFixed(1)}% left`,
     timeText: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`,
     // SPEC: normalized route distance advances by speed * dt; no invented km/h.
-    speedText: `${(nonnegative(values.speed ?? 0) * 100).toFixed(2)}% route/s`,
+    speedText: `${(nonnegative(values.speed ?? 0) * 100).toFixed(2)}% /s`,
     behind: values.phase === "running" && distance + 0.000001 < required,
   };
 }

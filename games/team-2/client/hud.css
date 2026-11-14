@@ -10,7 +10,7 @@
   border-radius: 10px;
 }
 .train-topbar {
-  position: fixed; z-index: 10; top: 16px; left: 20px; right: 20px;
+  position: fixed; z-index: 10; top: 16px; left: 80px; right: 20px;
   max-width: 1240px; margin: 0 auto; padding: 14px 20px;
   display: grid; grid-template-columns: minmax(0, 1fr) 130px 220px; gap: 24px;
   min-height: 96px;
@@ -73,7 +73,7 @@
   .journey-stats { gap: 12px; }
 }
 @media (max-width: 740px) {
-  .train-topbar { top: 8px; left: 8px; right: 8px; grid-template-columns: minmax(0, 1fr) 100px; gap: 10px; }
+  .train-topbar { top: 8px; left: 74px; right: 8px; grid-template-columns: minmax(0, 1fr) 100px; gap: 10px; }
   .train-journey { grid-template-columns: minmax(0, 1fr) auto; row-gap: 3px; }
   .journey-heading { font-size: 12px; }
   .journey-stats { grid-column: 2; grid-row: 1 / 3; }

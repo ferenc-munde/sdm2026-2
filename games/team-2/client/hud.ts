@@ -1,4 +1,6 @@
 import { journeyView } from "./journey-view";
+// Only the latest HUD may own the global safe-area value.
+let hudOffsetOwner: symbol | undefined;
 
 export interface HudTask {
   id: string;
@@ -107,8 +109,13 @@ export function createHud(container: HTMLElement) {
   result.hidden = true;
   container.append(topbar, result);
   // Reserve actual HUD height so the first carriage never sits behind it.
+  const offsetOwner = Symbol("hud-safe-area");
+  hudOffsetOwner = offsetOwner;
+  let lastSafeTop: string | undefined;
   const resizeObserver = new ResizeObserver(() => {
-    document.documentElement.style.setProperty("--hud-safe-top", `${Math.ceil(topbar.getBoundingClientRect().bottom + 12)}px`);
+    if (hudOffsetOwner !== offsetOwner) return;
+    lastSafeTop = `${Math.ceil(topbar.getBoundingClientRect().bottom + 12)}px`;
+    document.documentElement.style.setProperty("--hud-safe-top", lastSafeTop);
   });
   resizeObserver.observe(topbar);
 
@@ -119,7 +126,7 @@ export function createHud(container: HTMLElement) {
       journeyDistance.textContent = `${Math.round((1 - view.distance) * 100)}% to destination`;
       timeValue.textContent = view.timeText;
       timeMetric.classList.toggle("is-urgent", view.urgent);
-      speedValue.textContent = view.speedText.replace("% route/s", "% /s");
+      speedValue.textContent = view.speedText;
       speedValue.title = "Percent of the route travelled per second";
       train.style.left = `${view.distance * 100}%`;
       track.setAttribute("aria-valuenow", String(view.distance * 100));
@@ -162,7 +169,12 @@ export function createHud(container: HTMLElement) {
     },
     destroy() {
       resizeObserver.disconnect();
-      document.documentElement.style.removeProperty("--hud-safe-top");
+      if (hudOffsetOwner === offsetOwner) {
+        if (document.documentElement.style.getPropertyValue("--hud-safe-top") === lastSafeTop) {
+          document.documentElement.style.removeProperty("--hud-safe-top");
+        }
+        hudOffsetOwner = undefined;
+      }
       panel.remove();
       topbar.remove();
       result.remove();

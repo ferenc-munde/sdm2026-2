@@ -4,6 +4,7 @@ Documentation for the platform, next to [../ARCHITECTURE.md](../ARCHITECTURE.md)
 
 Written so far:
 
+- [`DEPLOYING_A_GAME.md`](DEPLOYING_A_GAME.md): how a deployed game runs, the rule every client follows to find its server (never assume port 2567), where each game stands and the checklist before deploying.
 - [`LOBBY_AND_JOIN.md`](LOBBY_AND_JOIN.md): how creating a room, joining by code, invite links and reconnecting worked on the previous hackathon's platform; the design to follow here.
 
 Planned documents (written by the platform team as the parts are built):
